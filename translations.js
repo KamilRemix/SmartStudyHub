@@ -1,0 +1,62 @@
+const translations = {
+    en: {
+        calculator: "Calculator",
+        fractionCalculator: "Fraction Calculator",
+        grades: "Grades",
+        settings: "Settings",
+        averageScore: "Average Score",
+        clear: "Clear",
+        light: "Light",
+        dark: "Dark",
+        theme: "Theme",
+        language: "Language",
+        whole: "whole",
+        numerator: "num",
+        denominator: "den"
+    },
+    ru: {
+        calculator: "Калькулятор",
+        fractionCalculator: "Калькулятор дробей",
+        grades: "Средний балл",
+        settings: "Настройки",
+        averageScore: "Средний балл",
+        clear: "Очистить",
+        light: "Светлая",
+        dark: "Темная",
+        theme: "Тема",
+        language: "Язык",
+        whole: "целое",
+        numerator: "чис",
+        denominator: "знам"
+    },
+    uk: {
+        calculator: "Калькулятор",
+        fractionCalculator: "Калькулятор дробів",
+        grades: "Середній бал",
+        settings: "Налаштування",
+        averageScore: "Середній бал",
+        clear: "Очистити",
+        light: "Світла",
+        dark: "Темна",
+        theme: "Тема",
+        language: "Мова",
+        whole: "ціле",
+        numerator: "чис",
+        denominator: "знам"
+    },
+    kk: {
+        calculator: "Калькулятор",
+        fractionCalculator: "Бөлшек калькуляторы",
+        grades: "Орташа балл",
+        settings: "Параметрлер",
+        averageScore: "Орташа балл",
+        clear: "Тазалау",
+        light: "Жарық",
+        dark: "Қараңғы",
+        theme: "Тақырып",
+        language: "Тіл",
+        whole: "бүтін",
+        numerator: "алым",
+        denominator: "бөлім"
+    }
+};
