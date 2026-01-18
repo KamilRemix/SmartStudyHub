@@ -32,7 +32,7 @@ body.dark-theme {
     --shadow-color-lift: rgba(0, 0, 0, 0.3);
 }
 
-/* ========= GENERAL STYLES ========= */
+/* ========= GENERAL STYLES (UPDATED) ========= */
 body {
     font-family: var(--font-family);
     background-color: var(--background-color);
@@ -40,6 +40,12 @@ body {
     margin: 0;
     padding: 0;
     transition: background-color 0.4s, color 0.4s;
+    
+    /* Центрирование контента для монитора твоего HP */
+    display: flex;
+    flex-direction: column;
+    align-items: center; 
+    min-height: 100vh;
 }
 
 body.dark-theme {
@@ -47,26 +53,30 @@ body.dark-theme {
 }
 
 main {
-    padding: 3rem;
+    padding: 1.5rem; 
     padding-bottom: 120px;
-    max-width: 1200px;
+    width: 100%; 
+    max-width: 500px; 
+    box-sizing: border-box; 
     margin: 0 auto;
 }
 
+/* Обновленный футер: теперь он не будет съезжать */
 footer {
     position: fixed;
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    width: clamp(300px, 50%, 500px);
+    width: 90%; 
+    max-width: 450px; 
     background-color: color-mix(in srgb, var(--component-background) 80%, transparent);
     backdrop-filter: blur(12px);
     border: 1px solid color-mix(in srgb, var(--primary-accent) 50%, transparent);
     border-radius: 50px;
     box-shadow: 0 5px 25px var(--shadow-color-deep);
     transition: all 0.3s ease;
+    z-index: 1000;
 }
-
 footer:hover {
     box-shadow: 0 8px 35px var(--shadow-color-deep), 0 0 40px var(--glow-color-primary);
 }
