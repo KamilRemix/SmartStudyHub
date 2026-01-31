@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartStudyHub</title>
+    
+    <link rel="icon" type="image/png" href="favicon.png">
+
+
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <!-- Firebase Scripts (Compat Version) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyCBX64ItDxwK_coTZGmmIrujDKQzUCckjI",
+        authDomain: "smartstudyhub-46d44.firebaseapp.com",
+        databaseURL: "https://smartstudyhub-46d44-default-rtdb.firebaseio.com",
+        projectId: "smartstudyhub-46d44",
+        storageBucket: "smartstudyhub-46d44.appspot.com",
+        messagingSenderId: "545571047137",
+        appId: "1:545571047137:web:fe3442d477094f8b5559a0",
+        measurementId: "G-ZVV9MYERVP"
+      };
+      
+      // Initialize Firebase
+      firebase.initializeApp(firebaseConfig);
+
+      // Make firebase services available globally
+      window.firebaseAuth = firebase.auth();
+    </script>
+</head>
+<body>
+    <main>
+        <div id="calculator-page" class="page active">
+            <smart-calculator></smart-calculator>
+        </div>
+        <div id="grades-page" class="page">
+            <grade-average-calculator></grade-average-calculator>
+        </div>
+        <div id="settings-page" class="page">
+            <settings-component></settings-component>
+        </div>
+    </main>
+
+    <footer>
+        <nav>
+            <button id="calculator-tab" class="nav-tab active">
+                <i data-feather="cpu"></i>
+                <span class="nav-label" data-i18n="calculator">Калькулятор</span>
+            </button>
+            <button id="grades-tab" class="nav-tab">
+                <i data-feather="bar-chart-2"></i>
+                <span class="nav-label" data-i18n="grades">Средний балл</span>
+            </button>
+            <button id="settings-tab" class="nav-tab">
+                <i data-feather="settings"></i>
+                <span class="nav-label" data-i18n="settings">Настройки</span>
+            </button>
+        </nav>
+    </footer>
+    
+    <script src="translations.js"></script>
+    <script src="main.js"></script>
+    <script>
+      feather.replace();
+    </script>
+</body>
+</html>
