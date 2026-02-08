@@ -211,8 +211,8 @@ class SettingsComponent extends HTMLElement {
                 
                 /* Language Dropdown Button */
                 .language-button {
-                    background: var(--background-color);
-                    border: 1px solid var(--primary-accent);
+                    background: var(--component-background);
+                    border: 1px solid color-mix(in srgb, var(--primary-accent) 60%, transparent);
                     border-radius: 12px;
                     padding: 1rem;
                     display: flex;
@@ -225,12 +225,11 @@ class SettingsComponent extends HTMLElement {
                     font-size: 1rem;
                     font-weight: 600;
                     color: var(--text-color);
-                    border: none;
-                    background: none;
                     outline: none;
+                    box-shadow: 0 6px 16px var(--shadow-color-lift);
                 }
                 .language-button:hover { 
-                    background-color: var(--shadow-color-lift); 
+                    background-color: color-mix(in srgb, var(--component-background) 80%, var(--background-color)); 
                     transform: translateY(-2px);
                     box-shadow: 0 4px 15px var(--glow-color-primary);
                 }
@@ -249,7 +248,7 @@ class SettingsComponent extends HTMLElement {
                     top: 100%;
                     left: 0;
                     width: 100%;
-                    background-color: var(--component-background);
+                    background: color-mix(in srgb, var(--component-background) 70%, var(--background-color));
                     border-radius: 12px;
                     box-shadow: 0 8px 20px var(--shadow-color-deep);
                     backdrop-filter: blur(10px);
@@ -264,6 +263,7 @@ class SettingsComponent extends HTMLElement {
                     margin-top: 0.5rem; /* Space between button and menu */
                     list-style: none;
                     margin: 0;
+                    border: 1px solid color-mix(in srgb, var(--primary-accent) 60%, transparent);
                 }
                 .language-dropdown-menu.open {
                     opacity: 1;
@@ -290,11 +290,16 @@ class SettingsComponent extends HTMLElement {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
+                    border: 1px solid transparent;
                 }
-                .language-list-item:hover { background-color: var(--background-color); }
+                .language-list-item:hover { 
+                    background-color: color-mix(in srgb, var(--background-color) 85%, var(--primary-accent));
+                    border-color: color-mix(in srgb, var(--primary-accent) 60%, transparent);
+                }
                 .language-list-item.active {
                     background-color: var(--primary-accent);
                     color: white;
+                    border-color: color-mix(in srgb, var(--primary-accent) 80%, white);
                 }
                 .language-list-item.active .check-mark {
                     display: block;
@@ -477,7 +482,11 @@ class SettingsComponent extends HTMLElement {
     }
     
     _toggleLangMenu(forceState) {
-        this.langList.classList.toggle('open', forceState);
+        const isOpen = typeof forceState === 'boolean'
+            ? forceState
+            : !this.langList.classList.contains('open');
+        this.langList.classList.toggle('open', isOpen);
+        this.langSelector.classList.toggle('open', isOpen);
     }
 
     populateLanguageList() {
