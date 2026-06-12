@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartStudyHub</title>
+    
+    <link rel="icon" type="image/png" href="favicon.png">
+
+
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <!-- Firebase Scripts (Compat Version) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyCBX64ItDxwK_coTZGmmIrujDKQzUCckjI",
+        authDomain: "smartstudyhub-46d44.firebaseapp.com",
+        databaseURL: "https://smartstudyhub-46d44-default-rtdb.firebaseio.com",
+        projectId: "smartstudyhub-46d44",
+        storageBucket: "smartstudyhub-46d44.appspot.com",
+        messagingSenderId: "545571047137",
+        appId: "1:545571047137:web:fe3442d477094f8b5559a0",
+        measurementId: "G-ZVV9MYERVP"
+      };
+      
+      // Initialize Firebase
+      firebase.initializeApp(firebaseConfig);
+    // expose config for modular Firebase modules
+    window.firebaseConfig = firebaseConfig;
+
+      // Make firebase services available globally
+      window.firebaseAuth = firebase.auth();
+    </script>
+</head>
+<body>
+    <header class="app-titlebar" id="app-titlebar" role="banner">
+        <span class="app-titlebar-title">SmartStudyHub</span>
+        <div class="app-titlebar-controls">
+            <button type="button" class="titlebar-btn titlebar-minimize" aria-label="Minimize">
+                <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><rect width="10" height="1"/></svg>
+            </button>
+            <button type="button" class="titlebar-btn titlebar-maximize" aria-label="Maximize">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="0.5" y="0.5" width="9" height="9" rx="0.5"/></svg>
+            </button>
+            <button type="button" class="titlebar-btn titlebar-close" aria-label="Close">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1 1l8 8M9 1L1 9"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <div id="calculator-page" class="page active">
+            <smart-calculator></smart-calculator>
+        </div>
+        <div id="grades-page" class="page">
+            <grade-average-calculator></grade-average-calculator>
+        </div>
+        <div id="settings-page" class="page">
+            <settings-component></settings-component>
+        </div>
+    </main>
+
+    <footer>
+        <nav>
+            <button id="calculator-tab" class="nav-tab active">
+                <i data-feather="cpu"></i>
+                <span class="nav-label" data-i18n="calculator">Калькулятор</span>
+            </button>
+            <button id="grades-tab" class="nav-tab">
+                <i data-feather="bar-chart-2"></i>
+                <span class="nav-label" data-i18n="grades">Средний балл</span>
+            </button>
+            <button id="settings-tab" class="nav-tab">
+                <i data-feather="settings"></i>
+                <span class="nav-label" data-i18n="settings">Настройки</span>
+            </button>
+        </nav>
+    </footer>
+
+    <div id="app-toast-container" class="app-toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Connect accounts -->
+    <div id="account-link-modal" class="app-dialog-modal account-link-modal" aria-hidden="true">
+        <div class="account-link-modal-content" role="dialog" aria-modal="true" aria-labelledby="account-link-modal-title">
+            <button type="button" class="account-link-modal-close" data-dialog-close="account-link" aria-label="Close">×</button>
+            <h2 id="account-link-modal-title" class="account-link-modal-title"></h2>
+            <div id="account-link-flow" class="auth-flow-diagram" aria-hidden="true"></div>
+            <p id="account-link-message" class="account-link-message-primary"></p>
+            <div class="account-link-modal-actions">
+                <button type="button" id="account-link-confirm-btn" class="account-link-btn account-link-btn-primary auth-action-btn"></button>
+                <button type="button" id="account-link-cancel-btn" class="account-link-btn account-link-btn-secondary auth-action-btn"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account already has its own grades -->
+    <div id="account-conflict-modal" class="app-dialog-modal account-conflict-modal" aria-hidden="true">
+        <div class="account-link-modal-content account-conflict-modal-content" role="dialog" aria-modal="true" aria-labelledby="account-conflict-modal-title">
+            <button type="button" class="account-link-modal-close" data-dialog-close="account-conflict" aria-label="Close">×</button>
+            <h2 id="account-conflict-modal-title" class="account-link-modal-title"></h2>
+            <div id="account-conflict-flow" class="auth-flow-diagram auth-flow-diagram--conflict" aria-hidden="true"></div>
+            <p id="account-conflict-message" class="account-link-message-primary"></p>
+            <div class="account-link-modal-actions">
+                <button type="button" id="account-conflict-switch-btn" class="account-link-btn account-link-btn-primary auth-action-btn"></button>
+                <button type="button" id="account-conflict-cancel-btn" class="account-link-btn account-link-btn-secondary auth-action-btn"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic auth / link error -->
+    <div id="account-error-modal" class="app-dialog-modal account-error-modal" aria-hidden="true">
+        <div class="account-link-modal-content account-error-modal-content" role="dialog" aria-modal="true" aria-labelledby="account-error-modal-title">
+            <button type="button" class="account-link-modal-close" data-dialog-close="account-error" aria-label="Close">×</button>
+            <h2 id="account-error-modal-title" class="account-link-modal-title"></h2>
+            <p id="account-error-message" class="account-link-message-primary"></p>
+            <div class="account-link-modal-actions">
+                <button type="button" id="account-error-ok-btn" class="account-link-btn account-link-btn-primary auth-action-btn"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Desktop app download modal -->
+    <div id="desktop-app-modal" class="download-modal" aria-hidden="true">
+        <div class="download-modal-content" role="dialog" aria-modal="true" aria-labelledby="desktop-app-title">
+            <button class="desktop-modal-close" type="button" data-close aria-label="Close">
+                ×
+            </button>
+            <div class="download-modal-header">
+                <div class="desktop-windows-logo" aria-hidden="true">
+                    <svg viewBox="0 0 48 48">
+                        <path d="M4 6L22 3.5V23H4V6Z" />
+                        <path d="M26 3L44 0.5V23H26V3Z" />
+                        <path d="M4 25H22V44.5L4 42V25Z" />
+                        <path d="M26 25H44V47.5L26 45V25Z" />
+                    </svg>
+                </div>
+                <div class="desktop-modal-title-block">
+                    <span class="desktop-modal-tag" data-i18n="desktopAppTag">Desktop app</span>
+                    <h2 id="desktop-app-title" data-i18n="desktopAppTitle">SmartStudyHub for Windows</h2>
+                    <p class="desktop-modal-desc" data-i18n="desktopAppDescription">
+                        Use SmartStudyHub as a fast native app on your Windows PC.
+                    </p>
+                </div>
+            </div>
+
+            <div class="desktop-modal-meta">
+                <div class="desktop-modal-version-row">
+                    <span id="desktop-version-label" class="desktop-version-label" data-i18n="versionLabel">Version</span>
+                    <span id="desktop-app-version" class="desktop-version-value">1.0.0</span>
+                </div>
+                <div class="desktop-modal-lang-row">
+                    <label for="desktop-lang-select" data-i18n="language">Language</label>
+                    <select id="desktop-lang-select"></select>
+                </div>
+            </div>
+
+            <div class="desktop-modal-changelog">
+                <h3 data-i18n="changelogTitle">Changelog</h3>
+                <ul>
+                    <li data-i18n="changelogItem1">New optimized layout for desktop screens.</li>
+                    <li data-i18n="changelogItem2">Improved offline-ready grade storage.</li>
+                    <li data-i18n="changelogItem3">Bug fixes and performance improvements.</li>
+                </ul>
+            </div>
+
+            <a id="desktop-app-download-btn"
+               class="desktop-modal-download-btn"
+               href="#"
+               target="_blank"
+               rel="noopener"
+               data-i18n="downloadExe">
+                Download .EXE
+            </a>
+
+            <p class="desktop-modal-note" data-i18n="desktopLangHint">
+                All text here changes when you switch language.
+            </p>
+        </div>
+    </div>
+    
+    <!-- Yandex login removed -->
+    <script src="translations.js"></script>
+    <script src="renderer.js"></script>
+    <script>
+      feather.replace();
+    </script>
+</body>
+</html>

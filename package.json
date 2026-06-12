@@ -1,0 +1,21 @@
+{
+  "name": "smartstudyhub",
+  "version": "1.0.0",
+  "description": "SmartStudyHub desktop app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --portable"
+  },
+  "build": {
+    "appId": "com.kamil.smartstudy",
+    "productName": "SmartStudyHub",
+    "win": {
+      "target": "portable"
+    }
+  },
+  "devDependencies": {
+    "electron": "^40.6.0",
+    "electron-builder": "^26.7.0"
+  }
+}

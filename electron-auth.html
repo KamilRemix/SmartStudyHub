@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in — SmartStudyHub</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #121212; color: #e0e0e0; }
+    .card { background: #1e1e1e; padding: 2rem; border-radius: 12px; text-align: center; max-width: 360px; border: 1px solid rgba(0, 255, 255, 0.35); box-shadow: 0 0 24px rgba(0, 255, 255, 0.15); }
+    h1 { margin: 0 0 1rem; font-size: 1.25rem; text-shadow: 0 0 10px rgba(0, 255, 255, 0.35); }
+    p { margin: 0 0 1.5rem; color: #a0a0a0; font-size: 0.9rem; }
+    button { width: 100%; color: #fff; border: none; padding: 12px 24px; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    button.google { background: #4285f4; }
+    button.google:hover { background: #3367d6; transform: translateY(-1px); }
+    button.github {
+      margin-top: 10px;
+      background: linear-gradient(135deg, rgba(0, 255, 255, 0.18) 0%, rgba(148, 0, 211, 0.22) 100%);
+      border: 1px solid rgba(0, 255, 255, 0.55);
+      box-shadow: 0 0 14px rgba(0, 255, 255, 0.25);
+    }
+    button.github:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 22px rgba(0, 255, 255, 0.4);
+    }
+    .status { margin-top: 1rem; font-size: 0.85rem; color: #00c853; }
+    .error { color: #ff5252; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>SmartStudyHub</h1>
+    <p id="auth-desc">Sign in to link your account to the desktop app.</p>
+    <button id="signin-btn" class="google" type="button">Sign in with Google</button>
+    <button id="github-signin-btn" class="github" type="button" hidden>Sign in with GitHub</button>
+    <div id="status" class="status"></div>
+  </div>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCBX64ItDxwK_coTZGmmIrujDKQzUCckjI",
+      authDomain: "smartstudyhub-46d44.firebaseapp.com",
+      databaseURL: "https://smartstudyhub-46d44-default-rtdb.firebaseio.com",
+      projectId: "smartstudyhub-46d44",
+      storageBucket: "smartstudyhub-46d44.appspot.com",
+      messagingSenderId: "545571047137",
+      appId: "1:545571047137:web:fe3442d477094f8b5559a0",
+      measurementId: "G-ZVV9MYERVP"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    const DEEP_LINK = 'smartstudyhub://auth';
+    const params = new URLSearchParams(window.location.search);
+    const requestedProvider = (params.get('provider') || 'google').toLowerCase();
+    const isGithub = requestedProvider === 'github';
+
+    const statusEl = document.getElementById('status');
+    const btn = document.getElementById('signin-btn');
+    const githubBtn = document.getElementById('github-signin-btn');
+    const descEl = document.getElementById('auth-desc');
+
+    if (isGithub) {
+      btn.hidden = true;
+      githubBtn.hidden = false;
+      descEl.textContent = 'Sign in with GitHub to link your account to the desktop app.';
+    } else {
+      descEl.textContent = 'Sign in with Google to link your account to the desktop app.';
+    }
+
+    function setStatus(msg, isError) {
+      statusEl.textContent = msg;
+      statusEl.className = 'status' + (isError ? ' error' : '');
+    }
+
+    function openInApp(token, provider) {
+      const url = DEEP_LINK
+        + '?token=' + encodeURIComponent(token)
+        + '&provider=' + encodeURIComponent(provider);
+      window.location.href = url;
+      setStatus('Opening SmartStudyHub app… You can close this tab.');
+    }
+
+    function tokenFromResult(result, provider) {
+      const cred = result.credential;
+      if (provider === 'github' && cred && cred.accessToken) {
+        return Promise.resolve({ token: cred.accessToken, provider: 'github' });
+      }
+      if (cred && cred.idToken) {
+        return Promise.resolve({ token: cred.idToken, provider: 'google' });
+      }
+      return result.user.getIdToken().then((token) => ({ token, provider }));
+    }
+
+    function runSignIn(providerName) {
+      setStatus('Signing in…');
+      const activeBtn = providerName === 'github' ? githubBtn : btn;
+      activeBtn.disabled = true;
+      btn.disabled = true;
+      githubBtn.disabled = true;
+
+      const provider = providerName === 'github'
+        ? new firebase.auth.GithubAuthProvider()
+        : new firebase.auth.GoogleAuthProvider();
+
+      firebase.auth().signInWithPopup(provider)
+        .then((result) => tokenFromResult(result, providerName))
+        .then(({ token, provider }) => {
+          setStatus('Success! Opening app…');
+          openInApp(token, provider);
+        })
+        .catch((err) => {
+          setStatus(err.message || 'Sign-in failed.', true);
+          btn.disabled = false;
+          githubBtn.disabled = false;
+        });
+    }
+
+    btn.addEventListener('click', () => runSignIn('google'));
+    githubBtn.addEventListener('click', () => runSignIn('github'));
+
+    if (isGithub) {
+      runSignIn('github');
+    }
+  </script>
+</body>
+</html>
