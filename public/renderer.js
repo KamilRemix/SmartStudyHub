@@ -289,7 +289,10 @@ function showToast(message, type = 'info', durationMs = 3000) {
     const toast = document.createElement('div');
     toast.className = `app-toast app-toast--${type}`;
     toast.setAttribute('role', 'status');
-    toast.textContent = message;
+    toast.innerHTML = `
+        <span class="app-toast-icon" aria-hidden="true">${type === 'success' ? '✓' : type === 'error' ? '!' : type === 'warning' ? '!' : 'i'}</span>
+        <span class="app-toast-message">${message}</span>
+    `;
     container.appendChild(toast);
 
     requestAnimationFrame(() => {
@@ -752,7 +755,18 @@ function setTheme(theme) {
 }
 
 // --- LANGUAGE & TRANSLATION ---
-let currentLang = 'ru'; // Default language
+let currentLang = 'en'; // Default language
+
+function getInitialUserLanguage() {
+    const savedLang = localStorage.getItem('language');
+    if (savedLang && translations[savedLang]) {
+        return savedLang;
+    }
+
+    const browserLang = navigator.language || navigator.userLanguage || 'en';
+    const normalizedLang = String(browserLang).toLowerCase().split(/[-_]/)[0];
+    return translations[normalizedLang] ? normalizedLang : 'en';
+}
 
 // Desktop app modal helpers are defined later; declare here so we can safely call them
 function syncDesktopDownloadLangSelector() {
@@ -796,6 +810,38 @@ function updateTranslations() {
     if (gradeAvgCalc && gradeAvgCalc.updateStrategy) {
         gradeAvgCalc.updateStrategy();
     }
+    // Update Tools specific texts (select options, buttons, badges)
+    try { updateToolsTranslations(); } catch (e) { /* non-fatal */ }
+}
+
+function updateToolsTranslations() {
+    // converter type options
+    const convType = document.getElementById('conv-type');
+    if (convType) {
+        const map = { length: 'length', mass: 'mass', temp: 'temperature' };
+        Array.from(convType.options).forEach(opt => {
+            const key = map[opt.value] || opt.value;
+            opt.textContent = translations[currentLang][key] || opt.textContent;
+        });
+    }
+    const refreshBtn = document.getElementById('currency-refresh');
+    if (refreshBtn) {
+        refreshBtn.textContent = translations[currentLang]['refresh'] || refreshBtn.textContent;
+    }
+    // badges (offline texts)
+    document.querySelectorAll('.tool-card').forEach(card => {
+        const badge = card.querySelector('.card-badge');
+        if (badge) {
+            // by default clear
+            if (!navigator.onLine) {
+                badge.classList.add('card-badge--offline');
+                badge.textContent = translations[currentLang]['offline'] || 'Offline';
+            } else {
+                badge.classList.remove('card-badge--offline');
+                badge.textContent = '';
+            }
+        }
+    });
 }
 
 // --- DESKTOP APP DOWNLOAD MODAL ---
@@ -879,6 +925,165 @@ function closeDesktopDownloadModal() {
 
 /* ========= WEB COMPONENTS ========= */
 
+// --- TOOLS Initialization (tiles: Settings, Unit Converter, Currency) ---
+function initTools() {
+    if (window.toolsInitialized) return;
+    window.toolsInitialized = true;
+
+    // Unit converter setup
+    const convType = document.getElementById('conv-type');
+    const convFrom = document.getElementById('conv-from');
+    const convTo = document.getElementById('conv-to');
+    const convValue = document.getElementById('conv-value');
+    const convResult = document.getElementById('conv-result');
+
+    function populateUnits() {
+        if (!convType || !convFrom || !convTo) return;
+        const type = convType.value;
+        convFrom.innerHTML = '';
+        convTo.innerHTML = '';
+        let opts = [];
+        if (type === 'length') opts = [{v:'m',t:'m'}, {v:'ft',t:'ft'}];
+        else if (type === 'mass') opts = [{v:'kg',t:'kg'}, {v:'lb',t:'lb'}];
+        else if (type === 'temp') opts = [{v:'c',t:'°C'}, {v:'f',t:'°F'}];
+        opts.forEach(o => {
+            const a = document.createElement('option'); a.value = o.v; a.textContent = o.t; convFrom.appendChild(a);
+            const b = document.createElement('option'); b.value = o.v; b.textContent = o.t; convTo.appendChild(b);
+        });
+    }
+
+    function doConvert() {
+        if (!convValue || !convFrom || !convTo || !convResult) return;
+        const v = parseFloat(convValue.value) || 0;
+        const from = convFrom.value;
+        const to = convTo.value;
+        let out = v;
+        if (from === to) out = v;
+        // length
+        if (from === 'm' && to === 'ft') out = v * 3.28084;
+        if (from === 'ft' && to === 'm') out = v / 3.28084;
+        // mass
+        if (from === 'kg' && to === 'lb') out = v * 2.20462;
+        if (from === 'lb' && to === 'kg') out = v / 2.20462;
+        // temp
+        if (from === 'c' && to === 'f') out = (v * 9/5) + 32;
+        if (from === 'f' && to === 'c') out = (v - 32) * 5/9;
+
+        convResult.textContent = out === null ? '' : out.toLocaleString(undefined, {maximumFractionDigits:4});
+    }
+
+    if (convType) convType.addEventListener('change', () => { populateUnits(); doConvert(); });
+    if (convFrom) convFrom.addEventListener('change', doConvert);
+    if (convTo) convTo.addEventListener('change', doConvert);
+    if (convValue) convValue.addEventListener('input', doConvert);
+    populateUnits(); doConvert();
+
+    // Currency card
+    const currencyCard = document.getElementById('currency-card');
+    const currencyRatesEl = document.getElementById('currency-rates');
+    const currencyMsg = document.getElementById('currency-message');
+    const currencyBtn = document.getElementById('currency-refresh');
+
+    function showCurrencyMessage(text, isError = false) {
+        if (!currencyMsg) return;
+        currencyMsg.textContent = text;
+        currencyMsg.classList.toggle('card-message--error', isError);
+    }
+
+    async function loadCurrency() {
+        if (!currencyRatesEl) return;
+        currencyRatesEl.innerHTML = '';
+        showCurrencyMessage('');
+        
+        try {
+            const res = await fetch('https://api.frankfurter.app/latest?from=USD');
+            if (!res.ok) throw new Error('Network response not ok');
+            const data = await res.json();
+            const rates = data.rates || {};
+            const base = data.base || 'USD';
+            
+            // Create currency rates display
+            const list = document.createElement('div');
+            list.innerHTML = `<div class="currency-base">Base: ${base} — ${data.date || ''}</div>`;
+            const ul = document.createElement('ul');
+            ul.style.listStyle='none'; ul.style.padding='0';
+            Object.keys(rates).slice(0,10).forEach(k => {
+                const li = document.createElement('li');
+                li.textContent = `${k}: ${rates[k].toFixed(2)}`;
+                ul.appendChild(li);
+            });
+            currencyRatesEl.appendChild(list); 
+            currencyRatesEl.appendChild(ul);
+        } catch (e) {
+            console.error('Failed to load currency rates:', e);
+            // Create beautiful glassmorphism error block
+            const errorBlock = document.createElement('div');
+            errorBlock.className = 'currency-error-block';
+            errorBlock.innerHTML = `
+                <div class="currency-error-icon">⚠️</div>
+                <div class="currency-error-text">
+                    ${translations[currentLang]?.currencyOffline || 'Не удалось обновить курсы валют. Проверьте подключение.'}
+                </div>
+                <button class="currency-error-btn" id="currency-refresh-from-error">
+                    ${translations[currentLang]?.refresh || 'Обновить'}
+                </button>
+            `;
+            currencyRatesEl.appendChild(errorBlock);
+            
+            // Add event listener to refresh button
+            const refreshBtn = errorBlock.querySelector('#currency-refresh-from-error');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', loadCurrency);
+            }
+        }
+    }
+
+    if (currencyBtn) currencyBtn.addEventListener('click', loadCurrency);
+    loadCurrency();
+
+    // react to online/offline to update badges
+    window.addEventListener('online', () => {
+        updateToolsTranslations();
+        loadCurrency();
+    });
+    window.addEventListener('offline', () => {
+        updateToolsTranslations();
+    });
+
+    // Hub <-> Panel navigation
+    const toolsHub = document.getElementById('tools-hub');
+    const panelSettings = document.getElementById('tools-settings-panel');
+    const panelConverter = document.getElementById('tools-converter-panel');
+    const panelCurrency = document.getElementById('tools-currency-panel');
+
+    function showHub() {
+        if (toolsHub) toolsHub.classList.remove('hidden');
+        [panelSettings, panelConverter, panelCurrency].forEach(p => p && p.classList.add('hidden'));
+        updateToolsTranslations();
+    }
+
+    function openPanel(name) {
+        if (toolsHub) toolsHub.classList.add('hidden');
+        if (name === 'settings' && panelSettings) panelSettings.classList.remove('hidden');
+        if (name === 'converter' && panelConverter) panelConverter.classList.remove('hidden');
+        if (name === 'currency' && panelCurrency) panelCurrency.classList.remove('hidden');
+        updateToolsTranslations();
+        // trigger currency load when opening currency panel
+        if (name === 'currency') loadCurrency();
+        // ensure conversion recalculation
+        if (name === 'converter') doConvert && doConvert();
+    }
+
+    document.getElementById('tile-settings')?.addEventListener('click', () => openPanel('settings'));
+    document.getElementById('tile-converter')?.addEventListener('click', () => openPanel('converter'));
+    document.getElementById('tile-currency')?.addEventListener('click', () => openPanel('currency'));
+
+    document.querySelectorAll('.panel-back').forEach(btn => btn.addEventListener('click', () => showHub()));
+
+    // start with hub visible
+    showHub();
+}
+
 // --- 1. SETTINGS COMPONENT ---
 class SettingsComponent extends HTMLElement {
     constructor() {
@@ -890,7 +1095,7 @@ class SettingsComponent extends HTMLElement {
     renderComponent() {
         this.shadowRoot.innerHTML = `
             <style>
-                .settings-container { max-width: 500px; margin: 0 auto; background: var(--component-background); border-radius: 20px; padding: 2.5rem; box-shadow: 0 10px 30px var(--shadow-color-deep); border: 1px solid var(--primary-accent); }
+                .settings-container { max-width: 500px; margin: 0 auto; padding: 2.5rem; }
                 .setting-section { margin-bottom: 2.5rem; }
                 .setting-section:last-child { margin-bottom: 0; }
                 h3 { margin: 0 0 1.5rem 0; font-size: 1.5rem; font-weight: 700; color: var(--text-color); border-bottom: 2px solid var(--primary-accent); padding-bottom: 1rem; text-shadow: 0 0 5px var(--glow-color-primary); }
@@ -953,11 +1158,26 @@ class SettingsComponent extends HTMLElement {
                     list-style: none;
                     margin: 0;
                     border: 1px solid color-mix(in srgb, var(--primary-accent) 60%, transparent);
+                    max-height: 220px;
+                    overflow-y: auto;
+                    overscroll-behavior: contain;
                 }
                 .language-dropdown-menu.open {
                     opacity: 1;
                     visibility: visible;
                     transform: translateY(0);
+                }
+                .language-dropdown-menu::-webkit-scrollbar {
+                    width: 8px;
+                }
+                .language-dropdown-menu::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .language-dropdown-menu::-webkit-scrollbar-thumb {
+                    background: color-mix(in srgb, var(--primary-accent) 55%, rgba(0,0,0,0.18));
+                    border-radius: 999px;
+                    border: 2px solid transparent;
+                    background-clip: content-box;
                 }
                 .language-bottom-sheet h3 {
                     margin: 0 0 1.5rem 0;
@@ -968,7 +1188,22 @@ class SettingsComponent extends HTMLElement {
                     padding: 0;
                     margin: 0;
                     overflow-y: auto;
+                    max-height: 220px;
                     flex-grow: 1;
+                    scrollbar-width: thin;
+                    scrollbar-color: color-mix(in srgb, var(--primary-accent) 55%, rgba(0,0,0,0.18)) transparent;
+                }
+                .language-list::-webkit-scrollbar {
+                    width: 8px;
+                }
+                .language-list::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .language-list::-webkit-scrollbar-thumb {
+                    background: color-mix(in srgb, var(--primary-accent) 55%, rgba(0,0,0,0.18));
+                    border-radius: 999px;
+                    border: 2px solid transparent;
+                    background-clip: content-box;
                 }
                 .language-list-item {
                     padding: 1.2rem 1rem;
@@ -2369,7 +2604,7 @@ class GradeAverageCalculator extends HTMLElement {
                     if (!isNaN(t5) && !isNaN(t4) && !isNaN(t3)) {
                         this.thresholds['5-point'] = { 5: t5, 4: t4, 3: t3 };
                         this.saveToDatabase();
-                        alert('✅ Пороги сохранены!');
+                        showToast(t('thresholdsSaved'), 'success', 2800);
                         this.updateStrategy();
                     }
                 } else { // us-letter
@@ -2381,7 +2616,7 @@ class GradeAverageCalculator extends HTMLElement {
                     if (!isNaN(tA) && !isNaN(tB) && !isNaN(tC) && !isNaN(tD)) {
                         this.thresholds['us-letter'] = { A: tA, B: tB, C: tC, D: tD, F: 0 };
                         this.saveToDatabase();
-                        alert('✅ Thresholds Saved!');
+                        showToast(t('thresholdsSaved'), 'success', 2800);
                         this.updateStrategy();
                     }
                 }
@@ -2914,9 +3149,9 @@ customElements.define('grade-average-calculator', GradeAverageCalculator);
 // --- MAIN APP INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     const savedTheme = localStorage.getItem('theme') || 'dark';
-    const savedLang = localStorage.getItem('language') || 'ru';
+    const initialLang = getInitialUserLanguage();
     setTheme(savedTheme);
-    setLanguage(savedLang);
+    setLanguage(initialLang);
 
     initDesktopDownloadModal();
     initAuthDialogs();
@@ -2956,7 +3191,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const tabs = document.querySelectorAll('.nav-tab');
     const pages = document.querySelectorAll('.page');
-    const tabMap = { 'calculator-tab': 'calculator-page', 'grades-tab': 'grades-page', 'settings-tab': 'settings-page' };
+    const tabMap = { 'calculator-tab': 'calculator-page', 'grades-tab': 'grades-page', 'tools-tab': 'tools-page' };
 
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -2965,6 +3200,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const pageId = tabMap[tab.id];
             pages.forEach(p => p.classList.remove('active'));
             document.getElementById(pageId).classList.add('active');
+            if (pageId === 'tools-page') {
+                // initialize tools UI when opened
+                try { initTools(); } catch (e) { console.warn('initTools failed', e); }
+            }
         });
     });
 

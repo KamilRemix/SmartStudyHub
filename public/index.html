@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SmartStudyHub</title>
     
     <link rel="icon" type="image/png" href="favicon.png">
@@ -64,8 +64,85 @@
         <div id="grades-page" class="page">
             <grade-average-calculator></grade-average-calculator>
         </div>
-        <div id="settings-page" class="page">
-            <settings-component></settings-component>
+        <div id="tools-page" class="page">
+            <div class="tools-page-content">
+                <!-- HUB: show only tiles by default -->
+                <div id="tools-hub" class="tools-hub">
+                    <button class="tool-tile" id="tile-settings" aria-label="Settings">
+                        <div class="tile-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 0l4.24-4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08 0l4.24 4.24"/>
+                            </svg>
+                        </div>
+                        <div class="tile-title" data-i18n="settings">Settings</div>
+                    </button>
+
+                    <button class="tool-tile" id="tile-converter" aria-label="Unit Converter">
+                        <div class="tile-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/><polyline points="5 12 12 5 19 12"/>
+                            </svg>
+                        </div>
+                        <div class="tile-title" data-i18n="unitConverter">Unit Converter</div>
+                    </button>
+
+                    <button class="tool-tile" id="tile-currency" aria-label="Currency Rates">
+                        <div class="tile-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/><path d="M12 6v12M9 9h6a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-6"/>
+                            </svg>
+                        </div>
+                        <div class="tile-title" data-i18n="currencyRates">Currency Rates</div>
+                    </button>
+                </div>
+
+                <!-- Panels: hidden by default -->
+                <section id="tools-settings-panel" class="tool-panel hidden">
+                    <div class="panel-header">
+                        <button class="panel-back" data-panel="settings">← <span data-i18n="back">Back</span></button>
+                    </div>
+                    <div class="panel-body">
+                        <settings-component></settings-component>
+                    </div>
+                </section>
+
+                <section id="tools-converter-panel" class="tool-panel hidden">
+                    <div class="panel-header">
+                        <button class="panel-back" data-panel="converter">← <span data-i18n="back">Back</span></button>
+                        <div class="panel-title" data-i18n="unitConverter">Unit Converter</div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="converter">
+                            <div class="converter-row">
+                                <input class="form-control" type="number" id="conv-value" value="1" inputmode="decimal" />
+                            </div>
+                            <div class="converter-row">
+                                <select class="form-control" id="conv-type">
+                                    <option value="length" data-i18n="length">Length</option>
+                                    <option value="mass" data-i18n="mass">Mass</option>
+                                    <option value="temp" data-i18n="temperature">Temperature</option>
+                                </select>
+                                <select class="form-control" id="conv-from"></select>
+                                <select class="form-control" id="conv-to"></select>
+                            </div>
+                            <div class="converter-result" id="conv-result"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tools-currency-panel" class="tool-panel hidden">
+                    <div class="panel-header">
+                        <button class="panel-back" data-panel="currency">← <span data-i18n="back">Back</span></button>
+                        <div class="panel-title" data-i18n="currencyRates">Currency Rates</div>
+                    </div>
+                    <div class="panel-body">
+                        <div id="currency-message" class="card-message"></div>
+                        <div id="currency-rates" class="currency-rates"></div>
+                        <div style="margin-top:8px"><button id="currency-refresh" class="btn btn-secondary" data-i18n="refresh">Refresh</button></div>
+                    </div>
+                </section>
+
+            </div>
         </div>
     </main>
 
@@ -79,9 +156,9 @@
                 <i data-feather="bar-chart-2"></i>
                 <span class="nav-label" data-i18n="grades">Средний балл</span>
             </button>
-            <button id="settings-tab" class="nav-tab">
-                <i data-feather="settings"></i>
-                <span class="nav-label" data-i18n="settings">Настройки</span>
+            <button id="tools-tab" class="nav-tab">
+                <i data-feather="grid"></i>
+                <span class="nav-label" data-i18n="tools">Tools</span>
             </button>
         </nav>
     </footer>
