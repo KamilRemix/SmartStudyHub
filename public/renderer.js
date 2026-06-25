@@ -62,15 +62,37 @@ async function syncUserProfileFromProviders(user, oauthProfile) {
     }
 }
 
+const tabMap = {
+    'calculator-tab': 'calculator-page',
+    'grades-tab': 'grades-page',
+    'tools-tab': 'tools-page'
+};
+
+function switchToTab(tabId) {
+    const pageId = tabMap[tabId];
+    if (!pageId) return;
+
+    document.querySelectorAll('.nav-tab').forEach((t) => t.classList.remove('active'));
+    const tab = document.getElementById(tabId);
+    if (tab) tab.classList.add('active');
+
+    document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
+    const targetPage = document.getElementById(pageId);
+    if (targetPage) targetPage.classList.add('active');
+
+    if (pageId === 'tools-page') {
+        try { initTools(); } catch (e) { console.warn('initTools failed', e); }
+    }
+}
+
 function switchToGradesTab() {
-    const tabs = document.querySelectorAll('.nav-tab');
-    const pages = document.querySelectorAll('.page');
-    tabs.forEach((t) => t.classList.remove('active'));
-    const gradesTab = document.getElementById('grades-tab');
-    if (gradesTab) gradesTab.classList.add('active');
-    pages.forEach((p) => p.classList.remove('active'));
-    const gradesPage = document.getElementById('grades-page');
-    if (gradesPage) gradesPage.classList.add('active');
+    switchToTab('grades-tab');
+}
+
+function initTabNavigation() {
+    document.querySelectorAll('.nav-tab').forEach((tab) => {
+        tab.addEventListener('click', () => switchToTab(tab.id));
+    });
 }
 
 function loadGradesForCurrentUser(retryCount = 0) {
@@ -282,6 +304,147 @@ function setDialogOpen(modalId, isOpen) {
     document.body.classList.toggle('app-dialog-open', Boolean(anyOpen));
 }
 
+let genericDialogResolver = null;
+
+function getGenericDialogElements() {
+    return {
+        modal: document.getElementById('app-generic-modal'),
+        title: document.getElementById('app-generic-modal-title'),
+        body: document.getElementById('app-generic-modal-body'),
+        input: document.getElementById('app-generic-modal-input'),
+        accept: document.getElementById('app-generic-modal-accept'),
+        cancel: document.getElementById('app-generic-modal-cancel'),
+    };
+}
+
+function closeAppGenericModal(result = false) {
+    const { modal } = getGenericDialogElements();
+    if (!modal || !modal.classList.contains('open')) return;
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+    const anyOpen = document.querySelector('.app-dialog-modal.open');
+    document.body.classList.toggle('app-dialog-open', Boolean(anyOpen));
+    if (genericDialogResolver) {
+        genericDialogResolver(result);
+        genericDialogResolver = null;
+    }
+}
+
+function openAppDialog({
+    title = '',
+    message = '',
+    showInput = false,
+    placeholder = '',
+    inputValue = '',
+    acceptLabel = t('accountErrorOk') || 'OK',
+    cancelLabel = t('cancel') || 'Cancel',
+    showCancel = false,
+    acceptValue = true,
+    cancelValue = false,
+}) {
+    const { modal, title: titleEl, body, input, accept, cancel } = getGenericDialogElements();
+    if (!modal || !titleEl || !body || !accept || !cancel) {
+        return Promise.resolve(false);
+    }
+
+    titleEl.textContent = title;
+    body.textContent = message;
+
+    if (showInput && input) {
+        input.style.display = 'block';
+        input.value = inputValue;
+        input.placeholder = placeholder;
+        setTimeout(() => {
+            input.focus();
+            input.select();
+        }, 0);
+    } else if (input) {
+        input.style.display = 'none';
+        input.value = '';
+    }
+
+    accept.textContent = acceptLabel;
+    cancel.textContent = cancelLabel;
+    cancel.style.display = showCancel ? 'inline-flex' : 'none';
+
+    const cleanup = () => {
+        accept.onclick = null;
+        cancel.onclick = null;
+        if (input) {
+            input.onkeydown = null;
+        }
+    };
+
+    genericDialogResolver = null;
+    return new Promise((resolve) => {
+        genericDialogResolver = resolve;
+
+        accept.onclick = () => {
+            const value = showInput && input ? input.value : acceptValue;
+            cleanup();
+            closeAppGenericModal(value);
+        };
+
+        cancel.onclick = () => {
+            cleanup();
+            closeAppGenericModal(cancelValue);
+        };
+
+        if (input) {
+            input.onkeydown = (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    accept.click();
+                } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    cancel.click();
+                }
+            };
+        }
+
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('app-dialog-open');
+    });
+}
+
+function showAppAlert(message, title = t('accountErrorModalTitle') || 'Notice') {
+    return openAppDialog({
+        title,
+        message,
+        showInput: false,
+        showCancel: false,
+        acceptLabel: t('accountErrorOk') || 'OK',
+    });
+}
+
+function showAppConfirm(message, title = t('accountConflictModalTitle') || 'Confirm', confirmLabel = t('apply') || 'OK') {
+    return openAppDialog({
+        title,
+        message,
+        showInput: false,
+        showCancel: true,
+        acceptLabel: confirmLabel,
+        cancelLabel: t('cancel') || 'Cancel',
+        acceptValue: true,
+        cancelValue: false,
+    });
+}
+
+function showAppPrompt(message, title = t('simulateGrade') || 'Input', placeholder = '') {
+    return openAppDialog({
+        title,
+        message,
+        showInput: true,
+        placeholder,
+        showCancel: true,
+        acceptLabel: t('apply') || 'Apply',
+        cancelLabel: t('cancel') || 'Cancel',
+        acceptValue: null,
+        cancelValue: null,
+    });
+};
+
 function showToast(message, type = 'info', durationMs = 3000) {
     const container = document.getElementById('app-toast-container');
     if (!container || !message) return;
@@ -396,6 +559,10 @@ function closeAccountErrorModal() {
 }
 
 function closeTopAuthDialog() {
+    if (document.getElementById('app-generic-modal')?.classList.contains('open')) {
+        closeAppGenericModal(false);
+        return;
+    }
     if (document.getElementById('account-error-modal')?.classList.contains('open')) {
         closeAccountErrorModal();
         return;
@@ -623,6 +790,7 @@ function initAuthDialogs() {
             if (target === 'account-link') closeAccountLinkModal();
             else if (target === 'account-conflict') closeAccountConflictModal();
             else if (target === 'account-error') closeAccountErrorModal();
+            else if (target === 'app-generic') closeAppGenericModal(false);
         });
     });
 
@@ -824,9 +992,32 @@ function updateToolsTranslations() {
             opt.textContent = translations[currentLang][key] || opt.textContent;
         });
     }
+    // placeholder for input and result label
+    const convValueEl = document.getElementById('conv-value');
+    if (convValueEl) {
+        convValueEl.placeholder = translations[currentLang]['valuePlaceholder'] || '';
+    }
+    const resultLabel = document.querySelector('#tools-converter-panel .result-label');
+    if (resultLabel) resultLabel.textContent = translations[currentLang]['result'] || resultLabel.textContent;
     const refreshBtn = document.getElementById('currency-refresh');
     if (refreshBtn) {
         refreshBtn.textContent = translations[currentLang]['refresh'] || refreshBtn.textContent;
+    }
+    const aiTileTitle = document.querySelector('#tile-ai .tile-title');
+    if (aiTileTitle) {
+        aiTileTitle.textContent = translations[currentLang]['aiAssistant'] || aiTileTitle.textContent;
+    }
+    const aiInput = document.getElementById('ai-chat-input');
+    if (aiInput) {
+        aiInput.placeholder = translations[currentLang]['aiInputPlaceholder'] || aiInput.placeholder;
+    }
+    const aiOfflineText = document.querySelector('.ai-offline-text');
+    if (aiOfflineText) {
+        aiOfflineText.textContent = translations[currentLang]['aiOfflineMessage'] || aiOfflineText.textContent;
+    }
+    const aiRetryBtn = document.getElementById('ai-offline-retry');
+    if (aiRetryBtn) {
+        aiRetryBtn.textContent = translations[currentLang]['aiRetry'] || aiRetryBtn.textContent;
     }
     // badges (offline texts)
     document.querySelectorAll('.tool-card').forEach(card => {
@@ -943,9 +1134,14 @@ function initTools() {
         convFrom.innerHTML = '';
         convTo.innerHTML = '';
         let opts = [];
-        if (type === 'length') opts = [{v:'m',t:'m'}, {v:'ft',t:'ft'}];
-        else if (type === 'mass') opts = [{v:'kg',t:'kg'}, {v:'lb',t:'lb'}];
-        else if (type === 'temp') opts = [{v:'c',t:'°C'}, {v:'f',t:'°F'}];
+        if (type === 'length') opts = [
+            {v:'km',t:'km'}, {v:'m',t:'m'}, {v:'cm',t:'cm'}, {v:'mm',t:'mm'},
+            {v:'mi',t:'mi'}, {v:'yd',t:'yd'}, {v:'ft',t:'ft'}, {v:'in',t:'in'}
+        ];
+        else if (type === 'mass') opts = [
+            {v:'t',t:'t'}, {v:'kg',t:'kg'}, {v:'g',t:'g'}, {v:'mg',t:'mg'}, {v:'lb',t:'lb'}, {v:'oz',t:'oz'}
+        ];
+        else if (type === 'temp') opts = [ {v:'c',t:'°C'}, {v:'f',t:'°F'}, {v:'k',t:'K'} ];
         opts.forEach(o => {
             const a = document.createElement('option'); a.value = o.v; a.textContent = o.t; convFrom.appendChild(a);
             const b = document.createElement('option'); b.value = o.v; b.textContent = o.t; convTo.appendChild(b);
@@ -957,17 +1153,32 @@ function initTools() {
         const v = parseFloat(convValue.value) || 0;
         const from = convFrom.value;
         const to = convTo.value;
+        const type = convType ? convType.value : 'length';
         let out = v;
         if (from === to) out = v;
-        // length
-        if (from === 'm' && to === 'ft') out = v * 3.28084;
-        if (from === 'ft' && to === 'm') out = v / 3.28084;
-        // mass
-        if (from === 'kg' && to === 'lb') out = v * 2.20462;
-        if (from === 'lb' && to === 'kg') out = v / 2.20462;
-        // temp
-        if (from === 'c' && to === 'f') out = (v * 9/5) + 32;
-        if (from === 'f' && to === 'c') out = (v - 32) * 5/9;
+        // length: convert everything to meters then to target
+        const toMeters = {
+            km: 1000, m:1, cm:0.01, mm:0.001, mi:1609.344, yd:0.9144, ft:0.3048, in:0.0254
+        };
+        const fromMeters = toMeters;
+        if (type === 'length' && toMeters[from] && toMeters[to]) {
+            out = v * (toMeters[from] / toMeters[to]);
+        }
+        // mass: convert via kilograms
+        const toKg = { t:1000, kg:1, g:0.001, mg:0.000001, lb:0.45359237, oz:0.028349523125 };
+        if (type === 'mass' && toKg[from] && toKg[to]) {
+            out = v * (toKg[from] / toKg[to]);
+        }
+        // temperature conversions
+        if (type === 'temp') {
+            if (from === to) out = v;
+            else if (from === 'c' && to === 'f') out = (v * 9/5) + 32;
+            else if (from === 'f' && to === 'c') out = (v - 32) * 5/9;
+            else if (from === 'c' && to === 'k') out = v + 273.15;
+            else if (from === 'k' && to === 'c') out = v - 273.15;
+            else if (from === 'f' && to === 'k') out = (v - 32) * 5/9 + 273.15;
+            else if (from === 'k' && to === 'f') out = (v - 273.15) * 9/5 + 32;
+        }
 
         convResult.textContent = out === null ? '' : out.toLocaleString(undefined, {maximumFractionDigits:4});
     }
@@ -1055,18 +1266,29 @@ function initTools() {
     const panelSettings = document.getElementById('tools-settings-panel');
     const panelConverter = document.getElementById('tools-converter-panel');
     const panelCurrency = document.getElementById('tools-currency-panel');
+    const panelAi = document.getElementById('tools-ai-panel');
+
+    let aiAssistantApi = null;
+    if (typeof SmartStudyAI !== 'undefined') {
+        aiAssistantApi = SmartStudyAI.init();
+    }
 
     function showHub() {
         if (toolsHub) toolsHub.classList.remove('hidden');
-        [panelSettings, panelConverter, panelCurrency].forEach(p => p && p.classList.add('hidden'));
+        [panelSettings, panelConverter, panelCurrency, panelAi].forEach(p => p && p.classList.add('hidden'));
         updateToolsTranslations();
     }
 
     function openPanel(name) {
         if (toolsHub) toolsHub.classList.add('hidden');
+        [panelSettings, panelConverter, panelCurrency, panelAi].forEach(p => p && p.classList.add('hidden'));
         if (name === 'settings' && panelSettings) panelSettings.classList.remove('hidden');
         if (name === 'converter' && panelConverter) panelConverter.classList.remove('hidden');
         if (name === 'currency' && panelCurrency) panelCurrency.classList.remove('hidden');
+        if (name === 'ai' && panelAi) {
+            panelAi.classList.remove('hidden');
+            aiAssistantApi?.onPanelOpen?.();
+        }
         updateToolsTranslations();
         // trigger currency load when opening currency panel
         if (name === 'currency') loadCurrency();
@@ -1077,6 +1299,7 @@ function initTools() {
     document.getElementById('tile-settings')?.addEventListener('click', () => openPanel('settings'));
     document.getElementById('tile-converter')?.addEventListener('click', () => openPanel('converter'));
     document.getElementById('tile-currency')?.addEventListener('click', () => openPanel('currency'));
+    document.getElementById('tile-ai')?.addEventListener('click', () => openPanel('ai'));
 
     document.querySelectorAll('.panel-back').forEach(btn => btn.addEventListener('click', () => showHub()));
 
@@ -2517,7 +2740,7 @@ class GradeAverageCalculator extends HTMLElement {
 
                 if (btn.dataset.grade) {
                     if (this.simulatedGrade !== null) {
-                        alert('💡 Нажми "Применить" или "Отмена"');
+                        showAppAlert('💡 Нажми "Применить" или "Отмена"', '');
                         return;
                     }
                     this.addGradeToSubject(this.currentSubject, btn.dataset.grade);
@@ -2557,13 +2780,14 @@ class GradeAverageCalculator extends HTMLElement {
                 if (grades && !isNaN(index) && grades[index]) {
                     const grade = grades[index];
                     const confirmText = (translations[currentLang]['deleteGradeConfirm'] || "Delete grade {grade}?").replace('{grade}', grade);
-                    if (confirm(confirmText)) {
+                    showAppConfirm(confirmText, '').then((confirmed) => {
+                        if (!confirmed) return;
                         grades.splice(index, 1);
                         if (this.currentSubject !== '__QUICK_CALC__') {
                             this.saveToDatabase();
                         }
                         this.update();
-                    }
+                    });
                 }
             }
         });
@@ -2573,7 +2797,7 @@ class GradeAverageCalculator extends HTMLElement {
         if (whatIfBtn) {
             whatIfBtn.addEventListener('click', () => {
                 if (!this.currentSubject) {
-                    alert('⚠️ Выбери предмет!');
+                    showAppAlert('⚠️ Выбери предмет!', '');
                     return;
                 }
                 this.showSimulator();
@@ -2655,9 +2879,12 @@ class GradeAverageCalculator extends HTMLElement {
             
             const deleteBtn = subjectCard.querySelector(`#delete-${subjectName}`);
             deleteBtn.addEventListener('click', () => {
-                if (confirm(`Удалить ${subjectName}?`)) {
-                    this.deleteSubject(subjectName);
-                }
+                const confirmText = `Удалить ${subjectName}?`;
+                showAppConfirm(confirmText, '').then((confirmed) => {
+                    if (confirmed) {
+                        this.deleteSubject(subjectName);
+                    }
+                });
             });
         });
     }
@@ -2691,25 +2918,25 @@ class GradeAverageCalculator extends HTMLElement {
         subjectSelect.value = this.currentSubject;
     }
     
-    showSimulator() {
+    async showSimulator() {
         const promptText = this.gradingSystem === '5-point' 
             ? 'Какую оценку добавить для симуляции? (1-5)'
             : 'Which grade would you like to simulate? (A, B, C, D, F)';
         
-        const gradeInput = prompt(promptText);
-        if (gradeInput === null) return;
+        const gradeInput = await showAppPrompt(promptText, t('simulateGrade') || 'Simulate Grade');
+        if (gradeInput === null || gradeInput === undefined) return;
 
         let grade;
         if (this.gradingSystem === '5-point') {
             grade = parseInt(gradeInput);
             if (isNaN(grade) || grade < 1 || grade > 5) {
-                alert('⚠️ Введи число от 1 до 5');
+                await showAppAlert('⚠️ Введи число от 1 до 5', '');
                 return;
             }
         } else {
             grade = gradeInput.toUpperCase();
             if (!['A', 'B', 'C', 'D', 'F'].includes(grade)) {
-                alert('⚠️ Please enter a valid letter grade (A, B, C, D, or F)');
+                await showAppAlert('⚠️ Please enter a valid letter grade (A, B, C, D, or F)', '');
                 return;
             }
         }
@@ -3145,7 +3372,6 @@ class GradeAverageCalculator extends HTMLElement {
 }
 customElements.define('grade-average-calculator', GradeAverageCalculator);
 
-
 // --- MAIN APP INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -3169,7 +3395,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.electronAPI.onGoogleSigninResult((err, token, provider) => {
             if (err) {
                 console.error('OAuth sign-in (desktop):', err);
-                alert('Sign-in failed: ' + err);
+                openAccountErrorModal('Sign-in failed: ' + err);
                 return;
             }
             if (!token || !firebaseAuth) return;
@@ -3184,30 +3410,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                 .catch((e) => {
                     console.error(e);
-                    alert('Sign-in failed: ' + (e && e.message ? e.message : e));
+                    openAccountErrorModal('Sign-in failed: ' + (e && e.message ? e.message : e));
                 });
         });
     }
 
-    const tabs = document.querySelectorAll('.nav-tab');
-    const pages = document.querySelectorAll('.page');
-    const tabMap = { 'calculator-tab': 'calculator-page', 'grades-tab': 'grades-page', 'tools-tab': 'tools-page' };
-
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            const pageId = tabMap[tab.id];
-            pages.forEach(p => p.classList.remove('active'));
-            document.getElementById(pageId).classList.add('active');
-            if (pageId === 'tools-page') {
-                // initialize tools UI when opened
-                try { initTools(); } catch (e) { console.warn('initTools failed', e); }
-            }
-        });
-    });
+    initTabNavigation();
 
     feather.replace();
     updateTranslations();
 });
-

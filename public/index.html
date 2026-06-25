@@ -70,29 +70,34 @@
                 <div id="tools-hub" class="tools-hub">
                     <button class="tool-tile" id="tile-settings" aria-label="Settings">
                         <div class="tile-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 0l4.24-4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08 0l4.24 4.24"/>
-                            </svg>
+                            <i data-feather="settings"></i>
                         </div>
                         <div class="tile-title" data-i18n="settings">Settings</div>
                     </button>
 
                     <button class="tool-tile" id="tile-converter" aria-label="Unit Converter">
                         <div class="tile-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/><polyline points="5 12 12 5 19 12"/>
-                            </svg>
+                            <i data-feather="sliders"></i>
                         </div>
                         <div class="tile-title" data-i18n="unitConverter">Unit Converter</div>
                     </button>
 
                     <button class="tool-tile" id="tile-currency" aria-label="Currency Rates">
                         <div class="tile-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"/><path d="M12 6v12M9 9h6a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-6"/>
-                            </svg>
+                            <i data-feather="dollar-sign"></i>
                         </div>
                         <div class="tile-title" data-i18n="currencyRates">Currency Rates</div>
+                    </button>
+
+                    <button class="tool-tile tool-tile--ai" id="tile-ai" aria-label="AI Assistant">
+                        <div class="tile-icon tile-icon--ai">
+                            <svg class="ai-tile-spark" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M24 4L26.8 17.2L40 20L26.8 22.8L24 36L21.2 22.8L8 20L21.2 17.2L24 4Z" fill="#007aff"/>
+                                <path d="M36 8L37.2 14.8L44 16L37.2 17.2L36 24L34.8 17.2L28 16L34.8 14.8L36 8Z" fill="#007aff" opacity="0.55"/>
+                                <circle cx="14" cy="32" r="3" fill="#007aff" opacity="0.4"/>
+                            </svg>
+                        </div>
+                        <div class="tile-title" data-i18n="aiAssistant">AI Помощник</div>
                     </button>
                 </div>
 
@@ -112,20 +117,35 @@
                         <div class="panel-title" data-i18n="unitConverter">Unit Converter</div>
                     </div>
                     <div class="panel-body">
-                        <div class="converter">
-                            <div class="converter-row">
-                                <input class="form-control" type="number" id="conv-value" value="1" inputmode="decimal" />
+                        <div class="converter-card">
+                            <div class="converter-header">
+                                <div class="converter-icon"><i data-feather="repeat"></i></div>
+                                <div>
+                                    <div class="converter-title" data-i18n="unitConverter">Unit Converter</div>
+                                    <div class="converter-sub" data-i18n="converterSub">Convert values quickly</div>
+                                </div>
                             </div>
-                            <div class="converter-row">
-                                <select class="form-control" id="conv-type">
-                                    <option value="length" data-i18n="length">Length</option>
-                                    <option value="mass" data-i18n="mass">Mass</option>
-                                    <option value="temp" data-i18n="temperature">Temperature</option>
-                                </select>
-                                <select class="form-control" id="conv-from"></select>
-                                <select class="form-control" id="conv-to"></select>
+
+                            <div class="converter-controls">
+                                <div class="converter-input">
+                                    <input class="conv-display" type="number" id="conv-value" value="1" inputmode="decimal" aria-label="Value" />
+                                </div>
+
+                                <div class="converter-selects">
+                                    <select class="form-control" id="conv-type">
+                                        <option value="length" data-i18n="length">Length</option>
+                                        <option value="mass" data-i18n="mass">Mass</option>
+                                        <option value="temp" data-i18n="temperature">Temperature</option>
+                                    </select>
+                                    <select class="form-control" id="conv-from"></select>
+                                    <select class="form-control" id="conv-to"></select>
+                                </div>
+
+                                <div class="converter-result-card">
+                                    <div class="result-label" data-i18n="result">Result</div>
+                                    <div class="converter-result" id="conv-result">0.0000</div>
+                                </div>
                             </div>
-                            <div class="converter-result" id="conv-result"></div>
                         </div>
                     </div>
                 </section>
@@ -139,6 +159,46 @@
                         <div id="currency-message" class="card-message"></div>
                         <div id="currency-rates" class="currency-rates"></div>
                         <div style="margin-top:8px"><button id="currency-refresh" class="btn btn-secondary" data-i18n="refresh">Refresh</button></div>
+                    </div>
+                </section>
+
+                <section id="tools-ai-panel" class="tool-panel tool-panel--ai hidden" aria-label="SmartStudyAI">
+                    <div class="ai-chat-shell glass-ai">
+                        <header class="ai-chat-header">
+                            <button class="ai-chat-back panel-back" type="button" data-panel="ai">
+                                ← <span data-i18n="back">Back</span>
+                            </button>
+                            <h2 class="ai-chat-title">SmartStudyAI</h2>
+                        </header>
+
+                        <div class="ai-chat-body">
+                            <div id="ai-chat-messages" class="ai-chat-messages" role="log" aria-live="polite"></div>
+
+                            <div id="ai-offline-toast" class="ai-offline-toast hidden" role="alert">
+                                <div class="ai-offline-toast-inner glass-ai">
+                                    <svg class="ai-offline-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                                        <path d="M8 38L40 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                                        <path d="M6 28C10 22 16 18 24 18C28 18 32 19.5 35.5 22" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                                        <path d="M12.5 32C15.5 28.5 19.5 26 24 26C27 26 29.8 27 32.5 28.8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                                        <circle cx="24" cy="36" r="2.5" fill="currentColor"/>
+                                    </svg>
+                                    <p class="ai-offline-text" data-i18n="aiOfflineMessage">Соединение потеряно. Проверьте Wi-Fi или мобильный интернет</p>
+                                    <button type="button" id="ai-offline-retry" class="ai-offline-retry" data-i18n="aiRetry">Повторить попытку</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <footer class="ai-chat-footer">
+                            <div id="ai-limit-notice" class="ai-limit-notice hidden" role="status"></div>
+                            <div class="ai-input-row">
+                                <textarea id="ai-chat-input" class="ai-chat-input" rows="1" data-i18n-placeholder="aiInputPlaceholder" placeholder="Напишите сообщение…" aria-label="Message"></textarea>
+                                <button type="button" id="ai-chat-send" class="ai-send-btn" aria-label="Send">
+                                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                        <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </footer>
                     </div>
                 </section>
 
@@ -205,6 +265,20 @@
         </div>
     </div>
 
+    <!-- Generic app dialog for confirmations, prompts and alerts -->
+    <div id="app-generic-modal" class="app-dialog-modal" aria-hidden="true">
+        <div class="generic-modal-content" role="dialog" aria-modal="true" aria-labelledby="app-generic-modal-title">
+            <button type="button" class="generic-modal-close" data-dialog-close="app-generic" aria-label="Close">×</button>
+            <h2 id="app-generic-modal-title" class="generic-modal-title"></h2>
+            <div id="app-generic-modal-body" class="generic-modal-body"></div>
+            <input id="app-generic-modal-input" class="generic-modal-input" type="text" />
+            <div class="generic-modal-actions">
+                <button type="button" id="app-generic-modal-accept" class="generic-modal-btn generic-modal-btn-primary"></button>
+                <button type="button" id="app-generic-modal-cancel" class="generic-modal-btn generic-modal-btn-secondary"></button>
+            </div>
+        </div>
+    </div>
+
     <!-- Desktop app download modal -->
     <div id="desktop-app-modal" class="download-modal" aria-hidden="true">
         <div class="download-modal-content" role="dialog" aria-modal="true" aria-labelledby="desktop-app-title">
@@ -266,6 +340,7 @@
     
     <!-- Yandex login removed -->
     <script src="translations.js"></script>
+    <script src="ai-assistant.js"></script>
     <script src="renderer.js"></script>
     <script>
       feather.replace();
