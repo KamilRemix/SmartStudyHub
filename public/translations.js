@@ -1302,3 +1302,30 @@ for (const key of Object.keys(__extraLabels)) {
         }
     }
 })();
+// Additional Missing Keys
+(function() {
+    const _back = {"en":"Back","ru":"Назад","uk":"Назад","be":"Назад","kk":"Артқа","es":"Atrás","de":"Zurück","fr":"Retour","zh":"返回","tr":"Geri","ar":"رجوع"};
+    for (const lang of Object.keys(translations)) {
+        if (!translations[lang]['back']) {
+            translations[lang]['back'] = _back[lang] || _back.en;
+        }
+    }
+    const _currencyConverterTitle = {"en":"Currency Converter","ru":"Конвертер Валют","uk":"Конвертер валют","be":"Канвэртар валют","kk":"Валюта конвертері","es":"Convertidor de divisas","de":"Währungsrechner","fr":"Convertisseur de devises","zh":"货币转换器","tr":"Döviz Çevirici","ar":"محول العملات"};
+    for (const lang of Object.keys(translations)) {
+        if (!translations[lang]['currencyConverterTitle']) {
+            translations[lang]['currencyConverterTitle'] = _currencyConverterTitle[lang] || _currencyConverterTitle.en;
+        }
+    }
+    const _currencyConverterSub = {"en":"Exchange Rates","ru":"Курсы обмена","uk":"Курси обміну","be":"Курсы абмену","kk":"Валюта бағамдары","es":"Tipos de cambio","de":"Wechselkurse","fr":"Taux de change","zh":"汇率","tr":"Döviz Kurları","ar":"أسعار الصرف"};
+    for (const lang of Object.keys(translations)) {
+        if (!translations[lang]['currencyConverterSub']) {
+            translations[lang]['currencyConverterSub'] = _currencyConverterSub[lang] || _currencyConverterSub.en;
+        }
+    }
+    const _popularRates = {"en":"Popular Rates","ru":"Популярные курсы","uk":"Популярні курси","be":"Папулярныя курсы","kk":"Танымал бағамдар","es":"Tasas populares","de":"Beliebte Kurse","fr":"Taux populaires","zh":"热门汇率","tr":"Popüler Kurlar","ar":"الأسعار الشائعة"};
+    for (const lang of Object.keys(translations)) {
+        if (!translations[lang]['popularRates']) {
+            translations[lang]['popularRates'] = _popularRates[lang] || _popularRates.en;
+        }
+    }
+})();
