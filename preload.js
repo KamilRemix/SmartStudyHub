@@ -18,8 +18,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   onGoogleSigninResult(callback) {
-    ipcRenderer.on('google-signin-result', (_event, error, token, provider) => {
-      callback(error, token, provider);
+    ipcRenderer.on('google-signin-result', (_event, error, token, provider, googleAccessToken) => {
+      callback(error, token, provider, googleAccessToken);
     });
   },
+
+  getGeminiApiKey() {
+    return ipcRenderer.invoke('get-gemini-key');
+  }
 });

@@ -72,10 +72,13 @@
       statusEl.className = 'status' + (isError ? ' error' : '');
     }
 
-    function openInApp(token, provider) {
-      const url = DEEP_LINK
+    function openInApp(token, provider, googleAccessToken) {
+      let url = DEEP_LINK
         + '?token=' + encodeURIComponent(token)
         + '&provider=' + encodeURIComponent(provider);
+      if (googleAccessToken) {
+        url += '&googleAccessToken=' + encodeURIComponent(googleAccessToken);
+      }
       window.location.href = url;
       setStatus('Opening SmartStudyHub app… You can close this tab.');
     }
@@ -85,8 +88,8 @@
       if (provider === 'github' && cred && cred.accessToken) {
         return Promise.resolve({ token: cred.accessToken, provider: 'github' });
       }
-      if (cred && cred.idToken) {
-        return Promise.resolve({ token: cred.idToken, provider: 'google' });
+      if (provider === 'google' && cred && cred.idToken) {
+        return Promise.resolve({ token: cred.idToken, provider: 'google', googleAccessToken: cred.accessToken });
       }
       return result.user.getIdToken().then((token) => ({ token, provider }));
     }
@@ -102,11 +105,20 @@
         ? new firebase.auth.GithubAuthProvider()
         : new firebase.auth.GoogleAuthProvider();
 
+      if (providerName === 'google') {
+        provider.addScope('https://www.googleapis.com/auth/calendar');
+        provider.addScope('https://www.googleapis.com/auth/tasks');
+        provider.addScope('https://www.googleapis.com/auth/youtube.readonly');
+        provider.addScope('https://www.googleapis.com/auth/gmail.modify');
+        provider.addScope('https://www.googleapis.com/auth/drive.file');
+        provider.addScope('https://www.googleapis.com/auth/documents');
+      }
+
       firebase.auth().signInWithPopup(provider)
         .then((result) => tokenFromResult(result, providerName))
-        .then(({ token, provider }) => {
+        .then(({ token, provider, googleAccessToken }) => {
           setStatus('Success! Opening app…');
-          openInApp(token, provider);
+          openInApp(token, provider, googleAccessToken);
         })
         .catch((err) => {
           setStatus(err.message || 'Sign-in failed.', true);

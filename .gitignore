@@ -1,2 +1,7 @@
+.env
 node_modules/
 .firebase/
+config.json
+dist/
+
+google-credentials.json

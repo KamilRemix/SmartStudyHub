@@ -69,6 +69,7 @@ const tabMap = {
 };
 
 function switchToTab(tabId) {
+    document.body.classList.remove('ai-chat-open');
     const pageId = tabMap[tabId];
     if (!pageId) return;
 
@@ -119,6 +120,10 @@ function loadGradesForCurrentUser(retryCount = 0) {
 
 async function handleSignedInUser(user, signInResult) {
     lastOAuthProfile = signInResult?.additionalUserInfo?.profile || null;
+
+    if (signInResult?.credential && (signInResult.credential.providerId === 'google.com' || signInResult.credential.signInMethod === 'google.com') && signInResult.credential.accessToken) {
+        localStorage.setItem('google_access_token', signInResult.credential.accessToken);
+    }
 
     try {
         await user.reload();
@@ -225,11 +230,23 @@ function createAuthProvider(providerId) {
         provider.addScope('read:user');
         return provider;
     }
-    return new firebase.auth.GoogleAuthProvider();
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/gmail.modify');
+    provider.addScope('https://www.googleapis.com/auth/drive.file');
+    provider.addScope('https://www.googleapis.com/auth/documents');
+    provider.addScope('https://www.googleapis.com/auth/calendar');
+    provider.addScope('https://www.googleapis.com/auth/tasks');
+    provider.addScope('https://www.googleapis.com/auth/youtube.readonly');
+    return provider;
 }
 
 function isIgnorableAuthError(error) {
     return Boolean(error && IGNORABLE_AUTH_ERRORS.includes(error.code));
+}
+
+function materialIcon(name, extraClasses = '') {
+    const classes = ['material-symbols-outlined', extraClasses].filter(Boolean).join(' ');
+    return `<span class="${classes}">${name}</span>`;
 }
 
 function getProviderIconSvg(providerId, iconClass = 'auth-flow-icon-svg') {
@@ -895,6 +912,7 @@ window.signOutUser = () => {
     firebaseAuth.signOut()
         .then(() => {
             // Clear local data on logout
+            localStorage.removeItem('google_access_token');
             if (gradeCalc) {
                 gradeCalc.subjects = {};
                 gradeCalc.render();
@@ -999,25 +1017,31 @@ function updateToolsTranslations() {
     }
     const resultLabel = document.querySelector('#tools-converter-panel .result-label');
     if (resultLabel) resultLabel.textContent = translations[currentLang]['result'] || resultLabel.textContent;
-    const refreshBtn = document.getElementById('currency-refresh');
-    if (refreshBtn) {
-        refreshBtn.textContent = translations[currentLang]['refresh'] || refreshBtn.textContent;
+    
+    // Currency element translations
+    const extraLabelsLocal = {
+        currencyConverterTitle: { en: 'Currency Converter', ru: 'Конвертер валют', uk: 'Конвертер валют', be: 'Канвэртар валют', kk: 'Валюта түрлендіргіші', es: 'Conversor de divisas', de: 'Währungsrechner', fr: 'Convertisseur de devises', zh: '货币兑换器', tr: 'Döviz Çevirici', ar: 'محول العملات' },
+        currencyConverterSub: { en: 'Convert between world currencies', ru: 'Конвертируйте мировые валюты', uk: 'Конвертуйте світові валюти', be: 'Канвертуйце сусветныя валюты', kk: 'Әлемдік валюталарды түрлендіру', es: 'Convierte entre divisas del mundo', de: 'Zwischen Weltwährungen umrechnen', fr: 'Convertir entre devises mondiales', zh: '在世界货币之间进行兑换', tr: 'Dünya para birimleri arasında çeviri yapın', ar: 'التحويل بين العملات العالمية' },
+        popularRates: { en: 'Popular Rates', ru: 'Популярные курсы', uk: 'Популярні курси', be: 'Папулярныя курсы', kk: 'Танымал бағамдар', es: 'Tasas populares', de: 'Beliebte Kurse', fr: 'Taux populaires', zh: '热门汇率', tr: 'Popüler Kurlar', ar: 'أسعار شائعة' },
+        lastUpdate: { en: 'Last update', ru: 'Последнее обновление', uk: 'Останнє оновлення', be: 'Апошняе абнаўленне', kk: 'Соңғы жаңарту', es: 'Última actualización', de: 'Letzte Aktualisierung', fr: 'Dernière mise à jour', zh: '最后更新', tr: 'Son güncelleme', ar: 'آخر تحديث' }
+    };
+
+    const tTitle = document.querySelector('[data-i18n="currencyConverterTitle"]');
+    if (tTitle) {
+        tTitle.textContent = (extraLabelsLocal.currencyConverterTitle[currentLang] || extraLabelsLocal.currencyConverterTitle.en);
     }
-    const aiTileTitle = document.querySelector('#tile-ai .tile-title');
-    if (aiTileTitle) {
-        aiTileTitle.textContent = translations[currentLang]['aiAssistant'] || aiTileTitle.textContent;
+    const tSub = document.querySelector('[data-i18n="currencyConverterSub"]');
+    if (tSub) {
+        tSub.textContent = (extraLabelsLocal.currencyConverterSub[currentLang] || extraLabelsLocal.currencyConverterSub.en);
     }
-    const aiInput = document.getElementById('ai-chat-input');
-    if (aiInput) {
-        aiInput.placeholder = translations[currentLang]['aiInputPlaceholder'] || aiInput.placeholder;
+    const tPop = document.querySelector('[data-i18n="popularRates"]');
+    if (tPop) {
+        tPop.textContent = (extraLabelsLocal.popularRates[currentLang] || extraLabelsLocal.popularRates.en);
     }
-    const aiOfflineText = document.querySelector('.ai-offline-text');
-    if (aiOfflineText) {
-        aiOfflineText.textContent = translations[currentLang]['aiOfflineMessage'] || aiOfflineText.textContent;
-    }
-    const aiRetryBtn = document.getElementById('ai-offline-retry');
-    if (aiRetryBtn) {
-        aiRetryBtn.textContent = translations[currentLang]['aiRetry'] || aiRetryBtn.textContent;
+
+    const refreshBtnSpan = document.querySelector('#currency-refresh span');
+    if (refreshBtnSpan) {
+        refreshBtnSpan.textContent = translations[currentLang]['refresh'] || 'Refresh';
     }
     // badges (offline texts)
     document.querySelectorAll('.tool-card').forEach(card => {
@@ -1127,6 +1151,7 @@ function initTools() {
     const convTo = document.getElementById('conv-to');
     const convValue = document.getElementById('conv-value');
     const convResult = document.getElementById('conv-result');
+    const convSwap = document.getElementById('conv-swap');
 
     function populateUnits() {
         if (!convType || !convFrom || !convTo) return;
@@ -1150,7 +1175,11 @@ function initTools() {
 
     function doConvert() {
         if (!convValue || !convFrom || !convTo || !convResult) return;
-        const v = parseFloat(convValue.value) || 0;
+        const v = parseFloat(convValue.value);
+        if (isNaN(v)) {
+            convResult.textContent = '0.0000';
+            return;
+        }
         const from = convFrom.value;
         const to = convTo.value;
         const type = convType ? convType.value : 'length';
@@ -1160,7 +1189,6 @@ function initTools() {
         const toMeters = {
             km: 1000, m:1, cm:0.01, mm:0.001, mi:1609.344, yd:0.9144, ft:0.3048, in:0.0254
         };
-        const fromMeters = toMeters;
         if (type === 'length' && toMeters[from] && toMeters[to]) {
             out = v * (toMeters[from] / toMeters[to]);
         }
@@ -1180,79 +1208,249 @@ function initTools() {
             else if (from === 'k' && to === 'f') out = (v - 273.15) * 9/5 + 32;
         }
 
-        convResult.textContent = out === null ? '' : out.toLocaleString(undefined, {maximumFractionDigits:4});
+        const toText = convTo.options[convTo.selectedIndex]?.textContent || '';
+        convResult.textContent = out === null ? '' : `${out.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ${toText}`;
     }
 
     if (convType) convType.addEventListener('change', () => { populateUnits(); doConvert(); });
     if (convFrom) convFrom.addEventListener('change', doConvert);
     if (convTo) convTo.addEventListener('change', doConvert);
     if (convValue) convValue.addEventListener('input', doConvert);
+    if (convSwap) {
+        convSwap.addEventListener('click', () => {
+            if (!convFrom || !convTo) return;
+            const temp = convFrom.value;
+            convFrom.value = convTo.value;
+            convTo.value = temp;
+            doConvert();
+            convSwap.style.transform = 'rotate(180deg)';
+            setTimeout(() => {
+                convSwap.style.transform = '';
+            }, 300);
+        });
+    }
     populateUnits(); doConvert();
 
-    // Currency card
-    const currencyCard = document.getElementById('currency-card');
+    // Currency card & converter
     const currencyRatesEl = document.getElementById('currency-rates');
     const currencyMsg = document.getElementById('currency-message');
     const currencyBtn = document.getElementById('currency-refresh');
+    const currencyLastUpdateEl = document.getElementById('currency-last-update');
+    
+    const currAmountEl = document.getElementById('curr-amount');
+    const currFromEl = document.getElementById('curr-from');
+    const currToEl = document.getElementById('curr-to');
+    const currResultEl = document.getElementById('curr-result');
+    const currSwapEl = document.getElementById('curr-swap');
+
+    const SUPPORTED_CURRENCIES = [
+        { code: 'USD', name: 'US Dollar', symbol: '$' },
+        { code: 'EUR', name: 'Euro', symbol: '€' },
+        { code: 'RUB', name: 'Russian Ruble', symbol: '₽' },
+        { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
+        { code: 'KZT', name: 'Kazakhstani Tenge', symbol: '₸' },
+        { code: 'BYN', name: 'Belarusian Ruble', symbol: 'Br' },
+        { code: 'GBP', name: 'British Pound', symbol: '£' },
+        { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+        { code: 'TRY', name: 'Turkish Lira', symbol: '₺' },
+        { code: 'AED', name: 'UAE Dirham', symbol: 'د.إ' }
+    ];
+
+    let currentRates = null;
+
+    function populateCurrencyDropdowns() {
+        if (!currFromEl || !currToEl || currFromEl.options.length > 0) return;
+
+        SUPPORTED_CURRENCIES.forEach(c => {
+            const opt1 = document.createElement('option');
+            opt1.value = c.code;
+            opt1.textContent = `${c.code} (${c.name})`;
+            currFromEl.appendChild(opt1);
+
+            const opt2 = document.createElement('option');
+            opt2.value = c.code;
+            opt2.textContent = `${c.code} (${c.name})`;
+            currToEl.appendChild(opt2);
+        });
+
+        currFromEl.value = 'USD';
+        currToEl.value = 'RUB';
+    }
+
+    function recalculateCurrency() {
+        if (!currAmountEl || !currFromEl || !currToEl || !currResultEl) return;
+        const amount = parseFloat(currAmountEl.value);
+        if (isNaN(amount) || amount <= 0) {
+            currResultEl.textContent = '0.0000';
+            return;
+        }
+
+        if (!currentRates) {
+            currResultEl.textContent = translations[currentLang]?.offline || 'Offline';
+            return;
+        }
+
+        const from = currFromEl.value;
+        const to = currToEl.value;
+        
+        const rateFrom = currentRates[from];
+        const rateTo = currentRates[to];
+
+        if (rateFrom && rateTo) {
+            const resultVal = (amount / rateFrom) * rateTo;
+            const targetCurrency = SUPPORTED_CURRENCIES.find(c => c.code === to);
+            const symbol = targetCurrency ? targetCurrency.symbol : '';
+            currResultEl.textContent = `${resultVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${symbol || to}`;
+        }
+    }
 
     function showCurrencyMessage(text, isError = false) {
         if (!currencyMsg) return;
+        currencyMsg.style.display = text ? 'block' : 'none';
         currencyMsg.textContent = text;
-        currencyMsg.classList.toggle('card-message--error', isError);
+        currencyMsg.className = isError ? 'currency-error-text' : 'currency-info-text';
+    }
+
+    function displayPopularRates() {
+        if (!currencyRatesEl || !currentRates) return;
+        currencyRatesEl.innerHTML = '';
+
+        const grid = document.createElement('div');
+        grid.className = 'currency-rates-grid';
+
+        const pairsToShow = [
+            { from: 'USD', to: 'RUB' },
+            { from: 'EUR', to: 'RUB' },
+            { from: 'CNY', to: 'RUB' },
+            { from: 'EUR', to: 'USD' },
+            { from: 'USD', to: 'KZT' },
+            { from: 'USD', to: 'BYN' }
+        ];
+
+        pairsToShow.forEach(pair => {
+            const rateFrom = currentRates[pair.from];
+            const rateTo = currentRates[pair.to];
+            if (rateFrom && rateTo) {
+                const val = (1 / rateFrom) * rateTo;
+                const card = document.createElement('div');
+                card.className = 'currency-rate-item';
+                card.innerHTML = `
+                    <div class="currency-rate-pair">${pair.from} / ${pair.to}</div>
+                    <div class="currency-rate-value">${val.toFixed(2)}</div>
+                `;
+                grid.appendChild(card);
+            }
+        });
+
+        currencyRatesEl.appendChild(grid);
     }
 
     async function loadCurrency() {
-        if (!currencyRatesEl) return;
-        currencyRatesEl.innerHTML = '';
+        populateCurrencyDropdowns();
         showCurrencyMessage('');
         
+        if (currencyRatesEl) {
+            currencyRatesEl.innerHTML = '<div style="text-align: center; padding: 20px;" class="converter-sub">Loading rates...</div>';
+        }
+
         try {
-            const res = await fetch('https://api.frankfurter.app/latest?from=USD');
-            if (!res.ok) throw new Error('Network response not ok');
+            const res = await fetch('https://open.er-api.com/v6/latest/USD');
+            if (!res.ok) throw new Error('API fetch failed');
             const data = await res.json();
-            const rates = data.rates || {};
-            const base = data.base || 'USD';
             
-            // Create currency rates display
-            const list = document.createElement('div');
-            list.innerHTML = `<div class="currency-base">Base: ${base} — ${data.date || ''}</div>`;
-            const ul = document.createElement('ul');
-            ul.style.listStyle='none'; ul.style.padding='0';
-            Object.keys(rates).slice(0,10).forEach(k => {
-                const li = document.createElement('li');
-                li.textContent = `${k}: ${rates[k].toFixed(2)}`;
-                ul.appendChild(li);
-            });
-            currencyRatesEl.appendChild(list); 
-            currencyRatesEl.appendChild(ul);
+            if (data && data.rates) {
+                currentRates = data.rates;
+                localStorage.setItem('cachedRates', JSON.stringify({
+                    rates: currentRates,
+                    time: Date.now()
+                }));
+                
+                if (currencyLastUpdateEl) {
+                    const dateStr = new Date(data.time_last_update_unix * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const updateLabel = currentLang === 'ru' ? 'Последнее обновление' : 'Last update';
+                    currencyLastUpdateEl.textContent = `${updateLabel}: ${dateStr}`;
+                }
+                
+                showCurrencyMessage('');
+                displayPopularRates();
+                recalculateCurrency();
+            } else {
+                throw new Error('Invalid data format');
+            }
         } catch (e) {
             console.error('Failed to load currency rates:', e);
-            // Create beautiful glassmorphism error block
-            const errorBlock = document.createElement('div');
-            errorBlock.className = 'currency-error-block';
-            errorBlock.innerHTML = `
-                <div class="currency-error-icon">⚠️</div>
-                <div class="currency-error-text">
-                    ${translations[currentLang]?.currencyOffline || 'Не удалось обновить курсы валют. Проверьте подключение.'}
-                </div>
-                <button class="currency-error-btn" id="currency-refresh-from-error">
-                    ${translations[currentLang]?.refresh || 'Обновить'}
-                </button>
-            `;
-            currencyRatesEl.appendChild(errorBlock);
             
-            // Add event listener to refresh button
-            const refreshBtn = errorBlock.querySelector('#currency-refresh-from-error');
-            if (refreshBtn) {
-                refreshBtn.addEventListener('click', loadCurrency);
+            const cached = localStorage.getItem('cachedRates');
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    currentRates = parsed.rates;
+                    const dateStr = new Date(parsed.time).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    
+                    if (currencyLastUpdateEl) {
+                        currencyLastUpdateEl.textContent = translations[currentLang]?.offline || 'Offline';
+                    }
+                    
+                    showCurrencyMessage(
+                        currentLang === 'ru' 
+                            ? `Показаны сохранённые курсы от ${dateStr}` 
+                            : `Displaying cached rates from ${dateStr}`, 
+                        false
+                    );
+                    displayPopularRates();
+                    recalculateCurrency();
+                    return;
+                } catch (_) {}
+            }
+            
+            if (currencyRatesEl) {
+                currencyRatesEl.innerHTML = '';
+                const errorBlock = document.createElement('div');
+                errorBlock.className = 'currency-error-block';
+                errorBlock.innerHTML = `
+                    <div class="currency-error-icon"><span class="material-symbols-outlined" style="font-size: 2rem;">warning</span></div>
+                    <div class="currency-error-text">
+                        ${currentLang === 'ru' 
+                            ? 'Не удалось загрузить курсы валют. Возможно, сервер временно недоступен или отсутствует интернет-соединение.' 
+                            : 'Failed to load currency rates. The server might be unavailable or device is offline.'}
+                    </div>
+                    <button class="currency-error-btn" id="currency-refresh-from-error" style="margin-top: 8px;">
+                        ${translations[currentLang]?.refresh || 'Refresh'}
+                    </button>
+                `;
+                currencyRatesEl.appendChild(errorBlock);
+                
+                const errorRefreshBtn = errorBlock.querySelector('#currency-refresh-from-error');
+                if (errorRefreshBtn) {
+                    errorRefreshBtn.addEventListener('click', loadCurrency);
+                }
+            }
+            if (currencyLastUpdateEl) {
+                currencyLastUpdateEl.textContent = 'Connection failed';
             }
         }
+    }
+
+    if (currAmountEl) currAmountEl.addEventListener('input', recalculateCurrency);
+    if (currFromEl) currFromEl.addEventListener('change', recalculateCurrency);
+    if (currToEl) currToEl.addEventListener('change', recalculateCurrency);
+    if (currSwapEl) {
+        currSwapEl.addEventListener('click', () => {
+            if (!currFromEl || !currToEl) return;
+            const temp = currFromEl.value;
+            currFromEl.value = currToEl.value;
+            currToEl.value = temp;
+            recalculateCurrency();
+            currSwapEl.style.transform = 'rotate(180deg)';
+            setTimeout(() => {
+                currSwapEl.style.transform = '';
+            }, 300);
+        });
     }
 
     if (currencyBtn) currencyBtn.addEventListener('click', loadCurrency);
     loadCurrency();
 
-    // react to online/offline to update badges
     window.addEventListener('online', () => {
         updateToolsTranslations();
         loadCurrency();
@@ -1270,7 +1468,9 @@ function initTools() {
 
     let aiAssistantApi = null;
     if (typeof SmartStudyAI !== 'undefined') {
-        aiAssistantApi = SmartStudyAI.init();
+        aiAssistantApi = SmartStudyAI.init({
+            onBack: () => showHub()
+        });
     }
 
     function showHub() {
@@ -1317,7 +1517,18 @@ class SettingsComponent extends HTMLElement {
     
     renderComponent() {
         this.shadowRoot.innerHTML = `
+            <link rel="stylesheet" href="material-symbols/outlined.css">
             <style>
+                .material-symbols-outlined {
+                    font-size: 24px;
+                    line-height: 1;
+                    display: inline-block;
+                    white-space: nowrap;
+                    vertical-align: middle;
+                    -webkit-font-smoothing: antialiased;
+                    font-feature-settings: "liga";
+                    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+                }
                 .settings-container { max-width: 500px; margin: 0 auto; padding: 2.5rem; }
                 .setting-section { margin-bottom: 2.5rem; }
                 .setting-section:last-child { margin-bottom: 0; }
@@ -1643,6 +1854,132 @@ class SettingsComponent extends HTMLElement {
                 .signout-btn:hover { 
                     background: var(--primary-accent);
                     color: white;
+                }
+
+                /* AI Extensions section styling */
+                .extensions-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.25rem;
+                    background: var(--component-background);
+                    padding: 1.5rem;
+                    border-radius: 16px;
+                    border: 1px solid color-mix(in srgb, var(--primary-accent) 20%, transparent);
+                    box-shadow: 0 8px 24px var(--shadow-color-lift);
+                    margin-top: 0.5rem;
+                }
+                .extension-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 1rem;
+                    padding-bottom: 1.25rem;
+                    border-bottom: 1px solid color-mix(in srgb, var(--text-color) 10%, transparent);
+                }
+                .extension-row:last-child {
+                    padding-bottom: 0;
+                    border-bottom: none;
+                }
+                .extension-info {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    flex-grow: 1;
+                }
+                .extension-icon {
+                    width: 44px;
+                    height: 44px;
+                    border-radius: 10px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid color-mix(in srgb, var(--primary-accent) 15%, transparent);
+                    flex-shrink: 0;
+                    transition: all 0.3s ease;
+                }
+                .extension-row:hover .extension-icon {
+                    transform: scale(1.08);
+                    border-color: var(--primary-accent);
+                    box-shadow: 0 0 10px color-mix(in srgb, var(--primary-accent) 30%, transparent);
+                }
+                .extension-icon-symbol {
+                    font-size: 26px !important;
+                    width: 1em;
+                    height: 1em;
+                    line-height: 1;
+                    overflow: hidden;
+                    flex-shrink: 0;
+                    transition: transform 0.3s ease;
+                }
+                .gmail-icon { color: #EA4335; }
+                .drive-icon { color: #0F9D58; }
+                .docs-icon { color: #4285F4; }
+                .keep-icon { color: #F4B400; }
+                .calendar-icon { color: #4285F4; }
+                .tasks-icon { color: #4285F4; }
+                .youtube-icon { color: #FF0000; }
+                .extension-row:hover .extension-icon-symbol {
+                    transform: scale(1.15);
+                }
+                .extension-text {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.25rem;
+                }
+                .extension-title {
+                    font-size: 1.05rem;
+                    font-weight: 600;
+                    color: var(--text-color);
+                }
+                .extension-desc {
+                    font-size: 0.82rem;
+                    color: var(--text-color-secondary);
+                    line-height: 1.3;
+                }
+                .premium-switch {
+                    position: relative;
+                    display: inline-block;
+                    width: 46px;
+                    height: 26px;
+                    flex-shrink: 0;
+                }
+                .premium-switch input {
+                    opacity: 0;
+                    width: 0;
+                    height: 0;
+                }
+                .premium-switch .slider {
+                    position: absolute;
+                    cursor: pointer;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: color-mix(in srgb, var(--text-color) 20%, transparent);
+                    transition: .3s;
+                    border-radius: 34px;
+                }
+                .premium-switch .slider:before {
+                    position: absolute;
+                    content: "";
+                    height: 20px;
+                    width: 20px;
+                    left: 3px;
+                    bottom: 3px;
+                    background-color: white;
+                    transition: .3s;
+                    border-radius: 50%;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                }
+                .premium-switch input:checked + .slider {
+                    background-color: var(--primary-accent);
+                }
+                .premium-switch input:checked + .slider:before {
+                    transform: translateX(20px);
+                }
+                .premium-switch input:focus + .slider {
+                    box-shadow: 0 0 1px var(--primary-accent);
                 }
             </style>
             <div class="settings-container">
@@ -2203,17 +2540,25 @@ class GradeAverageCalculator extends HTMLElement {
                 h2 { margin: 0 0 2rem 0; text-shadow: 0 0 5px var(--glow-color-primary); }
 
                 /* TABS */
-                .tabs { display: flex; justify-content: space-between; padding: 0; margin-bottom: 2rem; border-bottom: 2px solid var(--shadow-color-lift); }
+                .tabs {
+                    display: flex;
+                    justify-content: center;
+                    gap: 0.5rem;
+                    padding: 0;
+                    margin-bottom: 2rem;
+                    border-bottom: 2px solid var(--shadow-color-lift);
+                }
                 .tab-btn { 
                     background: none; 
                     border: none; 
-                    padding: 0.8rem 1rem; 
+                    padding: 0.8rem 0.75rem; 
                     color: var(--text-color-secondary); 
-                    font-size: 1rem; 
+                    font-size: 0.95rem; 
                     font-weight: 600; 
                     cursor: pointer; 
                     border-bottom: 3px solid transparent;
                     transition: all 0.3s;
+                    white-space: nowrap;
                 }
                 .tab-btn.active { 
                     color: var(--primary-accent); 
@@ -2438,50 +2783,96 @@ class GradeAverageCalculator extends HTMLElement {
                     font-weight: 700;
                 }
                 .threshold-input-row {
-                    display: flex;
+                    display: grid;
+                    grid-template-columns: 2fr 80px auto;
                     align-items: center;
-                    justify-content: space-between;
                     gap: 1rem;
-                    margin-bottom: 0.8rem;
+                    margin-bottom: 1rem;
                 }
                 .threshold-input-row label {
-                    min-width: 140px;
                     font-weight: 600;
                     color: var(--text-color);
                 }
                 .threshold-input-row span {
                     color: var(--text-color-secondary);
+                    font-size: 0.9rem;
+                    white-space: nowrap;
                 }
                 .threshold-input-row input {
-                    background: var(--component-background);
+                    background: rgba(255, 255, 255, 0.04);
                     color: var(--text-color);
-                    border: 1px solid var(--primary-accent);
+                    border: 1px solid rgba(255, 255, 255, 0.15);
                     border-radius: 8px;
                     padding: 0.5rem;
-                    width: 80px;
+                    width: 100%;
+                    box-sizing: border-box;
                     text-align: center;
                     font-weight: 600;
                     font-family: inherit;
+                    transition: all 0.3s;
                 }
                 .threshold-input-row input:focus {
                     outline: none;
+                    border-color: var(--primary-accent);
                     box-shadow: 0 0 8px var(--glow-color-primary);
                 }
                 .save-thresholds {
-                    background: var(--primary-accent);
+                    width: 100%;
+                    background: linear-gradient(135deg, var(--primary-accent), #005eff);
                     color: white;
                     border: none;
-                    padding: 0.75rem 1.5rem;
-                    border-radius: 8px;
-                    font-weight: 600;
+                    padding: 0.9rem 1.5rem;
+                    border-radius: 12px;
+                    font-weight: 700;
+                    font-size: 1rem;
                     cursor: pointer;
-                    margin-top: 1rem;
+                    margin-top: 1.2rem;
                     box-shadow: 0 4px 15px var(--glow-color-primary);
-                    transition: all 0.2s;
+                    transition: all 0.3s ease;
                 }
                 .save-thresholds:hover {
                     transform: translateY(-2px);
                     box-shadow: 0 6px 20px var(--glow-color-primary);
+                }
+                .save-thresholds:active {
+                    transform: translateY(0);
+                }
+
+                #subject-input {
+                    flex: 1;
+                    padding: 0.8rem 1.2rem;
+                    border-radius: 12px;
+                    border: 1px solid rgba(255, 255, 255, 0.15);
+                    background: rgba(255, 255, 255, 0.04);
+                    color: var(--text-color);
+                    font-family: inherit;
+                    font-size: 1rem;
+                    outline: none;
+                    transition: all 0.3s ease;
+                }
+                #subject-input:focus {
+                    border-color: var(--primary-accent);
+                    box-shadow: 0 0 10px var(--glow-color-primary);
+                    background: rgba(255, 255, 255, 0.08);
+                }
+                #add-subject-btn {
+                    padding: 0.8rem 1.8rem;
+                    border-radius: 12px;
+                    border: none;
+                    background: linear-gradient(135deg, var(--primary-accent), #005eff);
+                    color: white;
+                    font-weight: 700;
+                    font-size: 1rem;
+                    cursor: pointer;
+                    box-shadow: 0 4px 15px var(--glow-color-primary);
+                    transition: all 0.3s ease;
+                }
+                #add-subject-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px var(--glow-color-primary);
+                }
+                #add-subject-btn:active {
+                    transform: translateY(0);
                 }
                 .threshold-note {
                     font-size: 0.85rem;
@@ -2652,7 +3043,7 @@ class GradeAverageCalculator extends HTMLElement {
                 <!-- THRESHOLDS TAB -->
                 <div id="thresholds" class="tab-content">
                     <div class="threshold-group">
-                        <h3 data-i18n="thresholdsTitle">📊 Установи пороги для оценок</h3>
+                        <h3 data-i18n="thresholdsTitle"><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 4px;">bar_chart</span> Установи пороги для оценок</h3>
                         <p style="color: var(--text-color-secondary); font-size: 0.9rem; margin: 0 0 1rem 0;" data-i18n="thresholdsDesc">
                             Укажи, с какого среднего балла выставляется каждая оценка в твоей школе.
                         </p>
@@ -2675,9 +3066,9 @@ class GradeAverageCalculator extends HTMLElement {
                             <span style="color: var(--text-color-secondary);" data-i18n="andAbove">и выше</span>
                         </div>
 
-                        <button class="save-thresholds" data-i18n="saveThresholds">💾 Сохранить пороги</button>
+                        <button class="save-thresholds" data-i18n="saveThresholds"><span class="material-symbols-outlined" style="font-size: 1.1rem; vertical-align: middle; margin-right: 6px;">save</span>Сохранить пороги</button>
                         <p class="threshold-note" data-i18n="thresholdsNote">
-                            💡 Стандартные пороги: 5.0 → 4.5, 4.0 → 3.5, 3.0 → 2.5<br>
+                            <span class="material-symbols-outlined" style="font-size: 1.1rem; vertical-align: middle; margin-right: 4px;">lightbulb</span> Стандартные пороги: 5.0 → 4.5, 4.0 → 3.5, 3.0 → 2.5<br>
                             Измени их в соответствии с правилами твоей школы!
                         </p>
                     </div>
@@ -2963,15 +3354,73 @@ class GradeAverageCalculator extends HTMLElement {
         const oldAvg = this.calculateAverageForSubject(this.currentSubject);
         const newAvg = this.calculateAverage(); // Recalculates with the simulated grade
 
+        const extraSimulatorLabels = {
+            ifAdd: {
+                en: 'If you add the grade {grade} to {subject}:',
+                ru: 'Если вы добавите оценку {grade} по предмету {subject}:',
+                uk: 'Якщо ви додасте оцінку {grade} з предмета {subject}:',
+                be: 'Калі вы дадасце адзнаку {grade} па прадмеце {subject}:',
+                kk: 'Егер сіз {subject} пәніне {grade} бағасын қоссаңыз:',
+                es: 'Si agregas la calificación {grade} a {subject}:',
+                de: 'Wenn Sie die Note {grade} zu {subject} hinzufügen:',
+                fr: 'Si vous ajoutez la note {grade} à {subject} :',
+                zh: '如果向 {subject} 添加成绩 {grade}：',
+                tr: 'Eğer {subject} dersine {grade} notunu eklerseniz:',
+                ar: 'إذا أضفت الدرجة {grade} إلى {subject}:'
+            },
+            currentSimulated: {
+                en: 'Current: {current} → Simulated: {simulated}',
+                ru: 'Текущий: {current} → Прогноз: {simulated}',
+                uk: 'Поточний: {current} → Прогноз: {simulated}',
+                be: 'Бягучы: {current} → Прагноз: {simulated}',
+                kk: 'Ағымдағы: {current} → Болжамды: {simulated}',
+                es: 'Actual: {current} → Simulado: {simulated}',
+                de: 'Aktuell: {current} → Simuliert: {simulated}',
+                fr: 'Actuel : {current} → Simulé : {simulated}',
+                zh: '当前：{current} → 模拟：{simulated}',
+                tr: 'Mevcut: {current} → Simüle: {simulated}',
+                ar: 'الحالي: {current} ← المحاكاة: {simulated}'
+            },
+            quickCalc: {
+                en: 'Quick Calc',
+                ru: 'Быстрый подсчет',
+                uk: 'Швидкий підрахунок',
+                be: 'Хуткі падлік',
+                kk: 'Тез есептеу',
+                es: 'Cálculo rápido',
+                de: 'Schnellrechnung',
+                fr: 'Calcul rapide',
+                zh: '快速计算',
+                tr: 'Hızlı Hesaplama',
+                ar: 'حساب سريع'
+            }
+        };
+
+        const titleText = translations[currentLang]?.whatIf || 'What If?';
+        const applyText = translations[currentLang]?.apply || 'Apply';
+        const cancelText = translations[currentLang]?.cancel || 'Cancel';
+        
+        const subjLabel = this.currentSubject === '__QUICK_CALC__' 
+            ? (extraSimulatorLabels.quickCalc[currentLang] || extraSimulatorLabels.quickCalc.en)
+            : this.currentSubject;
+
+        const bodyTemplate = (extraSimulatorLabels.ifAdd[currentLang] || extraSimulatorLabels.ifAdd.en)
+            .replace('{grade}', grade)
+            .replace('{subject}', subjLabel);
+
+        const resultTemplate = (extraSimulatorLabels.currentSimulated[currentLang] || extraSimulatorLabels.currentSimulated.en)
+            .replace('{current}', oldAvg)
+            .replace('{simulated}', newAvg);
+
         content.innerHTML = `
-            <h2 style="color: var(--primary-accent); margin: 0 0 1rem 0;">What If?</h2>
-            <p style="color: var(--text-color); margin: 0 0 0.5rem 0;">If you add the grade <strong>${grade}</strong> to <strong>${this.currentSubject === '__QUICK_CALC__' ? 'Quick Calc' : this.currentSubject}</strong>:</p>
+            <h2 style="color: var(--primary-accent); margin: 0 0 1rem 0;">${titleText}</h2>
+            <p style="color: var(--text-color); margin: 0 0 0.5rem 0;">${bodyTemplate}</p>
             <p style="font-size: 1.5rem; color: var(--primary-accent); font-weight: 700; margin: 1rem 0;">
-                Current: ${oldAvg} → Simulated: ${newAvg}
+                ${resultTemplate}
             </p>
             <div style="display: flex; gap: 1rem; margin-top: 2rem;">
-                <button id="apply-sim" style="flex: 1; padding: 0.8rem; background: var(--primary-accent); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer;">Apply</button>
-                <button id="cancel-sim" style="flex: 1; padding: 0.8rem; background: #999; color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer;">Cancel</button>
+                <button id="apply-sim" style="flex: 1; padding: 0.8rem; background: var(--primary-accent); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer;">${applyText}</button>
+                <button id="cancel-sim" style="flex: 1; padding: 0.8rem; background: #999; color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer;">${cancelText}</button>
             </div>
         `;
         
@@ -3392,13 +3841,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (closeBtn) closeBtn.addEventListener('click', () => window.electronAPI.send('window-close'));
 
         // OAuth result from main process (system browser + deep link)
-        window.electronAPI.onGoogleSigninResult((err, token, provider) => {
+        window.electronAPI.onGoogleSigninResult((err, token, provider, googleAccessToken) => {
             if (err) {
                 console.error('OAuth sign-in (desktop):', err);
                 openAccountErrorModal('Sign-in failed: ' + err);
                 return;
             }
             if (!token || !firebaseAuth) return;
+            if (provider === 'google' && googleAccessToken) {
+                localStorage.setItem('google_access_token', googleAccessToken);
+            }
             const authProvider = provider === 'github' ? 'github' : 'google';
             const credential = authProvider === 'github'
                 ? firebase.auth.GithubAuthProvider.credential(token)
@@ -3406,6 +3858,9 @@ document.addEventListener('DOMContentLoaded', () => {
             firebaseAuth.signInWithCredential(credential)
                 .then((result) => {
                     console.log('Sign-in success (desktop).');
+                    if (provider === 'google' && googleAccessToken) {
+                        localStorage.setItem('google_access_token', googleAccessToken);
+                    }
                     return finalizeSignIn(result);
                 })
                 .catch((e) => {
@@ -3420,3 +3875,4 @@ document.addEventListener('DOMContentLoaded', () => {
     feather.replace();
     updateTranslations();
 });
+

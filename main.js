@@ -1,4 +1,5 @@
 const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
+const fs = require('fs');
 const path = require('path');
 
 // Auth page opened in system browser; after login it redirects to smartstudyhub://auth?token=...
@@ -25,7 +26,24 @@ function createWindow() {
   mainWindow = win;
   win.setMenuBarVisibility(false);
   Menu.setApplicationMenu(null);
-  win.loadFile(path.join(__dirname, 'index.html'));
+  
+  // Open external links in default browser
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http:') || url.startsWith('https:')) {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
+  });
+
+  win.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith('http:') || url.startsWith('https:')) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+
+  win.loadFile(path.join(__dirname, 'public', 'index.html'));
 }
 
 function handleAuthUrl(urlString) {
@@ -35,13 +53,29 @@ function handleAuthUrl(urlString) {
     // smartstudyhub://auth?token=... → hostname is "auth"
     if (u.hostname === 'auth' || u.pathname === '/auth') {
       const token = u.searchParams.get('token');
+      const googleAccessToken = u.searchParams.get('googleAccessToken') || u.searchParams.get('accessToken');
       const provider = u.searchParams.get('provider') || 'google';
       if (token && mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('google-signin-result', null, token, provider);
+        mainWindow.webContents.send('google-signin-result', null, token, provider, googleAccessToken);
       }
     }
   } catch (_) {}
 }
+
+// ----- Gemini API Key secure loading IPC -----
+ipcMain.handle('get-gemini-key', () => {
+  try {
+    const configPath = path.join(__dirname, 'config.json');
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, 'utf8');
+      const config = JSON.parse(content);
+      return config.GEMINI_API_KEY || '';
+    }
+  } catch (e) {
+    console.error('Failed to read config.json:', e);
+  }
+  return process.env.GEMINI_API_KEY || '';
+});
 
 // ----- Window controls (IPC) -----
 ipcMain.on('window-minimize', () => {

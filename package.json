@@ -5,7 +5,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win --portable"
+    "build": "electron-builder --win --portable",
+    "build:web": "node build-web.js"
   },
   "build": {
     "appId": "com.kamil.smartstudy",
@@ -17,5 +18,8 @@
   "devDependencies": {
     "electron": "^40.6.0",
     "electron-builder": "^26.7.0"
+  },
+  "dependencies": {
+    "material-symbols": "^0.45.7"
   }
 }

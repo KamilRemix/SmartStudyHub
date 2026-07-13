@@ -9,10 +9,28 @@
 
 
 
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2.3">
+    <style>
+        .ai-chat-input,
+        .ai-chat-input:focus,
+        .ai-chat-input:active,
+        .ai-chat-input:hover {
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            -webkit-box-shadow: none !important;
+            border-top: none !important;
+            border-bottom: none !important;
+            border-left: none !important;
+            border-right: none !important;
+            background: transparent !important;
+            border-radius: 0 !important;
+        }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="material-symbols/outlined.css">
     <script src="https://unpkg.com/feather-icons"></script>
     
     <!-- Firebase Scripts (Compat Version) -->
@@ -20,6 +38,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
       const firebaseConfig = {
         apiKey: "AIzaSyCBX64ItDxwK_coTZGmmIrujDKQzUCckjI",
@@ -89,6 +108,13 @@
                         <div class="tile-title" data-i18n="currencyRates">Currency Rates</div>
                     </button>
 
+                    <button class="tool-tile" id="tile-notes" aria-label="Notes">
+                        <div class="tile-icon">
+                            <span class="material-symbols-outlined" style="font-size: 28px; color: #fbbc04;">lightbulb</span>
+                        </div>
+                        <div class="tile-title" data-i18n="notes">Notes</div>
+                    </button>
+
                     <button class="tool-tile tool-tile--ai" id="tile-ai" aria-label="AI Assistant">
                         <div class="tile-icon tile-icon--ai">
                             <svg class="ai-tile-spark" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -119,7 +145,7 @@
                     <div class="panel-body">
                         <div class="converter-card">
                             <div class="converter-header">
-                                <div class="converter-icon"><i data-feather="repeat"></i></div>
+                                <div class="converter-icon"><i data-feather="sliders"></i></div>
                                 <div>
                                     <div class="converter-title" data-i18n="unitConverter">Unit Converter</div>
                                     <div class="converter-sub" data-i18n="converterSub">Convert values quickly</div>
@@ -132,18 +158,21 @@
                                 </div>
 
                                 <div class="converter-selects">
-                                    <select class="form-control" id="conv-type">
+                                    <select class="form-control" id="conv-type" aria-label="Unit Type">
                                         <option value="length" data-i18n="length">Length</option>
                                         <option value="mass" data-i18n="mass">Mass</option>
                                         <option value="temp" data-i18n="temperature">Temperature</option>
                                     </select>
-                                    <select class="form-control" id="conv-from"></select>
-                                    <select class="form-control" id="conv-to"></select>
+                                    <select class="form-control" id="conv-from" aria-label="From Unit"></select>
+                                    <div class="curr-swap-btn" id="conv-swap" style="cursor: pointer; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); transition: all 0.3s ease; flex-shrink: 0;" title="Swap Units">
+                                        <i data-feather="repeat" style="width: 18px; height: 18px; color: var(--primary-accent);"></i>
+                                    </div>
+                                    <select class="form-control" id="conv-to" aria-label="To Unit"></select>
                                 </div>
 
                                 <div class="converter-result-card">
                                     <div class="result-label" data-i18n="result">Result</div>
-                                    <div class="converter-result" id="conv-result">0.0000</div>
+                                    <div class="converter-result" id="conv-result" style="text-align: left; padding: 0; font-size: 1.5rem; background: none; border: none; box-shadow: none;">0.0000</div>
                                 </div>
                             </div>
                         </div>
@@ -156,19 +185,377 @@
                         <div class="panel-title" data-i18n="currencyRates">Currency Rates</div>
                     </div>
                     <div class="panel-body">
-                        <div id="currency-message" class="card-message"></div>
-                        <div id="currency-rates" class="currency-rates"></div>
-                        <div style="margin-top:8px"><button id="currency-refresh" class="btn btn-secondary" data-i18n="refresh">Refresh</button></div>
+                        <!-- Interactive Currency Converter Card -->
+                        <div class="converter-card" style="margin-bottom: 20px;">
+                            <div class="converter-header">
+                                <div class="converter-icon"><i data-feather="dollar-sign"></i></div>
+                                <div>
+                                    <div class="converter-title" data-i18n="currencyConverterTitle">Currency Converter</div>
+                                    <div class="converter-sub" data-i18n="currencyConverterSub">Convert between world currencies</div>
+                                </div>
+                            </div>
+
+                            <div class="converter-controls">
+                                <div class="converter-input">
+                                    <input class="conv-display" type="number" id="curr-amount" value="1" inputmode="decimal" aria-label="Amount" />
+                                </div>
+
+                                <div class="converter-selects">
+                                    <select class="form-control" id="curr-from" aria-label="From Currency">
+                                        <!-- Will populate dynamically -->
+                                    </select>
+                                    <div class="curr-swap-btn" id="curr-swap" style="cursor: pointer; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); transition: all 0.3s ease; flex-shrink: 0;" title="Swap Currencies">
+                                        <i data-feather="repeat" style="width: 18px; height: 18px; color: var(--primary-accent);"></i>
+                                    </div>
+                                    <select class="form-control" id="curr-to" aria-label="To Currency">
+                                        <!-- Will populate dynamically -->
+                                    </select>
+                                </div>
+
+                                <div class="converter-result-card">
+                                    <div class="result-label" data-i18n="result">Result</div>
+                                    <div class="converter-result" id="curr-result" style="text-align: left; padding: 0; font-size: 1.5rem; background: none; border: none; box-shadow: none;">0.0000</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Live Rates Section -->
+                        <div class="converter-card">
+                            <div class="converter-header" style="margin-bottom: 16px;">
+                                <div class="converter-title" data-i18n="popularRates">Popular Rates</div>
+                                <div class="converter-sub" id="currency-last-update" style="margin-top: 2px;">Updating...</div>
+                            </div>
+                            <div id="currency-message" class="card-message"></div>
+                            <div id="currency-rates" class="currency-rates"></div>
+                            <div class="currency-actions" style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                                <button id="currency-refresh" class="btn btn-secondary" style="border-radius: 12px; padding: 8px 16px; display: flex; align-items: center; gap: 8px;" data-i18n="refresh">
+                                    <i data-feather="refresh-cw" style="width: 14px; height: 14px;"></i>
+                                    <span>Refresh</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
+                <section id="tools-notes-panel" class="tool-panel hidden" aria-label="Notes">
+                    <!-- Notes Header Bar -->
+                    <div class="notes-header">
+                        <button class="panel-back notes-back-btn" data-panel="notes">
+                            <span class="material-symbols-outlined">arrow_back</span>
+                        </button>
+                        <div class="notes-search-wrap">
+                            <span class="material-symbols-outlined notes-search-icon">search</span>
+                            <input type="text" id="notes-search-input" class="notes-search-input" data-i18n-placeholder="noteSearch" placeholder="Search notes...">
+                        </div>
+                        <button id="notes-view-toggle" class="notes-icon-btn" title="Toggle view" aria-label="Toggle view">
+                            <span class="material-symbols-outlined" id="notes-view-icon">grid_view</span>
+                        </button>
+                    </div>
+
+                    <!-- Note Creator (collapsed) -->
+                    <div class="notes-creator-outer">
+                        <div class="note-creator-card" id="note-creator">
+                            <div class="note-creator-collapsed" id="note-creator-collapsed">
+                                <span data-i18n="takeANote" class="note-creator-placeholder">Take a note...</span>
+                                <div class="note-creator-quick-btns">
+                                    <button class="notes-icon-btn" id="btn-new-note-check" title="New checkbox note" aria-label="Checkbox">
+                                        <span class="material-symbols-outlined">check_box</span>
+                                    </button>
+                                    <button class="notes-icon-btn" id="btn-new-note-img" title="New image note" aria-label="Image" style="display:none;">
+                                        <span class="material-symbols-outlined">image</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="note-creator-expanded hidden" id="note-creator-expanded">
+                                <input type="text" id="note-title-input" class="note-input-title" data-i18n-placeholder="noteTitlePlaceholder" placeholder="Title...">
+                                <textarea id="note-text-input" class="note-input-text" data-i18n-placeholder="takeANote" placeholder="Take a note..." rows="3"></textarea>
+                                <!-- Checklist items area -->
+                                <div id="note-checklist-area" class="note-checklist-area hidden"></div>
+                                <!-- Footer toolbar -->
+                                <div class="note-creator-toolbar">
+                                    <div class="note-toolbar-left">
+                                        <button class="notes-icon-btn" id="btn-note-pin" title="Pin note" aria-label="Pin">
+                                            <span class="material-symbols-outlined">push_pin</span>
+                                        </button>
+                                        <button class="notes-icon-btn" id="btn-note-reminder" title="Reminder" aria-label="Reminder" style="display:none;">
+                                            <span class="material-symbols-outlined">add_alert</span>
+                                        </button>
+                                        <div class="note-color-popup-wrap">
+                                            <button class="notes-icon-btn" id="btn-note-color" title="Background color" aria-label="Color">
+                                                <span class="material-symbols-outlined">palette</span>
+                                            </button>
+                                            <div class="note-color-popup hidden" id="note-color-popup">
+                                                <button class="note-color-dot note-color-dot--default" data-color="" aria-label="Default"><span class="material-symbols-outlined" style="font-size:16px;color:#fff;opacity:0.7;">close</span></button>
+                                                <button class="note-color-dot" data-color="#5c2b29" style="background:#5c2b29" aria-label="Red"></button>
+                                                <button class="note-color-dot" data-color="#614a19" style="background:#614a19" aria-label="Orange"></button>
+                                                <button class="note-color-dot" data-color="#635d19" style="background:#635d19" aria-label="Yellow"></button>
+                                                <button class="note-color-dot" data-color="#345920" style="background:#345920" aria-label="Green"></button>
+                                                <button class="note-color-dot" data-color="#16504b" style="background:#16504b" aria-label="Teal"></button>
+                                                <button class="note-color-dot" data-color="#2d555e" style="background:#2d555e" aria-label="Blue"></button>
+                                                <button class="note-color-dot" data-color="#1e3a8a" style="background:#1e3a8a" aria-label="Dark Blue"></button>
+                                                <button class="note-color-dot" data-color="#42275e" style="background:#42275e" aria-label="Purple"></button>
+                                                <button class="note-color-dot" data-color="#5b2245" style="background:#5b2245" aria-label="Pink"></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button id="btn-close-note" class="notes-close-btn" data-i18n="noteClose">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes Body -->
+                    <div class="notes-body" id="notes-body">
+                        <!-- Pinned section -->
+                        <div id="notes-pinned-section" class="notes-section hidden">
+                            <div class="notes-section-label" data-i18n="notePinned">Pinned</div>
+                            <div id="notes-pinned-grid" class="notes-grid"></div>
+                        </div>
+                        <!-- Others section -->
+                        <div id="notes-others-section" class="notes-section">
+                            <div class="notes-section-label notes-others-label hidden" id="notes-others-label" data-i18n="noteOthers">Others</div>
+                            <div id="notes-grid" class="notes-grid"></div>
+                        </div>
+                        <!-- Empty state -->
+                        <div id="notes-empty-state" class="notes-empty-state hidden">
+                            <span class="material-symbols-outlined notes-empty-icon">lightbulb</span>
+                            <p data-i18n="noteEmptyState">Your notes will appear here</p>
+                        </div>
+                    </div>
+
+                    <!-- Note Edit Modal -->
+                    <div id="note-edit-modal" class="note-edit-modal hidden" aria-modal="true">
+                        <div class="note-edit-backdrop" id="note-edit-backdrop"></div>
+                        <div class="note-edit-card" id="note-edit-card">
+                            <input type="text" id="note-edit-title" class="note-input-title" data-i18n-placeholder="noteTitlePlaceholder" placeholder="Title...">
+                            <textarea id="note-edit-text" class="note-input-text note-edit-text" data-i18n-placeholder="takeANote" placeholder="Take a note..."></textarea>
+                            <div id="note-edit-checklist" class="note-checklist-area"></div>
+                            <div class="note-creator-toolbar note-edit-toolbar">
+                                <div class="note-toolbar-left">
+                                    <button class="notes-icon-btn" id="btn-edit-pin" title="Pin note" aria-label="Pin">
+                                        <span class="material-symbols-outlined">push_pin</span>
+                                    </button>
+                                    <div class="note-color-popup-wrap">
+                                        <button class="notes-icon-btn" id="btn-edit-color" title="Background color" aria-label="Color">
+                                            <span class="material-symbols-outlined">palette</span>
+                                        </button>
+                                        <div class="note-color-popup hidden" id="note-edit-color-popup">
+                                            <button class="note-color-dot note-color-dot--default" data-color="" aria-label="Default"><span class="material-symbols-outlined" style="font-size:16px;color:#fff;opacity:0.7;">close</span></button>
+                                            <button class="note-color-dot" data-color="#5c2b29" style="background:#5c2b29" aria-label="Red"></button>
+                                            <button class="note-color-dot" data-color="#614a19" style="background:#614a19" aria-label="Orange"></button>
+                                            <button class="note-color-dot" data-color="#635d19" style="background:#635d19" aria-label="Yellow"></button>
+                                            <button class="note-color-dot" data-color="#345920" style="background:#345920" aria-label="Green"></button>
+                                            <button class="note-color-dot" data-color="#16504b" style="background:#16504b" aria-label="Teal"></button>
+                                            <button class="note-color-dot" data-color="#2d555e" style="background:#2d555e" aria-label="Blue"></button>
+                                            <button class="note-color-dot" data-color="#1e3a8a" style="background:#1e3a8a" aria-label="Dark Blue"></button>
+                                            <button class="note-color-dot" data-color="#42275e" style="background:#42275e" aria-label="Purple"></button>
+                                            <button class="note-color-dot" data-color="#5b2245" style="background:#5b2245" aria-label="Pink"></button>
+                                        </div>
+                                    </div>
+                                    <button class="notes-icon-btn" id="btn-edit-delete" title="Delete note" aria-label="Delete">
+                                        <span class="material-symbols-outlined">delete</span>
+                                    </button>
+                                </div>
+                                <button id="btn-edit-close" class="notes-close-btn" data-i18n="noteClose">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+
                 <section id="tools-ai-panel" class="tool-panel tool-panel--ai hidden" aria-label="SmartStudyAI">
-                    <div class="ai-chat-shell glass-ai">
-                        <header class="ai-chat-header">
-                            <button class="ai-chat-back panel-back" type="button" data-panel="ai">
-                                ← <span data-i18n="back">Back</span>
+                    <!-- AI Settings Dialog (Personalization & API Key) -->
+                    <div id="ai-persona-modal" class="ai-persona-modal hidden" aria-hidden="true">
+                        <div class="ai-persona-content glass-ai" style="max-width: 440px; width: 100%;">
+                            <button type="button" id="ai-persona-close" class="ai-persona-close" aria-label="Close">×</button>
+                            <h3 style="margin-top: 0; color: var(--primary-accent); margin-bottom: 12px; font-size: 1.25rem;">Настройки SmartStudyAI</h3>
+                            
+                            <!-- API Key section -->
+                            <div style="margin-bottom: 1.2rem; text-align: left;">
+                                <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-color); display: block; margin-bottom: 6px;">Личный API-ключ Gemini:</label>
+                                <input type="password" id="ai-api-key-input-local" placeholder="Вставьте ваш ключ API (AIzaSy...)" style="width: 100%; padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--primary-accent) 40%, transparent); background: rgba(255,255,255,0.04); color: var(--text-color); font-family: inherit; font-size: 0.9rem; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
+                                <span style="font-size: 0.78rem; color: var(--text-color-secondary); display: block; margin-top: 4px; line-height: 1.3;">Использование личного ключа снимает дневной лимит сообщений. Ключ хранится только локально.</span>
+                            </div>
+
+                            <!-- Personalization section -->
+                            <div style="margin-bottom: 1.2rem; text-align: left;">
+                                <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-color); display: block; margin-bottom: 6px;">Обо мне (Персонализация):</label>
+                                <textarea id="ai-persona-input" style="width: 100%; height: 90px; resize: none; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--primary-accent) 40%, transparent); background: rgba(255,255,255,0.04); color: var(--text-color); padding: 10px; font-family: inherit; font-size: 0.9rem; box-sizing: border-box; outline: none;" placeholder="Например: Объясняй сложные темы простыми словами. Пиши ответы кратко и структурировано, используя списки. Если я прошу написать код, пиши его на JavaScript."></textarea>
+                                <span style="font-size: 0.78rem; color: var(--text-color-secondary); display: block; margin-top: 4px; line-height: 1.3;">Помогает адаптировать стиль ответов ИИ под ваши предпочтения (например: отвечать кратко, использовать определенный язык программирования и т.д.).</span>
+                            </div>
+
+                            <!-- AI Extensions Section -->
+                            <div style="margin-bottom: 1.2rem; text-align: left; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
+                                <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-color); display: block; margin-bottom: 12px;" data-i18n="aiExtensions">AI Extensions</label>
+                                <div class="extensions-list">
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <img src="google-icons/gmail.png" alt="Gmail" class="extension-icon-symbol">
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extGmailTitle">Gmail</div>
+                                                <div class="extension-desc" data-i18n="extGmailDesc">Read and send emails</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-gmail">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <span class="material-symbols-outlined extension-icon-symbol" style="color: #fbbc04; font-size: 24px;">description</span>
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extNotesTitle">Notes (Keep)</div>
+                                                <div class="extension-desc" data-i18n="extNotesDesc">AI can read, create, and manage your notes</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-notes">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+            
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <img src="google-icons/drive.png" alt="Google Drive" class="extension-icon-symbol">
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extDriveTitle">Google Drive</div>
+                                                <div class="extension-desc" data-i18n="extDriveDesc">Manage files and documents</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-drive">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <img src="google-icons/docs.png" alt="Google Docs" class="extension-icon-symbol">
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extDocsTitle">Google Docs</div>
+                                                <div class="extension-desc" data-i18n="extDocsDesc">Create and edit documents</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-docs">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+            
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <img src="google-icons/keep.png" alt="Google Keep" class="extension-icon-symbol">
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extKeepTitle">Google Keep</div>
+                                                <div class="extension-desc" data-i18n="extKeepDesc">Create and view notes</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-keep">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+            
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <img src="google-icons/calendar.png" alt="Google Calendar" class="extension-icon-symbol">
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extCalendarTitle">Google Calendar</div>
+                                                <div class="extension-desc" data-i18n="extCalendarDesc">View and manage calendar events</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-calendar">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+            
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <span class="material-symbols-outlined extension-icon-symbol tasks-icon">task_alt</span>
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extTasksTitle">Google Tasks</div>
+                                                <div class="extension-desc" data-i18n="extTasksDesc">Manage tasks and to-do lists</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-tasks">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+            
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <span class="material-symbols-outlined extension-icon-symbol youtube-icon">play_circle</span>
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extYoutubeTitle">YouTube</div>
+                                                <div class="extension-desc" data-i18n="extYoutubeDesc">Search for videos and music</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-youtube">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
+                                <button type="button" id="ai-persona-cancel" style="border-radius: 10px; padding: 8px 18px; background: transparent; border: 1px solid var(--text-color-secondary); color: var(--text-color-secondary); cursor: pointer; font-weight: 600; font-family: inherit;">Отмена</button>
+                                <button type="button" id="ai-persona-save" style="background: var(--primary-accent); color: white; border-radius: 10px; padding: 8px 22px; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px var(--glow-color-primary); font-family: inherit;">Сохранить</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chats History Drawer -->
+                    <div id="ai-drawer" class="ai-drawer hidden" aria-hidden="true">
+                        <div class="ai-drawer-header">
+                            <h3 style="margin: 0; font-size: 1.1rem; color: var(--primary-accent);">История диалогов</h3>
+                            <button type="button" id="ai-drawer-close" style="background: none; border: none; color: var(--text-color-secondary); font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px;">×</button>
+                        </div>
+                        <button type="button" id="ai-new-chat-btn" style="width: 100%; margin: 10px 0; padding: 10px; border-radius: 10px; border: 1px dashed var(--primary-accent); background: rgba(0, 255, 255, 0.03); color: var(--primary-accent); font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit;">
+                            <span>+ Новый диалог</span>
+                        </button>
+                        <div id="ai-chats-list" class="ai-chats-list">
+                            <!-- Injected dynamically -->
+                        </div>
+                        <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; margin-top: auto;">
+                            <button type="button" id="ai-toggle-persona" title="Настройки ИИ" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255, 255, 255, 0.03); color: var(--text-color); font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; transition: background 0.2s;">
+                                <span><span class="material-symbols-outlined" style="font-size: 1.1rem; line-height: 1; vertical-align: middle;">settings</span> Настройки ИИ</span>
                             </button>
-                            <h2 class="ai-chat-title">SmartStudyAI</h2>
+                        </div>
+                    </div>
+
+                    <div class="ai-chat-shell glass-ai">
+                        <header class="ai-chat-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box;">
+                            <button class="ai-chat-back panel-back" type="button" data-panel="ai">
+                                ← <span data-i18n="back">Назад</span>
+                            </button>
+                            <h2 class="ai-chat-title" style="margin: 0;">SmartStudyAI</h2>
+                            
+                            <!-- Toggle history drawer (hamburger menu) -->
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <button type="button" id="ai-toggle-history" title="История и настройки" style="background: none; border: 1px solid rgba(255,255,255,0.15); color: var(--text-color); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; transition: all 0.2s;">
+                                    ☰
+                                </button>
+                            </div>
                         </header>
 
                         <div class="ai-chat-body">
@@ -340,6 +727,9 @@
     
     <!-- Yandex login removed -->
     <script src="translations.js"></script>
+    <!-- Tool Implementations -->
+    <script src="converter.js"></script>
+    <script src="notes.js"></script>
     <script src="ai-assistant.js"></script>
     <script src="renderer.js"></script>
     <script>
