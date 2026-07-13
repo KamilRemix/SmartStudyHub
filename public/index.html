@@ -368,20 +368,20 @@
                     <div id="ai-persona-modal" class="ai-persona-modal hidden" aria-hidden="true">
                         <div class="ai-persona-content glass-ai" style="max-width: 440px; width: 100%;">
                             <button type="button" id="ai-persona-close" class="ai-persona-close" aria-label="Close">×</button>
-                            <h3 style="margin-top: 0; color: var(--primary-accent); margin-bottom: 12px; font-size: 1.25rem;">Настройки SmartStudyAI</h3>
+                            <h3 style="margin-top: 0; color: var(--primary-accent); margin-bottom: 12px; font-size: 1.25rem;" data-i18n="aiSettings">AI Settings</h3>
                             
                             <!-- API Key section -->
                             <div style="margin-bottom: 1.2rem; text-align: left;">
-                                <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-color); display: block; margin-bottom: 6px;">Личный API-ключ Gemini:</label>
-                                <input type="password" id="ai-api-key-input-local" placeholder="Вставьте ваш ключ API (AIzaSy...)" style="width: 100%; padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--primary-accent) 40%, transparent); background: rgba(255,255,255,0.04); color: var(--text-color); font-family: inherit; font-size: 0.9rem; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
-                                <span style="font-size: 0.78rem; color: var(--text-color-secondary); display: block; margin-top: 4px; line-height: 1.3;">Использование личного ключа снимает дневной лимит сообщений. Ключ хранится только локально.</span>
+                                <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-color); display: block; margin-bottom: 6px;" data-i18n="aiPersonalApiKey">Personal Gemini API key:</label>
+                                <input type="password" id="ai-api-key-input-local" data-i18n-placeholder="aiApiKeyPlaceholder" placeholder="Paste your API key (AIzaSy...)" style="width: 100%; padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--primary-accent) 40%, transparent); background: rgba(255,255,255,0.04); color: var(--text-color); font-family: inherit; font-size: 0.9rem; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
+                                <span style="font-size: 0.78rem; color: var(--text-color-secondary); display: block; margin-top: 4px; line-height: 1.3;" data-i18n="aiApiKeyHint">Using a personal key removes the daily message limit. The key is stored locally only.</span>
                             </div>
 
                             <!-- Personalization section -->
                             <div style="margin-bottom: 1.2rem; text-align: left;">
-                                <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-color); display: block; margin-bottom: 6px;">Обо мне (Персонализация):</label>
-                                <textarea id="ai-persona-input" style="width: 100%; height: 90px; resize: none; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--primary-accent) 40%, transparent); background: rgba(255,255,255,0.04); color: var(--text-color); padding: 10px; font-family: inherit; font-size: 0.9rem; box-sizing: border-box; outline: none;" placeholder="Например: Объясняй сложные темы простыми словами. Пиши ответы кратко и структурировано, используя списки. Если я прошу написать код, пиши его на JavaScript."></textarea>
-                                <span style="font-size: 0.78rem; color: var(--text-color-secondary); display: block; margin-top: 4px; line-height: 1.3;">Помогает адаптировать стиль ответов ИИ под ваши предпочтения (например: отвечать кратко, использовать определенный язык программирования и т.д.).</span>
+                                <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-color); display: block; margin-bottom: 6px;" data-i18n="aiAboutMe">About me (Personalization):</label>
+                                <textarea id="ai-persona-input" style="width: 100%; height: 90px; resize: none; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--primary-accent) 40%, transparent); background: rgba(255,255,255,0.04); color: var(--text-color); padding: 10px; font-family: inherit; font-size: 0.9rem; box-sizing: border-box; outline: none;" data-i18n-placeholder="aiPersonaPlaceholder" placeholder="E.g.: Explain complex topics simply. Keep answers brief with bullet points."></textarea>
+                                <span style="font-size: 0.78rem; color: var(--text-color-secondary); display: block; margin-top: 4px; line-height: 1.3;" data-i18n="aiPersonaHint">Helps adapt the AI response style to your preferences (e.g. short answers, specific programming language, etc.).</span>
                             </div>
 
                             <!-- AI Extensions Section -->
@@ -518,8 +518,8 @@
                             </div>
                             
                             <div style="display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
-                                <button type="button" id="ai-persona-cancel" style="border-radius: 10px; padding: 8px 18px; background: transparent; border: 1px solid var(--text-color-secondary); color: var(--text-color-secondary); cursor: pointer; font-weight: 600; font-family: inherit;">Отмена</button>
-                                <button type="button" id="ai-persona-save" style="background: var(--primary-accent); color: white; border-radius: 10px; padding: 8px 22px; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px var(--glow-color-primary); font-family: inherit;">Сохранить</button>
+                                <button type="button" id="ai-persona-cancel" style="border-radius: 10px; padding: 8px 18px; background: transparent; border: 1px solid var(--text-color-secondary); color: var(--text-color-secondary); cursor: pointer; font-weight: 600; font-family: inherit;" data-i18n="cancel">Cancel</button>
+                                <button type="button" id="ai-persona-save" style="background: var(--primary-accent); color: white; border-radius: 10px; padding: 8px 22px; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px var(--glow-color-primary); font-family: inherit;" data-i18n="save">Save</button>
                             </div>
                         </div>
                     </div>
@@ -527,18 +527,18 @@
                     <!-- Chats History Drawer -->
                     <div id="ai-drawer" class="ai-drawer hidden" aria-hidden="true">
                         <div class="ai-drawer-header">
-                            <h3 style="margin: 0; font-size: 1.1rem; color: var(--primary-accent);">История диалогов</h3>
+                            <h3 style="margin: 0; font-size: 1.1rem; color: var(--primary-accent);" data-i18n="aiChatHistory">Chat History</h3>
                             <button type="button" id="ai-drawer-close" style="background: none; border: none; color: var(--text-color-secondary); font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px;">×</button>
                         </div>
                         <button type="button" id="ai-new-chat-btn" style="width: 100%; margin: 10px 0; padding: 10px; border-radius: 10px; border: 1px dashed var(--primary-accent); background: rgba(0, 255, 255, 0.03); color: var(--primary-accent); font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit;">
-                            <span>+ Новый диалог</span>
+                            <span data-i18n="aiNewChat">+ New Chat</span>
                         </button>
                         <div id="ai-chats-list" class="ai-chats-list">
                             <!-- Injected dynamically -->
                         </div>
                         <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; margin-top: auto;">
-                            <button type="button" id="ai-toggle-persona" title="Настройки ИИ" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255, 255, 255, 0.03); color: var(--text-color); font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; transition: background 0.2s;">
-                                <span><span class="material-symbols-outlined" style="font-size: 1.1rem; line-height: 1; vertical-align: middle;">settings</span> Настройки ИИ</span>
+                            <button type="button" id="ai-toggle-persona" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255, 255, 255, 0.03); color: var(--text-color); font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; transition: background 0.2s;">
+                                <span><span class="material-symbols-outlined" style="font-size: 1.1rem; line-height: 1; vertical-align: middle;">settings</span> <span data-i18n="aiSettingsBtn">AI Settings</span></span>
                             </button>
                         </div>
                     </div>

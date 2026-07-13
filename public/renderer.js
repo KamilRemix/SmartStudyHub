@@ -975,16 +975,24 @@ function setLanguage(lang) {
 
 function updateTranslations() {
     updateAuthDialogTexts();
+    const t = translations[currentLang] || translations['en'];
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.dataset.i18n;
-        el.textContent = translations[currentLang][key] || key;
+        const val = t[key];
+        if (val !== undefined) el.textContent = val;
+    });
+    // Update placeholder attributes
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.dataset.i18nPlaceholder;
+        const val = t[key];
+        if (val !== undefined) el.placeholder = val;
     });
     // Update shadow DOM translations
     document.querySelectorAll('smart-calculator, grade-average-calculator, settings-component').forEach(component => {
         if (component.shadowRoot) {
             component.shadowRoot.querySelectorAll('[data-i18n]').forEach(el => {
                 const key = el.dataset.i18n;
-                const translation = translations[currentLang][key];
+                const translation = t[key];
                 if (translation) {
                     el.textContent = translation;
                 }
