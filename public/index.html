@@ -125,9 +125,155 @@
                         </div>
                         <div class="tile-title" data-i18n="aiAssistant">AI Помощник</div>
                     </button>
+
+                    <button class="tool-tile" id="tile-translator" aria-label="Translator">
+                        <div class="tile-icon">
+                            <i data-feather="globe"></i>
+                        </div>
+                        <div class="tile-title" data-i18n="translator">Переводчик</div>
+                    </button>
+
+                    <button class="tool-tile" id="tile-genpass" aria-label="GenPass">
+                        <div class="tile-icon">
+                            <span class="material-symbols-outlined" style="font-size: 28px; color: var(--primary-accent);">vpn_key</span>
+                        </div>
+                        <div class="tile-title" data-i18n="genpass">GenPass</div>
+                    </button>
                 </div>
 
                 <!-- Panels: hidden by default -->
+                <section id="tools-genpass-panel" class="tool-panel hidden" aria-label="GenPass">
+                    <div class="panel-header">
+                        <button class="panel-back" data-panel="genpass">← <span data-i18n="back">Back</span></button>
+                        <div class="panel-title">GenPass</div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="genpass-tabs">
+                            <button class="genpass-tab active" data-target="genpass-generator" data-i18n="genpassTabGen">Генератор</button>
+                            <button class="genpass-tab" data-target="genpass-analyzer" data-i18n="genpassTabCheck">Проверить пароль</button>
+                            <button class="genpass-tab" data-target="genpass-vault" data-i18n="genpassTabVault">Мои пароли</button>
+                        </div>
+                        
+                        <!-- TAB 1: Generator -->
+                        <div id="genpass-generator" class="genpass-content active">
+                            <div class="converter-card">
+                                <div class="password-display-wrapper" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                                    <input type="text" id="genpass-output" class="genpass-display" readonly style="flex: 1; padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: var(--text-color); font-family: monospace; font-size: 1.2rem; text-align: center;">
+                                    <button id="genpass-save-generated" class="notes-icon-btn" style="width: 50px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;" title="Сохранить в хранилище"><span class="material-symbols-outlined" style="color: var(--text-color);">bookmark_add</span></button>
+                                    <button id="genpass-copy-btn" class="notes-icon-btn" style="width: 50px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;" title="Копировать"><span class="material-symbols-outlined" style="color: var(--text-color);">content_copy</span></button>
+                                </div>
+                                <div class="genpass-controls" style="display: flex; flex-direction: column; gap: 15px;">
+                                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                                        <label style="color: var(--text-color); font-weight: 600;"><span data-i18n="genpassLength">Длина</span>: <span id="genpass-length-val">16</span></label>
+                                        <input type="range" id="genpass-length" min="5" max="64" value="16" style="width: 100%;">
+                                        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-color);">
+                                                <span data-i18n="genpassUpper">Заглавные буквы (A-Z)</span>
+                                                <label class="premium-switch">
+                                                    <input type="checkbox" id="genpass-upper" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-color);">
+                                                <span data-i18n="genpassLower">Строчные буквы (a-z)</span>
+                                                <label class="premium-switch">
+                                                    <input type="checkbox" id="genpass-lower" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-color);">
+                                                <span data-i18n="genpassNumbers">Цифры (0-9)</span>
+                                                <label class="premium-switch">
+                                                    <input type="checkbox" id="genpass-numbers" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-color);">
+                                                <span data-i18n="genpassSymbols">Символы (!@#$)</span>
+                                                <label class="premium-switch">
+                                                    <input type="checkbox" id="genpass-symbols" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button id="genpass-generate-btn" class="glass-button" style="width: 100%; margin-top: 20px; padding: 12px; background: var(--primary-accent); border:none; border-radius:10px; color:white; font-weight:bold; cursor: pointer; transition: opacity 0.2s;" data-i18n="genpassGenerate">Сгенерировать</button>
+                            </div>
+                        </div>
+
+                        <!-- TAB 2: Checker -->
+                        <div id="genpass-analyzer" class="genpass-content hidden" style="display: none;">
+                            <div class="converter-card">
+                                <div class="password-input-wrapper" style="position: relative; display: flex; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid color-mix(in srgb, var(--primary-accent) 40%, transparent); border-radius: 10px; padding-right: 10px;">
+                                    <input type="password" id="genpass-analyze-input" placeholder="Введите пароль для проверки" style="width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; color: var(--text-color); font-family: inherit; font-size: 0.9rem; outline: none;" data-i18n-placeholder="genpassCheckPlaceholder">
+                                    <button id="genpass-save-analyzed" class="notes-icon-btn" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--text-color-secondary);" title="Сохранить в хранилище"><span class="material-symbols-outlined">bookmark_add</span></button>
+                                    <button id="genpass-toggle-vis" class="notes-icon-btn" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--text-color-secondary);"><span class="material-symbols-outlined">visibility</span></button>
+                                    <button id="genpass-clear-input" class="notes-icon-btn" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--text-color-secondary);"><span class="material-symbols-outlined">close</span></button>
+                                </div>
+
+                                <div class="genpass-verdict-card" style="margin-top: 20px; padding: 20px; text-align: center; border-radius: 15px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
+                                    <div class="score-ring" style="display: inline-flex; align-items: center; justify-content: center; width: 100px; height: 100px; border-radius: 50%; border: 6px solid #444; margin-bottom: 15px; transition: border-color 0.3s;">
+                                        <h1 id="genpass-score" style="margin: 0; font-size: 2rem; color: var(--text-color);">0%</h1>
+                                    </div>
+                                    <h3 id="genpass-status" style="margin: 10px 0; font-size: 1.2rem; color: var(--text-color);" data-i18n="genpassWaiting">Ожидание ввода...</h3>
+                                    <p id="genpass-crack-time" style="color: var(--text-color-secondary); font-size: 0.9rem; margin-bottom: 0;">Время на взлом: -</p>
+                                    <p id="genpass-leak-warning" style="color: #ff4c4c; font-weight: bold; margin-top: 10px; display: none; align-items: center; justify-content: center; gap: 6px;"><span class="material-symbols-outlined" style="font-size: 20px; color: #ff4c4c; vertical-align: middle;">warning</span> <span id="genpass-leak-warning-text">Этот пароль найден в утечках!</span></p>
+                                </div>
+
+                                <div class="genpass-checklist" style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
+                                    <div class="check-item" id="check-length" style="display: flex; align-items: center; gap: 8px; color: var(--text-color-secondary);"><span class="material-symbols-outlined" style="color: #ff4c4c; font-size: 20px;">cancel</span> Длина минимум 12 символов</div>
+                                    <div class="check-item" id="check-upperlower" style="display: flex; align-items: center; gap: 8px; color: var(--text-color-secondary);"><span class="material-symbols-outlined" style="color: #ff4c4c; font-size: 20px;">cancel</span> Заглавные и строчные буквы</div>
+                                    <div class="check-item" id="check-numsym" style="display: flex; align-items: center; gap: 8px; color: var(--text-color-secondary);"><span class="material-symbols-outlined" style="color: #ff4c4c; font-size: 20px;">cancel</span> Цифры и спецсимволы</div>
+                                    <div class="check-item" id="check-patterns" style="display: flex; align-items: center; gap: 8px; color: var(--text-color-secondary);"><span class="material-symbols-outlined" style="color: #4caf50; font-size: 20px;">check_circle</span> Нет простых паттернов</div>
+                                    <div class="check-item" id="check-pwned" style="display: flex; align-items: center; gap: 8px; color: var(--text-color-secondary);"><span class="material-symbols-outlined" style="color: #4caf50; font-size: 20px;">check_circle</span> Не скомпрометирован</div>
+                                </div>
+
+                                <button id="genpass-improve-btn" class="glass-button" style="display: none; width: 100%; margin-top: 20px; padding: 12px; background: #ff9800; border:none; border-radius:10px; color:white; font-weight:bold; cursor: pointer;" data-i18n="genpassImprove">Улучшить пароль</button>
+                            </div>
+                        </div>
+
+                        <!-- TAB 3: Vault / My Passwords -->
+                        <div id="genpass-vault" class="genpass-content hidden" style="display: none;">
+                            <div class="converter-card">
+                                <div class="converter-header" style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div class="converter-title" style="font-size: 1.1rem; font-weight: 600; color: var(--text-color);" data-i18n="genpassSavedTitle">Сохраненные пароли</div>
+                                        <div id="genpass-sync-status" class="converter-sub" style="font-size: 0.8rem; color: var(--text-color-secondary);">Синхронизация...</div>
+                                    </div>
+                                    <div style="display: flex; gap: 10px; align-items: center;">
+                                        <span class="material-symbols-outlined" id="genpass-add-btn" style="color: var(--primary-accent); cursor: pointer; font-size: 24px;" title="Добавить пароль вручную">add_circle</span>
+                                        <span class="material-symbols-outlined" id="genpass-sync-icon" style="color: var(--text-color-secondary); cursor: pointer; font-size: 22px;" title="Синхронизировать">sync</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Manual Add Form (initially hidden) -->
+                                <div id="genpass-add-form" class="hidden" style="margin-bottom: 20px; padding: 15px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); display: none; flex-direction: column; gap: 12px; transition: all 0.3s ease;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-color);" data-i18n="genpassAddNew">Добавить новый пароль</h4>
+                                        <span class="material-symbols-outlined" id="genpass-add-close" style="cursor: pointer; font-size: 20px; color: var(--text-color-secondary);">close</span>
+                                    </div>
+                                    <input type="text" id="genpass-add-label" placeholder="Название сервиса (например, Google)" style="width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.15); color: var(--text-color); font-size: 0.85rem; outline: none;" data-i18n-placeholder="genpassAddLabelPlaceholder">
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <div style="position: relative; flex: 1; display: flex; align-items: center; background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding-right: 8px;">
+                                            <input type="password" id="genpass-add-password" placeholder="Пароль" style="width: 100%; padding: 10px 12px; border: none; background: transparent; color: var(--text-color); font-size: 0.85rem; outline: none;" data-i18n-placeholder="genpassAddPwdPlaceholder">
+                                            <span class="material-symbols-outlined" id="genpass-add-toggle-vis" style="cursor: pointer; font-size: 18px; color: var(--text-color-secondary);">visibility</span>
+                                        </div>
+                                        <button id="genpass-add-gen-btn" class="notes-icon-btn" style="width: 38px; height: 38px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;" title="Сгенерировать безопасный пароль"><span class="material-symbols-outlined" style="color: var(--primary-accent); font-size: 20px;">vpn_key</span></button>
+                                    </div>
+                                    <button id="genpass-add-save-btn" class="glass-button" style="width: 100%; padding: 10px; background: var(--primary-accent); border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer;" data-i18n="genpassAddBtn">Добавить пароль</button>
+                                </div>
+                                <div id="genpass-saved-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto; padding-right: 5px;">
+                                    <!-- List populated dynamically -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Floating Hover Tooltip -->
+                        <div id="genpass-tooltip" class="genpass-tooltip"></div>
+                    </div>
+                </section>
+
                 <section id="tools-settings-panel" class="tool-panel hidden">
                     <div class="panel-header">
                         <button class="panel-back" data-panel="settings">← <span data-i18n="back">Back</span></button>
@@ -250,6 +396,9 @@
                         <button id="notes-view-toggle" class="notes-icon-btn" title="Toggle view" aria-label="Toggle view">
                             <span class="material-symbols-outlined" id="notes-view-icon">grid_view</span>
                         </button>
+                        <button id="notes-filter-reminders" class="notes-icon-btn" title="Reminders" aria-label="Reminders">
+                            <span class="material-symbols-outlined">notifications</span>
+                        </button>
                     </div>
 
                     <!-- Note Creator (collapsed) -->
@@ -261,12 +410,19 @@
                                     <button class="notes-icon-btn" id="btn-new-note-check" title="New checkbox note" aria-label="Checkbox">
                                         <span class="material-symbols-outlined">check_box</span>
                                     </button>
-                                    <button class="notes-icon-btn" id="btn-new-note-img" title="New image note" aria-label="Image" style="display:none;">
+                                    <button class="notes-icon-btn" id="btn-new-note-img" title="New image note" aria-label="Image">
                                         <span class="material-symbols-outlined">image</span>
                                     </button>
                                 </div>
                             </div>
                             <div class="note-creator-expanded hidden" id="note-creator-expanded">
+                                <div id="note-creator-image-container" class="note-image-container hidden">
+                                    <img id="note-creator-image" src="" alt="Note image">
+                                    <button id="note-creator-image-remove" class="notes-icon-btn note-image-remove" aria-label="Remove image">
+                                        <span class="material-symbols-outlined">close</span>
+                                    </button>
+                                </div>
+                                <input type="file" id="note-creator-file-input" accept="image/*" class="hidden">
                                 <input type="text" id="note-title-input" class="note-input-title" data-i18n-placeholder="noteTitlePlaceholder" placeholder="Title...">
                                 <textarea id="note-text-input" class="note-input-text" data-i18n-placeholder="takeANote" placeholder="Take a note..." rows="3"></textarea>
                                 <!-- Checklist items area -->
@@ -277,7 +433,7 @@
                                         <button class="notes-icon-btn" id="btn-note-pin" title="Pin note" aria-label="Pin">
                                             <span class="material-symbols-outlined">push_pin</span>
                                         </button>
-                                        <button class="notes-icon-btn" id="btn-note-reminder" title="Reminder" aria-label="Reminder" style="display:none;">
+                                        <button class="notes-icon-btn" id="btn-note-reminder" title="Reminder" aria-label="Reminder">
                                             <span class="material-symbols-outlined">add_alert</span>
                                         </button>
                                         <div class="note-color-popup-wrap">
@@ -327,6 +483,13 @@
                     <div id="note-edit-modal" class="note-edit-modal hidden" aria-modal="true">
                         <div class="note-edit-backdrop" id="note-edit-backdrop"></div>
                         <div class="note-edit-card" id="note-edit-card">
+                            <div id="note-edit-image-container" class="note-image-container hidden">
+                                <img id="note-edit-image" src="" alt="Note image">
+                                <button id="note-edit-image-remove" class="notes-icon-btn note-image-remove" aria-label="Remove image">
+                                    <span class="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+                            <input type="file" id="note-edit-file-input" accept="image/*" class="hidden">
                             <input type="text" id="note-edit-title" class="note-input-title" data-i18n-placeholder="noteTitlePlaceholder" placeholder="Title...">
                             <textarea id="note-edit-text" class="note-input-text note-edit-text" data-i18n-placeholder="takeANote" placeholder="Take a note..."></textarea>
                             <div id="note-edit-checklist" class="note-checklist-area"></div>
@@ -334,6 +497,12 @@
                                 <div class="note-toolbar-left">
                                     <button class="notes-icon-btn" id="btn-edit-pin" title="Pin note" aria-label="Pin">
                                         <span class="material-symbols-outlined">push_pin</span>
+                                    </button>
+                                    <button class="notes-icon-btn" id="btn-edit-reminder" title="Reminder" aria-label="Reminder">
+                                        <span class="material-symbols-outlined">add_alert</span>
+                                    </button>
+                                    <button class="notes-icon-btn" id="btn-edit-img" title="Add image" aria-label="Image">
+                                        <span class="material-symbols-outlined">image</span>
                                     </button>
                                     <div class="note-color-popup-wrap">
                                         <button class="notes-icon-btn" id="btn-edit-color" title="Background color" aria-label="Color">
@@ -357,6 +526,29 @@
                                     </button>
                                 </div>
                                 <button id="btn-edit-close" class="notes-close-btn" data-i18n="noteClose">Close</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reminder Modal Popover -->
+                    <div id="note-reminder-modal" class="note-reminder-modal hidden">
+                        <div class="note-reminder-backdrop" id="note-reminder-backdrop"></div>
+                        <div class="note-reminder-card glass-ai">
+                            <div class="note-reminder-header">
+                                <span class="material-symbols-outlined note-reminder-icon">notifications_active</span>
+                                <span class="note-reminder-title" data-i18n="noteReminderTitle">Установить напоминание</span>
+                            </div>
+                            <div class="note-reminder-body">
+                                <label class="note-reminder-label" data-i18n="noteReminderSelectDate">Выберите дату и время:</label>
+                                <input type="datetime-local" id="note-reminder-datetime" class="note-reminder-input">
+                            </div>
+                            <div class="note-reminder-footer">
+                                <button id="note-reminder-clear" class="notes-icon-btn note-reminder-clear-btn hidden" title="Удалить напоминание">
+                                    <span class="material-symbols-outlined" style="font-size:18px;color:var(--secondary-accent,#ff3b30);">delete</span>
+                                </button>
+                                <div style="flex:1"></div>
+                                <button id="note-reminder-cancel" class="notes-close-btn" data-i18n="noteClose">Отмена</button>
+                                <button id="note-reminder-save" class="notes-close-btn note-reminder-save-btn" data-i18n="save">Сохранить</button>
                             </div>
                         </div>
                     </div>
@@ -589,6 +781,14 @@
                     </div>
                 </section>
 
+                <section id="tools-translator-panel" class="tool-panel hidden" aria-label="Translator">
+                    <div class="panel-header">
+                        <button class="panel-back" data-panel="translator">← <span data-i18n="back">Back</span></button>
+                        <div class="panel-title" data-i18n="translator">Переводчик</div>
+                    </div>
+                    <div class="panel-body" id="translator-container"></div>
+                </section>
+
             </div>
         </div>
     </main>
@@ -725,12 +925,16 @@
         </div>
     </div>
     
+    <!-- Toast container for notifications -->
+    <div id="app-toast-container"></div>
+    
     <!-- Yandex login removed -->
     <script src="translations.js"></script>
     <!-- Tool Implementations -->
-    <script src="converter.js"></script>
     <script src="notes.js"></script>
     <script src="ai-assistant.js"></script>
+    <script src="translator.js"></script>
+    <script src="genpass.js"></script>
     <script src="renderer.js"></script>
     <script>
       feather.replace();

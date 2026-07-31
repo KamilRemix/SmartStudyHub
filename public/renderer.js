@@ -938,6 +938,10 @@ function setTheme(theme) {
         document.body.classList.add('light-theme');
         localStorage.setItem('theme', 'light');
     }
+    const settingsComp = document.querySelector('settings-component');
+    if (settingsComp && settingsComp.updateThemeButtons) {
+        settingsComp.updateThemeButtons();
+    }
 }
 
 // --- LANGUAGE & TRANSLATION ---
@@ -1065,6 +1069,9 @@ function updateToolsTranslations() {
             }
         }
     });
+    if (window.updateGenPassTranslations) {
+        try { window.updateGenPassTranslations(); } catch(e) { console.warn(e); }
+    }
 }
 
 // --- DESKTOP APP DOWNLOAD MODAL ---
@@ -1473,6 +1480,8 @@ function initTools() {
     const panelConverter = document.getElementById('tools-converter-panel');
     const panelCurrency = document.getElementById('tools-currency-panel');
     const panelAi = document.getElementById('tools-ai-panel');
+    const panelTranslator = document.getElementById('tools-translator-panel');
+    const panelGenpass = document.getElementById('tools-genpass-panel');
 
     let aiAssistantApi = null;
     if (typeof SmartStudyAI !== 'undefined') {
@@ -1483,19 +1492,26 @@ function initTools() {
 
     function showHub() {
         if (toolsHub) toolsHub.classList.remove('hidden');
-        [panelSettings, panelConverter, panelCurrency, panelAi].forEach(p => p && p.classList.add('hidden'));
+        [panelSettings, panelConverter, panelCurrency, panelAi, panelTranslator, panelGenpass].forEach(p => p && p.classList.add('hidden'));
         updateToolsTranslations();
     }
 
     function openPanel(name) {
         if (toolsHub) toolsHub.classList.add('hidden');
-        [panelSettings, panelConverter, panelCurrency, panelAi].forEach(p => p && p.classList.add('hidden'));
+        [panelSettings, panelConverter, panelCurrency, panelAi, panelTranslator, panelGenpass].forEach(p => p && p.classList.add('hidden'));
         if (name === 'settings' && panelSettings) panelSettings.classList.remove('hidden');
         if (name === 'converter' && panelConverter) panelConverter.classList.remove('hidden');
         if (name === 'currency' && panelCurrency) panelCurrency.classList.remove('hidden');
         if (name === 'ai' && panelAi) {
             panelAi.classList.remove('hidden');
             aiAssistantApi?.onPanelOpen?.();
+        }
+        if (name === 'translator' && panelTranslator) {
+            panelTranslator.classList.remove('hidden');
+            if (typeof SmartTranslator !== 'undefined') SmartTranslator.init();
+        }
+        if (name === 'genpass' && panelGenpass) {
+            panelGenpass.classList.remove('hidden');
         }
         updateToolsTranslations();
         // trigger currency load when opening currency panel
@@ -1508,6 +1524,8 @@ function initTools() {
     document.getElementById('tile-converter')?.addEventListener('click', () => openPanel('converter'));
     document.getElementById('tile-currency')?.addEventListener('click', () => openPanel('currency'));
     document.getElementById('tile-ai')?.addEventListener('click', () => openPanel('ai'));
+    document.getElementById('tile-translator')?.addEventListener('click', () => openPanel('translator'));
+    document.getElementById('tile-genpass')?.addEventListener('click', () => openPanel('genpass'));
 
     document.querySelectorAll('.panel-back').forEach(btn => btn.addEventListener('click', () => showHub()));
 
@@ -2032,6 +2050,8 @@ class SettingsComponent extends HTMLElement {
     
     connectedCallback() {
         this.renderComponent();
+        updateTranslations();
+        this.updateThemeButtons();
     }
     
     setupTheme() { 
@@ -3835,6 +3855,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialLang = getInitialUserLanguage();
     setTheme(savedTheme);
     setLanguage(initialLang);
+
+    setTimeout(() => {
+        updateTranslations();
+    }, 50);
 
     initDesktopDownloadModal();
     initAuthDialogs();

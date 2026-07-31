@@ -1,6 +1,11 @@
 {
   "hosting": {
+    "site": "smartstudyhub-46d44",
     "public": "dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
   }
 }

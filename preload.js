@@ -6,6 +6,8 @@ const ALLOWED_SEND_CHANNELS = [
   'window-close',
   'google-signin',
   'github-signin',
+  'show-notification',
+  'open-external',
 ];
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -25,5 +27,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   getGeminiApiKey() {
     return ipcRenderer.invoke('get-gemini-key');
+  },
+
+  showNotification(title, body) {
+    ipcRenderer.send('show-notification', title, body);
+  },
+
+  openExternal(url) {
+    ipcRenderer.send('open-external', url);
   }
 });

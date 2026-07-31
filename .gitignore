@@ -1,7 +1,32 @@
+# Environment & Secrets
 .env
-node_modules/
-.firebase/
 config.json
+google-credentials.json
+
+# Dependencies
+node_modules/
+
+# Firebase cache
+.firebase/
+
+# Build output (web)
 dist/
 
-google-credentials.json
+# Desktop build output
+release/
+
+# AI helper/debug scripts (not part of the product)
+find-missing.js
+add_translations.js
+
+# Test files
+public/test_icons.html
+
+# Deploy utilities (local one-time use)
+_deploy.bat
+RELEASE_NOTES.md
+
+# OS files
+Thumbs.db
+.DS_Store
+*.log

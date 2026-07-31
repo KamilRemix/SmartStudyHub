@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell, Notification } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
@@ -11,11 +11,15 @@ const PROTOCOL = 'smartstudyhub';
 let mainWindow = null;
 
 function createWindow() {
+  const rootIcon = path.join(__dirname, 'favicon.png');
+  const publicIcon = path.join(__dirname, 'public', 'favicon.png');
+  const iconPath = fs.existsSync(rootIcon) ? rootIcon : (fs.existsSync(publicIcon) ? publicIcon : undefined);
+
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
     frame: false,
-    icon: path.join(__dirname, 'favicon.png'),
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -69,12 +73,20 @@ ipcMain.handle('get-gemini-key', () => {
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, 'utf8');
       const config = JSON.parse(content);
-      return config.GEMINI_API_KEY || '';
+      if (config.GEMINI_API_KEY) return config.GEMINI_API_KEY;
+    }
+    const envPath = path.join(__dirname, '.env');
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const match = envContent.match(/REACT_APP_GEMINI_API_KEY\s*=\s*(.*)/);
+      if (match && match[1]) {
+        return match[1].replace(/[\r\n\s'"]/g, '');
+      }
     }
   } catch (e) {
-    console.error('Failed to read config.json:', e);
+    console.error('Failed to read config/env:', e);
   }
-  return process.env.GEMINI_API_KEY || '';
+  return process.env.GEMINI_API_KEY || process.env.REACT_APP_GEMINI_API_KEY || '';
 });
 
 // ----- Window controls (IPC) -----
@@ -100,6 +112,17 @@ ipcMain.on('google-signin', () => {
 ipcMain.on('github-signin', () => {
   const url = AUTH_PAGE_URL + (AUTH_PAGE_URL.includes('?') ? '&' : '?') + 'provider=github';
   shell.openExternal(url);
+});
+
+// ----- Links and Notifications -----
+ipcMain.on('open-external', (e, url) => {
+  if (url) shell.openExternal(url);
+});
+
+ipcMain.on('show-notification', (e, title, body) => {
+  if (Notification.isSupported()) {
+    new Notification({ title, body }).show();
+  }
 });
 
 // ----- App lifecycle -----
