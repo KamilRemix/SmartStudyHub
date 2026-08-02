@@ -59,31 +59,69 @@ Write-Host "  GitHub push complete." -ForegroundColor Green
 
 # ---- STEP 5: GitHub Release ----
 Write-Host ""
-Write-Host "[7/7] Creating GitHub Release v1.0.0..." -ForegroundColor Yellow
+
+# Get version from package.json
+$version = "1.0.0"
+$packageJsonPath = Join-Path $projectDir "package.json"
+if (Test-Path $packageJsonPath) {
+    $packageJson = Get-Content $packageJsonPath | ConvertFrom-Json
+    if ($packageJson.version) {
+        $version = $packageJson.version
+    }
+}
+
+Write-Host "[7/7] Processing GitHub Release v$version..." -ForegroundColor Yellow
 
 $ghCmd = Get-Command gh -ErrorAction SilentlyContinue
 if ($ghCmd) {
     $notesFile = Join-Path $projectDir "RELEASE_NOTES.md"
+    
+    # Search for setup executable in dist
+    $installer = Get-ChildItem -Path (Join-Path $projectDir "dist") -Filter "SmartStudyHub*Setup*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $installer) {
+        $installer = Get-ChildItem -Path (Join-Path $projectDir "dist") -Filter "SmartStudyHub*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    }
 
-    $installer = Get-ChildItem -Path $projectDir -Recurse -Filter "SmartStudyHub-Setup*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    # Check if release exists on GitHub
+    $releaseExists = $false
+    gh release view "v$version" --repo "KamilRemix/SmartStudyHub" >$null 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        $releaseExists = $true
+    }
 
     if ($installer) {
         Write-Host "  Found installer: $($installer.FullName)" -ForegroundColor Gray
-        gh release create v1.0.0 --repo "KamilRemix/SmartStudyHub" --title "SmartStudyHub v1.0.0" --notes-file $notesFile $installer.FullName
-        Write-Host "  GitHub Release created with installer!" -ForegroundColor Green
+        if ($releaseExists) {
+            Write-Host "  Release v$version already exists. Uploading installer..." -ForegroundColor Yellow
+            gh release upload "v$version" --repo "KamilRemix/SmartStudyHub" $installer.FullName --clobber
+            Write-Host "  Installer uploaded to existing release!" -ForegroundColor Green
+        } else {
+            Write-Host "  Creating new release v$version..." -ForegroundColor Yellow
+            if (Test-Path $notesFile) {
+                gh release create "v$version" --repo "KamilRemix/SmartStudyHub" --title "SmartStudyHub v$version" --notes-file $notesFile $installer.FullName
+            } else {
+                gh release create "v$version" --repo "KamilRemix/SmartStudyHub" --title "SmartStudyHub v$version" --notes "Release v$version of SmartStudyHub" $installer.FullName
+            }
+            Write-Host "  GitHub Release created with installer!" -ForegroundColor Green
+        }
     } else {
-        Write-Host "  No .exe found - creating release without asset." -ForegroundColor DarkYellow
-        gh release create v1.0.0 --repo "KamilRemix/SmartStudyHub" --title "SmartStudyHub v1.0.0" --notes-file $notesFile
-        Write-Host "  GitHub Release created (no .exe attached)." -ForegroundColor Green
-        Write-Host ""
-        Write-Host "  TIP: Build the Windows installer first:" -ForegroundColor DarkYellow
-        Write-Host "       npm run build" -ForegroundColor White
-        Write-Host "       Then upload the .exe from dist/ to the release manually." -ForegroundColor White
+        Write-Host "  No .exe found in dist/." -ForegroundColor DarkYellow
+        if (-not $releaseExists) {
+            Write-Host "  Creating release v$version without asset..." -ForegroundColor Yellow
+            if (Test-Path $notesFile) {
+                gh release create "v$version" --repo "KamilRemix/SmartStudyHub" --title "SmartStudyHub v$version" --notes-file $notesFile
+            } else {
+                gh release create "v$version" --repo "KamilRemix/SmartStudyHub" --title "SmartStudyHub v$version" --notes "Release v$version of SmartStudyHub"
+            }
+            Write-Host "  GitHub Release created (no .exe attached)." -ForegroundColor Green
+        } else {
+            Write-Host "  Release v$version already exists." -ForegroundColor Green
+        }
     }
 } else {
     Write-Host "  'gh' CLI not found." -ForegroundColor Red
     Write-Host "  Install it from: https://cli.github.com/" -ForegroundColor Yellow
-    Write-Host "  Then run: gh release create v1.0.0 --title 'SmartStudyHub v1.0.0' --notes-file RELEASE_NOTES.md" -ForegroundColor Yellow
+    Write-Host "  Then run: gh release upload v$version dist\<installer>.exe" -ForegroundColor Yellow
 }
 
 Write-Host ""
