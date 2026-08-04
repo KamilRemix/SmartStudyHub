@@ -15,7 +15,7 @@ if (-not $cert) {
     Write-Host "Certificate added to Trusted Root Certification Authorities." -ForegroundColor Green
 }
 
-$exeFiles = Get-ChildItem -Path "$PSScriptRoot\..\dist" -Filter "*.exe" -Recurse
+$exeFiles = Get-ChildItem -Path "$PSScriptRoot\..\dist-exe" -Filter "*.exe" -Recurse
 
 if ($exeFiles.Count -eq 0) {
     Write-Host "No .exe files found in dist folder to sign." -ForegroundColor Yellow
