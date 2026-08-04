@@ -12,9 +12,10 @@ if (fs.existsSync(envPath)) {
     }
 }
 
+apiKey = process.env.REACT_APP_GEMINI_API_KEY || apiKey || '';
+
 if (!apiKey) {
-    console.error('❌ Error: REACT_APP_GEMINI_API_KEY not found in .env file.');
-    process.exit(1);
+    console.warn('⚠️ Warning: REACT_APP_GEMINI_API_KEY not found. Proceeding with static web build.');
 }
 
 // 2. Create/clean dist directory
