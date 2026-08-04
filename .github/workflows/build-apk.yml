@@ -46,8 +46,28 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
+      - name: Rename APK for Release
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk SmartStudyHub-v1.1.0.apk
+
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v3
         with:
           name: SmartStudyHub-Android-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: SmartStudyHub-v1.1.0.apk
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+        with:
+          tag_name: v1.1.0
+          name: SmartStudyHub v1.1.0 (Android APK & Web Release)
+          body: |
+            🎉 **SmartStudyHub v1.1.0 Release**
+            - 📱 **Android APK**: Download `SmartStudyHub-v1.1.0.apk` directly below!
+            - 🎨 Updated icon across desktop, web & Android.
+            - 📱 Fixed mobile GPA calculator layout responsiveness.
+            - 🔐 Added GitHub Sign-In support.
+          files: SmartStudyHub-v1.1.0.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
