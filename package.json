@@ -14,10 +14,12 @@
     "productName": "SmartStudyHub",
     "nodeGypRebuild": false,
     "asar": true,
+    "icon": "favicon.ico",
     "directories": {
       "output": "dist"
     },
     "win": {
+      "icon": "favicon.ico",
       "target": [
         "nsis"
       ]
