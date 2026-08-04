@@ -11,9 +11,14 @@ const PROTOCOL = 'smartstudyhub';
 let mainWindow = null;
 
 function createWindow() {
-  const rootIcon = path.join(__dirname, 'favicon.png');
-  const publicIcon = path.join(__dirname, 'public', 'favicon.png');
-  const iconPath = fs.existsSync(rootIcon) ? rootIcon : (fs.existsSync(publicIcon) ? publicIcon : undefined);
+  const iconPath = [
+    path.join(__dirname, 'icon.png'),
+    path.join(__dirname, 'favicon.ico'),
+    path.join(__dirname, 'favicon.png'),
+    path.join(__dirname, 'public', 'icon.png'),
+    path.join(__dirname, 'public', 'favicon.ico'),
+    path.join(__dirname, 'public', 'favicon.png')
+  ].find(p => fs.existsSync(p));
 
   const win = new BrowserWindow({
     width: 1200,

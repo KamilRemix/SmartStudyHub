@@ -33,7 +33,7 @@
     <h1>SmartStudyHub</h1>
     <p id="auth-desc">Sign in to link your account to the desktop app.</p>
     <button id="signin-btn" class="google" type="button">Sign in with Google</button>
-    <button id="github-signin-btn" class="github" type="button" hidden>Sign in with GitHub</button>
+    <button id="github-signin-btn" class="github" type="button">Sign in with GitHub</button>
     <div id="status" class="status"></div>
   </div>
   <script>
@@ -59,13 +59,7 @@
     const githubBtn = document.getElementById('github-signin-btn');
     const descEl = document.getElementById('auth-desc');
 
-    if (isGithub) {
-      btn.hidden = true;
-      githubBtn.hidden = false;
-      descEl.textContent = 'Sign in with GitHub to link your account to the desktop app.';
-    } else {
-      descEl.textContent = 'Sign in with Google to link your account to the desktop app.';
-    }
+    descEl.textContent = 'Sign in with Google or GitHub to link your account to the desktop app.';
 
     function setStatus(msg, isError) {
       statusEl.textContent = msg;

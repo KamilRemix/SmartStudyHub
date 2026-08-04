@@ -1,0 +1,6 @@
+{
+  "appId": "com.kamil.smartstudy",
+  "appName": "SmartStudyHub",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

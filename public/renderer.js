@@ -765,6 +765,8 @@ window.signInWithProvider = (providerId, triggerOrRetry = 0) => {
     if (typeof window.electronAPI !== 'undefined' && window.electronAPI.isElectron) {
         if (providerId === 'google.com') {
             window.electronAPI.send('google-signin');
+        } else if (providerId === 'github.com') {
+            window.electronAPI.send('github-signin');
         } else {
             showToast(t('accountLinkElectronUnsupported'), 'warning', 3000);
         }
@@ -2992,6 +2994,29 @@ class GradeAverageCalculator extends HTMLElement {
                     #subjects-list {
                         margin: 1.5rem 0;
                     }
+
+                    .add-subject-row {
+                        display: flex;
+                        gap: 0.5rem;
+                        margin-bottom: 1rem;
+                        width: 100%;
+                        box-sizing: border-box;
+                        align-items: center;
+                    }
+
+                    @media (max-width: 480px) {
+                        .add-subject-row {
+                            gap: 0.4rem;
+                        }
+                        #subject-input {
+                            font-size: 0.9rem;
+                            padding: 0.65rem;
+                        }
+                        #add-subject-btn {
+                            padding: 0.65rem 0.9rem;
+                            font-size: 0.9rem;
+                        }
+                    }
                 }
             </style>
 
@@ -3007,12 +3032,12 @@ class GradeAverageCalculator extends HTMLElement {
 
                 <!-- SUBJECTS TAB (NEW) -->
                 <div id="subjects" class="tab-content active">
-                    <div style="text-align: center; padding: 1.5rem;">
+                    <div style="text-align: center; padding: 1rem 0.5rem;">
                         <h3 data-i18n="subjects">Мои предметы</h3>
-                        <div id="subjects-list" style="margin: 2rem 0; display: grid; gap: 1rem;"></div>
-                        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-                            <input type="text" id="subject-input" placeholder="Название" data-i18n="subjectName" style="flex: 1; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--primary-accent); background: var(--component-background); color: var(--text-color); font-family: inherit;">
-                            <button id="add-subject-btn" data-i18n="create">Создать</button>
+                        <div id="subjects-list" style="margin: 1.5rem 0; display: grid; gap: 1rem;"></div>
+                        <div class="add-subject-row">
+                            <input type="text" id="subject-input" placeholder="Название" data-i18n="subjectName" style="flex: 1; min-width: 0; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--primary-accent); background: var(--component-background); color: var(--text-color); font-family: inherit; box-sizing: border-box;">
+                            <button id="add-subject-btn" data-i18n="create" style="flex-shrink: 0; padding: 0.8rem 1.2rem; background: var(--primary-accent); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: opacity 0.2s;">Создать</button>
                         </div>
                     </div>
                 </div>

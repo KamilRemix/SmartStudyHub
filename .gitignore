@@ -9,11 +9,10 @@ node_modules/
 # Firebase cache
 .firebase/
 
-# Build output (web)
+# Build output (web & electron)
 dist/
-
-# Desktop build output
-release/
+dist-exe/
+icon .png
 
 # AI helper/debug scripts (not part of the product)
 find-missing.js
