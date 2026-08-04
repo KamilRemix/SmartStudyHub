@@ -3,6 +3,8 @@ name: Build Android APK & Windows Executable
 on:
   push:
     branches: [ main ]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
