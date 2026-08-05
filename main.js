@@ -2,6 +2,9 @@ const { app, BrowserWindow, Menu, ipcMain, shell, Notification } = require('elec
 const fs = require('fs');
 const path = require('path');
 
+// ─── Auto-Updater ───────────────────────────────────────────────────
+const { checkForUpdates, initCrashDetection, registerUpdateIPC } = require('./updater');
+
 // Auth page opened in system browser; after login it redirects to smartstudyhub://auth?token=...
 // Host electron-auth.html at this URL (e.g. Firebase Hosting: smartstudyhub-46d44.web.app/electron-auth.html)
 const AUTH_PAGE_URL = 'https://smartstudyhub-46d44.web.app/electron-auth.html';
@@ -153,6 +156,15 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+
+  // ─── Auto-Updater: crash detection & update check ─────────────
+  initCrashDetection(mainWindow);
+  registerUpdateIPC(mainWindow);
+
+  // Check for updates 5 seconds after window is ready
+  mainWindow.webContents.on('did-finish-load', () => {
+    setTimeout(() => checkForUpdates(mainWindow), 5000);
+  });
 
   // Cold start: app launched by protocol (e.g. from browser redirect)
   const argvUrl = process.argv.find((arg) => arg.startsWith(`${PROTOCOL}://`));

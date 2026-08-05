@@ -1,18 +1,17 @@
-name: Build Android APK & Windows Executable
+name: Build & Release (Android APK + Windows EXE)
 
 on:
   push:
-    branches: [ main ]
     tags:
       - 'v*'
-  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-apk:
-    name: Build Android APK
+    name: "\U0001F4F1 Build Android APK"
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -39,49 +38,43 @@ jobs:
         env:
           REACT_APP_GEMINI_API_KEY: ${{ secrets.REACT_APP_GEMINI_API_KEY }}
 
-      - name: Initialize & Sync Capacitor Android
+      - name: Sync Capacitor Android
         run: |
           npx cap add android || true
           npx cap sync android
 
-      - name: Build Android Debug APK
+      - name: Build Android APK (Release)
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Rename APK for Release
+      - name: Rename APK
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk SmartStudyHub-v1.1.0.apk
+          TAG=${{ github.ref_name }}
+          cp android/app/build/outputs/apk/debug/app-debug.apk SmartStudyHub-${TAG}.apk
 
-      - name: Upload Android APK Artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SmartStudyHub-Android-APK
-          path: SmartStudyHub-v1.1.0.apk
+          path: SmartStudyHub-*.apk
 
-      - name: Publish to GitHub Releases
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+      - name: Publish APK to GitHub Releases
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.1.0
-          name: SmartStudyHub v1.1.0 (Android APK & Windows EXE)
-          body: |
-            🎉 **SmartStudyHub v1.1.0 Release**
-            - 📱 **Android APK**: Download `SmartStudyHub-v1.1.0.apk` directly below!
-            - 💻 **Windows EXE**: Download `SmartStudyHub Setup 1.0.0.exe` directly below!
-            - 🎨 Updated icon across desktop, web & Android.
-            - 📱 Fixed mobile GPA calculator layout responsiveness.
-            - 🔐 Added GitHub Sign-In support.
-          files: SmartStudyHub-v1.1.0.apk
+          tag_name: ${{ github.ref_name }}
+          name: "SmartStudyHub ${{ github.ref_name }}"
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: SmartStudyHub-*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-exe:
-    name: Build Windows EXE
+    name: "\U0001F4BB Build Windows EXE"
     runs-on: windows-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -99,17 +92,40 @@ jobs:
         env:
           REACT_APP_GEMINI_API_KEY: ${{ secrets.REACT_APP_GEMINI_API_KEY }}
 
-      - name: Build Windows Executable
+      - name: Build Windows Executable (NSIS)
         run: npm run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISH: never
 
-      - name: Publish EXE to GitHub Releases
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+      - name: Rename EXE
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $exe = Get-ChildItem -Path dist-exe -Filter '*.exe' | Select-Object -First 1
+          if ($exe) {
+            $newName = "SmartStudyHub-Setup-${tag}.exe"
+            Copy-Item $exe.FullName -Destination $newName
+            Write-Host "Renamed to $newName"
+          } else {
+            Write-Error "No .exe found in dist-exe/"
+            exit 1
+          }
+
+      - name: Upload EXE Artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: v1.1.0
-          files: dist-exe/*.exe
+          name: SmartStudyHub-Windows-EXE
+          path: SmartStudyHub-Setup-*.exe
+
+      - name: Publish EXE to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "SmartStudyHub ${{ github.ref_name }}"
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: SmartStudyHub-Setup-*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

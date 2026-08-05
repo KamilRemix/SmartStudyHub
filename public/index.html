@@ -925,6 +925,35 @@
         </div>
     </div>
     
+    
+    <!-- Auto-Update Modal (Electron + Android) -->
+    <div id="update-modal" class="update-modal" aria-hidden="true">
+        <div class="update-modal-content" role="dialog" aria-modal="true" aria-labelledby="update-modal-title">
+            <button class="update-modal-close" type="button" aria-label="Close">&times;</button>
+            <div class="update-modal-header">
+                <div class="update-modal-icon" aria-hidden="true">
+                    <span class="material-symbols-outlined">system_update</span>
+                </div>
+                <div class="update-modal-title-block">
+                    <h2 class="update-modal-title" id="update-modal-title">Доступно обновление</h2>
+                </div>
+            </div>
+            <div class="update-modal-changelog">
+                <p>Загрузка информации...</p>
+            </div>
+            <div class="update-modal-progress-container" style="display: none;">
+                <div class="update-modal-progress-track">
+                    <div class="update-modal-progress-bar" style="width: 0%;"></div>
+                </div>
+                <span class="update-modal-progress-text">0%</span>
+            </div>
+            <div class="update-modal-actions">
+                <button class="update-modal-btn-primary">Скачать</button>
+                <button class="update-modal-btn-secondary">Позже</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast container for notifications -->
     <div id="app-toast-container"></div>
     
@@ -935,6 +964,7 @@
     <script src="ai-assistant.js"></script>
     <script src="translator.js"></script>
     <script src="genpass.js"></script>
+    <script src="updater-android.js"></script>
     <script src="renderer.js"></script>
     <script>
       feather.replace();

@@ -8,6 +8,9 @@ const ALLOWED_SEND_CHANNELS = [
   'github-signin',
   'show-notification',
   'open-external',
+  // Auto-updater channels
+  'update-info-received',
+  'apply-update',
 ];
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -35,5 +38,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   openExternal(url) {
     ipcRenderer.send('open-external', url);
-  }
+  },
+
+  // ─── Auto-Updater API ───────────────────────────────────────────
+  checkForUpdates() {
+    return ipcRenderer.invoke('check-for-updates');
+  },
+
+  startUpdateDownload() {
+    return ipcRenderer.invoke('start-update-download');
+  },
+
+  applyUpdate() {
+    ipcRenderer.send('apply-update');
+  },
+
+  onUpdateAvailable(callback) {
+    ipcRenderer.on('update-available', (_event, info) => callback(info));
+  },
+
+  onUpdateDownloaded(callback) {
+    ipcRenderer.on('update-downloaded', (_event, info) => callback(info));
+  },
+
+  onUpdateError(callback) {
+    ipcRenderer.on('update-error', (_event, info) => callback(info));
+  },
+
+  onRollbackDetected(callback) {
+    ipcRenderer.on('update-rollback-detected', (_event, info) => callback(info));
+  },
 });

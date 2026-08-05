@@ -3931,5 +3931,154 @@ document.addEventListener('DOMContentLoaded', () => {
 
     feather.replace();
     updateTranslations();
+
+    // ─── Auto-Updater UI (Electron) ────────────────────────────────
+    initElectronAutoUpdater();
+
+    // ─── Auto-Updater (Android / Capacitor) ────────────────────────
+    if (typeof initAndroidUpdater === 'function') {
+        initAndroidUpdater();
+    }
 });
+
+/* ========= ELECTRON AUTO-UPDATER UI ========= */
+
+function initElectronAutoUpdater() {
+    if (typeof window.electronAPI === 'undefined' || !window.electronAPI.isElectron) return;
+
+    const modal = document.getElementById('update-modal');
+    if (!modal) return;
+
+    const closeBtn = modal.querySelector('.update-modal-close');
+    const title = modal.querySelector('.update-modal-title');
+    const changelog = modal.querySelector('.update-modal-changelog');
+    const btnPrimary = modal.querySelector('.update-modal-btn-primary');
+    const btnSecondary = modal.querySelector('.update-modal-btn-secondary');
+    const progressContainer = modal.querySelector('.update-modal-progress-container');
+    const progressBar = modal.querySelector('.update-modal-progress-bar');
+    const progressText = modal.querySelector('.update-modal-progress-text');
+
+    // Close button
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            modal.classList.remove('active');
+        });
+    }
+
+    // Click outside to close
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.remove('active');
+    });
+
+    // Listen for update-available from main process
+    window.electronAPI.onUpdateAvailable((info) => {
+        console.log('[Updater UI] Update available:', info.version);
+
+        // Store info for later download
+        window.electronAPI.send('update-info-received', info);
+
+        // Populate modal
+        if (title) title.textContent = '🎉 Доступно обновление ' + info.version;
+        if (changelog) {
+            const changelogHtml = (info.changelog || 'Нет описания')
+                .replace(/\n/g, '<br>')
+                .replace(/^## (.+)$/gm, '<strong>$1</strong>')
+                .replace(/^- (.+)$/gm, '• $1');
+            changelog.innerHTML = '<div class="update-changelog-content">' + changelogHtml + '</div>';
+        }
+
+        if (progressContainer) progressContainer.style.display = 'none';
+
+        if (btnPrimary) {
+            btnPrimary.textContent = '⬇️ Скачать и установить';
+            btnPrimary.style.display = '';
+            btnPrimary.onclick = () => {
+                // Start background download
+                btnPrimary.style.display = 'none';
+                if (progressContainer) progressContainer.style.display = '';
+                if (progressText) progressText.textContent = 'Скачивание...';
+                if (progressBar) progressBar.style.width = '0%';
+
+                window.electronAPI.startUpdateDownload().catch((err) => {
+                    console.error('[Updater UI] Download error:', err);
+                    if (progressText) progressText.textContent = 'Ошибка: ' + (err.message || err);
+                    btnPrimary.textContent = '🔄 Повторить';
+                    btnPrimary.style.display = '';
+                });
+            };
+        }
+
+        if (btnSecondary) {
+            btnSecondary.textContent = 'Позже';
+            btnSecondary.style.display = '';
+            btnSecondary.onclick = () => {
+                modal.classList.remove('active');
+            };
+        }
+
+        modal.classList.add('active');
+    });
+
+    // Listen for download completion
+    window.electronAPI.onUpdateDownloaded((info) => {
+        console.log('[Updater UI] Update downloaded:', info.path);
+
+        if (progressBar) progressBar.style.width = '100%';
+        if (progressText) progressText.textContent = 'Загрузка завершена!';
+
+        if (btnPrimary) {
+            btnPrimary.textContent = '🚀 Установить и перезапустить';
+            btnPrimary.style.display = '';
+            btnPrimary.onclick = () => {
+                btnPrimary.disabled = true;
+                btnPrimary.textContent = 'Установка...';
+                window.electronAPI.applyUpdate();
+            };
+        }
+
+        if (btnSecondary) {
+            btnSecondary.textContent = 'Позже';
+            btnSecondary.style.display = '';
+        }
+    });
+
+    // Listen for errors
+    window.electronAPI.onUpdateError((info) => {
+        console.error('[Updater UI] Update error:', info.error);
+        if (progressText) progressText.textContent = 'Ошибка: ' + info.error;
+        if (progressBar) progressBar.style.width = '0%';
+        if (btnPrimary) {
+            btnPrimary.textContent = '🔄 Повторить';
+            btnPrimary.style.display = '';
+        }
+    });
+
+    // Listen for rollback detection
+    window.electronAPI.onRollbackDetected((info) => {
+        console.warn('[Updater UI] Rollback detected:', info.message);
+
+        if (title) title.textContent = '⚠️ Проблема после обновления';
+        if (changelog) {
+            changelog.innerHTML = '<p>' + info.message +
+                '</p><p style="margin-top:8px;font-size:0.85em;opacity:0.7;">Пожалуйста, скачайте предыдущую версию из GitHub Releases или обратитесь в поддержку.</p>';
+        }
+        if (progressContainer) progressContainer.style.display = 'none';
+
+        if (btnPrimary) {
+            btnPrimary.textContent = 'Открыть GitHub Releases';
+            btnPrimary.style.display = '';
+            btnPrimary.onclick = () => {
+                window.electronAPI.openExternal('https://github.com/KamilRemix/SmartStudyHub/releases');
+                modal.classList.remove('active');
+            };
+        }
+        if (btnSecondary) {
+            btnSecondary.textContent = 'Закрыть';
+            btnSecondary.style.display = '';
+            btnSecondary.onclick = () => modal.classList.remove('active');
+        }
+
+        modal.classList.add('active');
+    });
+}
 
