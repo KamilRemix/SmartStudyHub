@@ -8,10 +8,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
   <style>
     body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #121212; color: #e0e0e0; }
-    .card { background: #1e1e1e; padding: 2rem; border-radius: 12px; text-align: center; max-width: 360px; border: 1px solid rgba(0, 255, 255, 0.35); box-shadow: 0 0 24px rgba(0, 255, 255, 0.15); }
+    .card { background: #1e1e1e; padding: 2rem; border-radius: 12px; text-align: center; max-width: 400px; border: 1px solid rgba(0, 255, 255, 0.35); box-shadow: 0 0 24px rgba(0, 255, 255, 0.15); }
     h1 { margin: 0 0 1rem; font-size: 1.25rem; text-shadow: 0 0 10px rgba(0, 255, 255, 0.35); }
-    p { margin: 0 0 1.5rem; color: #a0a0a0; font-size: 0.9rem; }
-    button { width: 100%; color: #fff; border: none; padding: 12px 24px; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    p { margin: 0 0 1.5rem; color: #a0a0a0; font-size: 0.9rem; line-height: 1.4; }
+    button { width: 100%; color: #fff; border: none; padding: 12px 24px; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s, background 0.2s; }
     button.google { background: #4285f4; }
     button.google:hover { background: #3367d6; transform: translateY(-1px); }
     button.github {
@@ -24,16 +24,23 @@
       transform: translateY(-1px);
       box-shadow: 0 0 22px rgba(0, 255, 255, 0.4);
     }
-    .status { margin-top: 1rem; font-size: 0.85rem; color: #00c853; }
+    button.pulse {
+      animation: pulseBtn 1.5s infinite alternate;
+    }
+    @keyframes pulseBtn {
+      from { transform: scale(1); }
+      to { transform: scale(1.03); }
+    }
+    .status { margin-top: 1rem; font-size: 0.85rem; color: #00c853; word-break: break-word; }
     .error { color: #ff5252; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>SmartStudyHub</h1>
-    <p id="auth-desc">Sign in to link your account to the desktop app.</p>
+    <p id="auth-desc">Click below to complete sign-in for the desktop app.</p>
     <button id="signin-btn" class="google" type="button">Sign in with Google</button>
-    <button id="github-signin-btn" class="github" type="button" hidden>Sign in with GitHub</button>
+    <button id="github-signin-btn" class="github" type="button">Sign in with GitHub</button>
     <div id="status" class="status"></div>
   </div>
   <script>
@@ -60,11 +67,11 @@
     const descEl = document.getElementById('auth-desc');
 
     if (isGithub) {
-      btn.hidden = true;
-      githubBtn.hidden = false;
-      descEl.textContent = 'Sign in with GitHub to link your account to the desktop app.';
+      githubBtn.classList.add('pulse');
+      descEl.textContent = 'Click "Sign in with GitHub" to link your account to the desktop app.';
     } else {
-      descEl.textContent = 'Sign in with Google to link your account to the desktop app.';
+      btn.classList.add('pulse');
+      descEl.textContent = 'Click "Sign in with Google" to link your account to the desktop app.';
     }
 
     function setStatus(msg, isError) {
@@ -84,22 +91,42 @@
     }
 
     function tokenFromResult(result, provider) {
+      if (!result) return Promise.reject(new Error('No result returned from auth'));
       const cred = result.credential;
-      if (provider === 'github' && cred && cred.accessToken) {
+      const prov = provider || (cred && cred.providerId && cred.providerId.includes('github') ? 'github' : 'google');
+      if (prov === 'github' && cred && cred.accessToken) {
         return Promise.resolve({ token: cred.accessToken, provider: 'github' });
       }
-      if (provider === 'google' && cred && cred.idToken) {
+      if (prov === 'google' && cred && cred.idToken) {
         return Promise.resolve({ token: cred.idToken, provider: 'google', googleAccessToken: cred.accessToken });
       }
-      return result.user.getIdToken().then((token) => ({ token, provider }));
+      if (result.user) {
+        return result.user.getIdToken().then((token) => ({ token, provider: prov }));
+      }
+      return Promise.reject(new Error('Failed to retrieve user token'));
     }
+
+    // Check for redirect result when returning from redirect auth
+    firebase.auth().getRedirectResult()
+      .then((result) => {
+        if (result && result.user) {
+          setStatus('Authentication successful! Opening app…');
+          return tokenFromResult(result).then(({ token, provider, googleAccessToken }) => {
+            openInApp(token, provider, googleAccessToken);
+          });
+        }
+      })
+      .catch((err) => {
+        console.error('Redirect auth error:', err);
+        setStatus(err.message || 'Redirect authentication failed.', true);
+      });
 
     function runSignIn(providerName) {
       setStatus('Signing in…');
-      const activeBtn = providerName === 'github' ? githubBtn : btn;
-      activeBtn.disabled = true;
       btn.disabled = true;
       githubBtn.disabled = true;
+      btn.classList.remove('pulse');
+      githubBtn.classList.remove('pulse');
 
       const provider = providerName === 'github'
         ? new firebase.auth.GithubAuthProvider()
@@ -121,18 +148,20 @@
           openInApp(token, provider, googleAccessToken);
         })
         .catch((err) => {
-          setStatus(err.message || 'Sign-in failed.', true);
-          btn.disabled = false;
-          githubBtn.disabled = false;
+          console.warn('Popup sign-in warning:', err);
+          if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+            setStatus('Popup blocked or closed. Switching to secure redirect…');
+            firebase.auth().signInWithRedirect(provider);
+          } else {
+            setStatus(err.message || 'Sign-in failed.', true);
+            btn.disabled = false;
+            githubBtn.disabled = false;
+          }
         });
     }
 
     btn.addEventListener('click', () => runSignIn('google'));
     githubBtn.addEventListener('click', () => runSignIn('github'));
-
-    if (isGithub) {
-      runSignIn('github');
-    }
   </script>
 </body>
 </html>
