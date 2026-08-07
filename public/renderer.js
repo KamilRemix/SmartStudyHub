@@ -1177,43 +1177,6 @@ async function fetchLatestReleaseAssets() {
     }
 }
 
-    if (langSelect) {
-        langSelect.innerHTML = '';
-        for (const langCode in translations) {
-            const opt = document.createElement('option');
-            opt.value = langCode;
-            opt.textContent = translations[langCode].languageName;
-            langSelect.appendChild(opt);
-        }
-        syncDesktopDownloadLangSelector();
-
-        langSelect.addEventListener('change', (e) => {
-            const newLang = e.target.value;
-            if (newLang && translations[newLang]) {
-                setLanguage(newLang);
-            }
-        });
-    }
-}
-
-function openDesktopDownloadModal() {
-    const modal = document.getElementById('desktop-app-modal');
-    if (!modal) return;
-    modal.classList.add('open');
-    modal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('desktop-modal-open');
-    document.body.style.overflow = 'hidden';
-}
-
-function closeDesktopDownloadModal() {
-    const modal = document.getElementById('desktop-app-modal');
-    if (!modal) return;
-    modal.classList.remove('open');
-    modal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('desktop-modal-open');
-    document.body.style.overflow = '';
-}
-
 
 /* ========= WEB COMPONENTS ========= */
 
