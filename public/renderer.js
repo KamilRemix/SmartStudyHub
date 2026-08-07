@@ -1078,44 +1078,104 @@ function updateToolsTranslations() {
 
 // --- DESKTOP APP DOWNLOAD MODAL ---
 
-const DESKTOP_APP_VERSION = '1.0.0';
-// TODO: replace with your real .exe URL from GitHub/Vercel storage
-const DESKTOP_APP_DOWNLOAD_URL = 'https://example.com/SmartStudyHub-Setup.exe';
+const DESKTOP_APP_VERSION = '1.1.0';
+const DESKTOP_APP_DOWNLOAD_URL = 'https://github.com/KamilRemix/SmartStudyHub/releases/latest';
 
 function initDesktopDownloadModal() {
-    const triggerBtn = document.getElementById('download-desktop-btn');
-    const modal = document.getElementById('desktop-app-modal');
-    if (!triggerBtn || !modal) return;
+    initWebDownloadHub();
+}
 
-    const closeBtn = modal.querySelector('[data-close]');
-    const downloadBtn = document.getElementById('desktop-app-download-btn');
-    const versionEl = document.getElementById('desktop-app-version');
-    const langSelect = document.getElementById('desktop-lang-select');
+function initWebDownloadHub() {
+    // Check if running inside Electron or Capacitor native app
+    const isElectron = typeof window.electronAPI !== 'undefined' && window.electronAPI.isElectron;
+    const isCapacitor = typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
 
-    if (versionEl) {
-        versionEl.textContent = DESKTOP_APP_VERSION;
-    }
-    if (downloadBtn) {
-        downloadBtn.href = DESKTOP_APP_DOWNLOAD_URL;
+    if (isElectron || isCapacitor) {
+        document.body.classList.add(isElectron ? 'is-electron' : 'is-native-app');
+        return; // Hides all .web-download-trigger elements in CSS
     }
 
-    triggerBtn.addEventListener('click', () => openDesktopDownloadModal());
+    const modal = document.getElementById('download-hub-modal') || document.getElementById('desktop-app-modal');
+    if (!modal) return;
 
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => closeDesktopDownloadModal());
-    }
+    // Attach click listeners to all triggers with class .web-download-trigger or ID #download-desktop-btn
+    const triggers = document.querySelectorAll('.web-download-trigger, #download-desktop-btn, #web-download-tab, #tile-download');
+    triggers.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            modal.classList.add('active');
+            document.body.classList.add('desktop-modal-open');
+        });
+    });
+
+    const closeBtns = modal.querySelectorAll('[data-hub-close], [data-close], .download-hub-close');
+    closeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            modal.classList.remove('active');
+            document.body.classList.remove('desktop-modal-open');
+        });
+    });
 
     modal.addEventListener('click', (event) => {
         if (event.target === modal) {
-            closeDesktopDownloadModal();
+            modal.classList.remove('active');
+            document.body.classList.remove('desktop-modal-open');
         }
     });
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
-            closeDesktopDownloadModal();
+            modal.classList.remove('active');
+            document.body.classList.remove('desktop-modal-open');
         }
     });
+
+    // Dynamically fetch latest release assets from GitHub API
+    fetchLatestReleaseAssets();
+}
+
+async function fetchLatestReleaseAssets() {
+    try {
+        const response = await fetch('https://api.github.com/repos/KamilRemix/SmartStudyHub/releases/latest');
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const tag = data.tag_name;
+
+        const tagEl = document.getElementById('hub-release-tag');
+        if (tagEl && tag) tagEl.textContent = tag;
+
+        const exeAsset = data.assets && data.assets.find(a => a.name.endsWith('.exe'));
+        const apkAsset = data.assets && data.assets.find(a => a.name.endsWith('.apk'));
+
+        if (exeAsset) {
+            const winBtn = document.getElementById('hub-win-download-btn');
+            if (winBtn) {
+                winBtn.href = exeAsset.browser_download_url;
+                const subtext = winBtn.querySelector('.btn-subtext');
+                const sizeMb = (exeAsset.size / (1024 * 1024)).toFixed(1);
+                if (subtext) subtext.textContent = `Setup .exe (${sizeMb} МБ) • Win 10/11`;
+            }
+        }
+
+        if (apkAsset) {
+            const apkBtn = document.getElementById('hub-apk-download-btn');
+            if (apkBtn) {
+                apkBtn.href = apkAsset.browser_download_url;
+                const subtext = apkBtn.querySelector('.btn-subtext');
+                const sizeMb = (apkAsset.size / (1024 * 1024)).toFixed(1);
+                if (subtext) subtext.textContent = `Release .apk (${sizeMb} МБ) • Android 7+`;
+            }
+
+            const qrImg = document.getElementById('hub-apk-qr-img');
+            if (qrImg) {
+                qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(apkAsset.browser_download_url)}&color=ffffff&bgcolor=1e293b`;
+            }
+        }
+    } catch (err) {
+        console.warn('[WebDownloadHub] Could not fetch GitHub release details:', err);
+    }
+}
 
     if (langSelect) {
         langSelect.innerHTML = '';

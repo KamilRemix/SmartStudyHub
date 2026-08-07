@@ -3990,3 +3990,495 @@ body.dark-theme .note-reminder-input {
         text-align: center;
     }
 }
+
+/* ========= WEB DOWNLOAD HUB MODAL & TRIGGERS ========= */
+
+/* Hide download triggers inside native Electron or Capacitor apps */
+body.is-electron .web-download-trigger,
+body.is-native-app .web-download-trigger,
+body.is-capacitor .web-download-trigger {
+    display: none !important;
+}
+
+/* Pulse animation dot for download indicators */
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #00e676;
+    box-shadow: 0 0 10px #00e676;
+    display: inline-block;
+    animation: pulseDotGlow 1.8s infinite ease-in-out;
+}
+
+@keyframes pulseDotGlow {
+    0% { transform: scale(0.9); opacity: 0.7; box-shadow: 0 0 6px #00e676; }
+    50% { transform: scale(1.25); opacity: 1; box-shadow: 0 0 14px #00e676; }
+    100% { transform: scale(0.9); opacity: 0.7; box-shadow: 0 0 6px #00e676; }
+}
+
+/* Floating Web Trigger Button (Top Right on Web version) */
+.download-desktop-btn {
+    position: fixed;
+    top: 16px;
+    right: 20px;
+    z-index: 1200;
+    padding: 8px 16px;
+    border-radius: 50px;
+    border: 1px solid color-mix(in srgb, var(--primary-accent) 45%, transparent);
+    background: rgba(18, 24, 38, 0.75);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    color: var(--text-color);
+    font-family: var(--font-family);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 16px var(--glow-color-primary);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s, background 0.2s;
+}
+
+.download-desktop-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    background: rgba(24, 32, 50, 0.9);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4), 0 0 24px var(--glow-color-primary);
+    border-color: var(--primary-accent);
+}
+
+.download-desktop-btn:active {
+    transform: translateY(0) scale(0.98);
+}
+
+/* Download Hub Modal Overlay */
+.download-hub-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(8, 12, 22, 0.82);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    animation: hubFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.download-hub-modal.active {
+    display: flex;
+}
+
+@keyframes hubFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes hubSlideUp {
+    from { opacity: 0; transform: translateY(30px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Download Hub Dialog Container */
+.download-hub-content {
+    background: color-mix(in srgb, var(--component-background) 92%, #0a0f1d);
+    border-radius: 24px;
+    padding: 36px;
+    max-width: 840px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow:
+        0 32px 64px rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 0 40px var(--glow-color-primary);
+    border: 1px solid color-mix(in srgb, var(--primary-accent) 30%, transparent);
+    animation: hubSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.download-hub-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-color-secondary);
+    font-size: 26px;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s, transform 0.2s;
+    line-height: 1;
+}
+
+.download-hub-close:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text-color);
+    transform: rotate(90deg);
+}
+
+/* Header */
+.download-hub-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.download-hub-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 50px;
+    background: rgba(0, 255, 255, 0.08);
+    border: 1px solid rgba(0, 255, 255, 0.25);
+    color: var(--primary-accent);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+}
+
+.download-hub-badge .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.download-hub-title {
+    font-family: var(--font-family);
+    font-size: 1.65rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin: 0 0 10px 0;
+    letter-spacing: -0.01em;
+}
+
+.download-hub-subtitle {
+    font-size: 0.95rem;
+    color: var(--text-color-secondary);
+    max-width: 620px;
+    margin: 0 auto 16px auto;
+    line-height: 1.55;
+}
+
+.download-hub-version-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.84rem;
+    color: var(--text-color-secondary);
+    background: rgba(255, 255, 255, 0.04);
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Cards Grid */
+.download-hub-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 24px;
+    margin-bottom: 28px;
+}
+
+/* Download Cards */
+.download-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 20px;
+    padding: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s, box-shadow 0.25s;
+}
+
+.download-card:hover {
+    transform: translateY(-4px);
+}
+
+.download-card--windows:hover {
+    border-color: rgba(0, 242, 254, 0.4);
+    box-shadow: 0 20px 40px rgba(0, 242, 254, 0.12);
+}
+
+.download-card--android:hover {
+    border-color: rgba(0, 230, 118, 0.4);
+    box-shadow: 0 20px 40px rgba(0, 230, 118, 0.12);
+}
+
+.card-glow-bg {
+    position: absolute;
+    top: -40%;
+    right: -40%;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0.15;
+    filter: blur(40px);
+}
+
+.download-card--windows .card-glow-bg {
+    background: radial-gradient(circle, #00f2fe, transparent 70%);
+}
+
+.download-card--android .card-glow-bg {
+    background: radial-gradient(circle, #00e676, transparent 70%);
+}
+
+/* Card Header */
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.platform-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.platform-icon--win {
+    background: linear-gradient(135deg, rgba(0, 242, 254, 0.15), rgba(79, 172, 254, 0.25));
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    color: #00f2fe;
+}
+.platform-icon--win svg {
+    width: 26px;
+    height: 26px;
+}
+
+.platform-icon--android {
+    background: linear-gradient(135deg, rgba(0, 230, 118, 0.15), rgba(16, 185, 129, 0.25));
+    border: 1px solid rgba(0, 230, 118, 0.3);
+    color: #00e676;
+}
+.platform-icon--android .material-symbols-outlined {
+    font-size: 30px;
+}
+
+.platform-tag {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-color-secondary);
+}
+
+.platform-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin: 2px 0 0 0;
+}
+
+/* Features List */
+.platform-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 24px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.platform-features li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.88rem;
+    color: var(--text-color-secondary);
+    line-height: 1.45;
+}
+
+.check-icon {
+    font-size: 18px !important;
+    color: var(--primary-accent);
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* Buttons */
+.download-btn {
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    border-radius: 14px;
+    color: #ffffff;
+    font-family: var(--font-family);
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.download-btn--win {
+    background: linear-gradient(135deg, #00c6ff, #0072ff);
+    box-shadow: 0 6px 20px rgba(0, 114, 255, 0.3);
+}
+
+.download-btn--win:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(0, 114, 255, 0.45);
+}
+
+.download-btn--android {
+    background: linear-gradient(135deg, #00e676, #00b0ff);
+    box-shadow: 0 6px 20px rgba(0, 230, 118, 0.3);
+}
+
+.download-btn--android:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(0, 230, 118, 0.45);
+}
+
+.btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-text-block {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.btn-main-text {
+    font-size: 0.98rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.btn-subtext {
+    font-size: 0.78rem;
+    opacity: 0.85;
+    margin-top: 2px;
+}
+
+.btn-arrow {
+    font-size: 20px !important;
+    transition: transform 0.2s;
+}
+
+.download-btn:hover .btn-arrow {
+    transform: translateX(4px);
+}
+
+/* Android Actions Layout with QR code */
+.android-actions-block {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.android-actions-block .download-btn--android {
+    flex: 1;
+}
+
+.qr-code-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
+.qr-code-img {
+    width: 64px;
+    height: 64px;
+    border-radius: 6px;
+    display: block;
+}
+
+.qr-hint {
+    font-size: 0.68rem;
+    color: var(--text-color-secondary);
+    margin-top: 4px;
+    text-align: center;
+}
+
+/* Modal Footer */
+.download-hub-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.86rem;
+    color: var(--text-color-secondary);
+}
+
+.footer-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.footer-github-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-color-secondary);
+    text-decoration: none;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: color 0.2s, background 0.2s;
+}
+
+.footer-github-link:hover {
+    color: var(--text-color);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Responsive Styles for Download Hub */
+@media (max-width: 720px) {
+    .download-hub-content {
+        padding: 24px 20px;
+        border-radius: 20px;
+    }
+    .download-hub-title {
+        font-size: 1.3rem;
+    }
+    .download-hub-grid {
+        grid-template-columns: 1fr;
+    }
+    .android-actions-block {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .qr-code-box {
+        flex-direction: row;
+        gap: 12px;
+        justify-content: center;
+        padding: 10px;
+    }
+    .qr-code-img {
+        width: 48px;
+        height: 48px;
+    }
+    .download-hub-footer {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+    }
+}

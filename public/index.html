@@ -61,6 +61,13 @@
     </script>
 </head>
 <body>
+    <!-- Floating Web Download Button (Shown ONLY on website version) -->
+    <button id="download-desktop-btn" class="download-desktop-btn web-download-trigger" type="button" aria-label="Скачать приложение для ПК и телефона">
+        <span class="pulse-dot"></span>
+        <span class="material-symbols-outlined icon-glow">rocket_launch</span>
+        <span class="btn-label">Скачать App</span>
+    </button>
+
     <header class="app-titlebar" id="app-titlebar" role="banner">
         <span class="app-titlebar-title">SmartStudyHub</span>
         <div class="app-titlebar-controls">
@@ -138,6 +145,13 @@
                             <span class="material-symbols-outlined" style="font-size: 28px; color: var(--primary-accent);">vpn_key</span>
                         </div>
                         <div class="tile-title" data-i18n="genpass">GenPass</div>
+                    </button>
+
+                    <button class="tool-tile tool-tile--download web-download-trigger" id="tile-download" aria-label="Скачать приложения">
+                        <div class="tile-icon tile-icon--download">
+                            <span class="material-symbols-outlined" style="font-size: 28px; color: var(--primary-accent);">download_for_offline</span>
+                        </div>
+                        <div class="tile-title">Скачать App</div>
                     </button>
                 </div>
 
@@ -807,6 +821,10 @@
                 <i data-feather="grid"></i>
                 <span class="nav-label" data-i18n="tools">Tools</span>
             </button>
+            <button id="web-download-tab" class="nav-tab web-download-trigger" title="Скачать приложение для ПК и Android">
+                <i data-feather="download-cloud"></i>
+                <span class="nav-label">Скачать App</span>
+            </button>
         </nav>
     </footer>
 
@@ -867,61 +885,130 @@
     </div>
 
     <!-- Desktop app download modal -->
-    <div id="desktop-app-modal" class="download-modal" aria-hidden="true">
-        <div class="download-modal-content" role="dialog" aria-modal="true" aria-labelledby="desktop-app-title">
-            <button class="desktop-modal-close" type="button" data-close aria-label="Close">
-                ×
-            </button>
-            <div class="download-modal-header">
-                <div class="desktop-windows-logo" aria-hidden="true">
-                    <svg viewBox="0 0 48 48">
-                        <path d="M4 6L22 3.5V23H4V6Z" />
-                        <path d="M26 3L44 0.5V23H26V3Z" />
-                        <path d="M4 25H22V44.5L4 42V25Z" />
-                        <path d="M26 25H44V47.5L26 45V25Z" />
-                    </svg>
+    <!-- Beautiful Web Download Hub Modal (PC & Android) -->
+    <div id="download-hub-modal" class="download-hub-modal" aria-hidden="true">
+        <div class="download-hub-content" role="dialog" aria-modal="true" aria-labelledby="download-hub-title">
+            <button class="download-hub-close" type="button" data-hub-close aria-label="Close">&times;</button>
+            
+            <div class="download-hub-header">
+                <div class="download-hub-badge">
+                    <span class="material-symbols-outlined">rocket_launch</span>
+                    <span>SMARTSTUDYHUB APPS</span>
                 </div>
-                <div class="desktop-modal-title-block">
-                    <span class="desktop-modal-tag" data-i18n="desktopAppTag">Desktop app</span>
-                    <h2 id="desktop-app-title" data-i18n="desktopAppTitle">SmartStudyHub for Windows</h2>
-                    <p class="desktop-modal-desc" data-i18n="desktopAppDescription">
-                        Use SmartStudyHub as a fast native app on your Windows PC.
-                    </p>
+                <h2 id="download-hub-title" class="download-hub-title">Установите приложение на ПК и Телефон</h2>
+                <p class="download-hub-subtitle">
+                    Получите максимум производительности: быстрый запуск без браузера, фоновые уведомления и оффлайн-доступ к оценкам и заметкам.
+                </p>
+                <div class="download-hub-version-tag">
+                    <span class="pulse-dot"></span>
+                    <span>Последний релиз: <strong id="hub-release-tag">v1.1.0</strong> (Официальные сборки GitHub)</span>
                 </div>
             </div>
 
-            <div class="desktop-modal-meta">
-                <div class="desktop-modal-version-row">
-                    <span id="desktop-version-label" class="desktop-version-label" data-i18n="versionLabel">Version</span>
-                    <span id="desktop-app-version" class="desktop-version-value">1.0.0</span>
+            <div class="download-hub-grid">
+                <!-- Windows Card -->
+                <div class="download-card download-card--windows">
+                    <div class="card-glow-bg"></div>
+                    <div class="card-header">
+                        <div class="platform-icon platform-icon--win">
+                            <svg viewBox="0 0 48 48" fill="currentColor">
+                                <path d="M4 6L22 3.5V23H4V6Z" />
+                                <path d="M26 3L44 0.5V23H26V3Z" />
+                                <path d="M4 25H22V44.5L4 42V25Z" />
+                                <path d="M26 25H44V47.5L26 45V25Z" />
+                            </svg>
+                        </div>
+                        <div class="platform-info">
+                            <span class="platform-tag">Windows x64</span>
+                            <h3 class="platform-title">SmartStudyHub for PC</h3>
+                        </div>
+                    </div>
+
+                    <ul class="platform-features">
+                        <li>
+                            <span class="material-symbols-outlined check-icon">check_circle</span>
+                            <span>Быстрый запуск с рабочего стола без браузера</span>
+                        </li>
+                        <li>
+                            <span class="material-symbols-outlined check-icon">check_circle</span>
+                            <span>Системный трей и удобный вход через Deep Link</span>
+                        </li>
+                        <li>
+                            <span class="material-symbols-outlined check-icon">check_circle</span>
+                            <span>Безопасное автообновление в фоновом режиме</span>
+                        </li>
+                    </ul>
+
+                    <a id="hub-win-download-btn" class="download-btn download-btn--win" href="https://github.com/KamilRemix/SmartStudyHub/releases/latest" target="_blank" rel="noopener">
+                        <div class="btn-icon">
+                            <span class="material-symbols-outlined">desktop_windows</span>
+                        </div>
+                        <div class="btn-text-block">
+                            <span class="btn-main-text">Скачать для Windows</span>
+                            <span class="btn-subtext">Setup .exe • Win 10/11</span>
+                        </div>
+                        <span class="material-symbols-outlined btn-arrow">arrow_forward</span>
+                    </a>
                 </div>
-                <div class="desktop-modal-lang-row">
-                    <label for="desktop-lang-select" data-i18n="language">Language</label>
-                    <select id="desktop-lang-select"></select>
+
+                <!-- Android Card -->
+                <div class="download-card download-card--android">
+                    <div class="card-glow-bg"></div>
+                    <div class="card-header">
+                        <div class="platform-icon platform-icon--android">
+                            <span class="material-symbols-outlined">android</span>
+                        </div>
+                        <div class="platform-info">
+                            <span class="platform-tag">Android 7.0+</span>
+                            <h3 class="platform-title">SmartStudyHub Mobile</h3>
+                        </div>
+                    </div>
+
+                    <ul class="platform-features">
+                        <li>
+                            <span class="material-symbols-outlined check-icon">check_circle</span>
+                            <span>Оптимизировано под сенсорное управление</span>
+                        </li>
+                        <li>
+                            <span class="material-symbols-outlined check-icon">check_circle</span>
+                            <span>Быстрое оффлайн-хранение оценок и заметок</span>
+                        </li>
+                        <li>
+                            <span class="material-symbols-outlined check-icon">check_circle</span>
+                            <span>Безопасный системный PackageInstaller</span>
+                        </li>
+                    </ul>
+
+                    <div class="android-actions-block">
+                        <a id="hub-apk-download-btn" class="download-btn download-btn--android" href="https://github.com/KamilRemix/SmartStudyHub/releases/latest" target="_blank" rel="noopener">
+                            <div class="btn-icon">
+                                <span class="material-symbols-outlined">smartphone</span>
+                            </div>
+                            <div class="btn-text-block">
+                                <span class="btn-main-text">Скачать для Android</span>
+                                <span class="btn-subtext">Release .apk</span>
+                            </div>
+                            <span class="material-symbols-outlined btn-arrow">arrow_forward</span>
+                        </a>
+
+                        <div class="qr-code-box" title="Отсканируйте камерой телефона">
+                            <img id="hub-apk-qr-img" class="qr-code-img" src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=https%3A%2F%2Fgithub.com%2FKamilRemix%2FSmartStudyHub%2Freleases%2Flatest&color=ffffff&bgcolor=1e293b" alt="QR Code for Mobile Download" loading="lazy" />
+                            <span class="qr-hint">QR-код на телефон</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="desktop-modal-changelog">
-                <h3 data-i18n="changelogTitle">Changelog</h3>
-                <ul>
-                    <li data-i18n="changelogItem1">New optimized layout for desktop screens.</li>
-                    <li data-i18n="changelogItem2">Improved offline-ready grade storage.</li>
-                    <li data-i18n="changelogItem3">Bug fixes and performance improvements.</li>
-                </ul>
+            <div class="download-hub-footer">
+                <div class="footer-note">
+                    <span class="material-symbols-outlined">language</span>
+                    <span>Вы сейчас используете <strong>SmartStudyHub Web</strong></span>
+                </div>
+                <a class="footer-github-link" href="https://github.com/KamilRemix/SmartStudyHub" target="_blank" rel="noopener">
+                    <i data-feather="github"></i>
+                    <span>GitHub Репозиторий</span>
+                </a>
             </div>
-
-            <a id="desktop-app-download-btn"
-               class="desktop-modal-download-btn"
-               href="#"
-               target="_blank"
-               rel="noopener"
-               data-i18n="downloadExe">
-                Download .EXE
-            </a>
-
-            <p class="desktop-modal-note" data-i18n="desktopLangHint">
-                All text here changes when you switch language.
-            </p>
         </div>
     </div>
     
