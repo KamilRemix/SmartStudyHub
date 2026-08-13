@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "studio-9933447149-80d6a",
+    "site": "smartstudyhub-46d44",
     "public": "dist",
     "ignore": [
       "firebase.json",
