@@ -1873,6 +1873,25 @@ ${personalization ? 'Here is some information about the student to tailor your r
     }
 
     function initAiAssistant(options = {}) {
+        if (window.AI_ASSISTANT_ENABLED === false || true) { // Temporarily hardcoded to disabled for RuStore release
+            const aiPanelBody = document.querySelector('#tools-ai-panel .panel-body');
+            if (aiPanelBody) {
+                aiPanelBody.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-color-secondary);">AI Assistant temporarily unavailable</div>';
+            }
+            // Hide trigger buttons if they exist
+            document.querySelectorAll('.tool-tile--ai').forEach(el => el.style.display = 'none');
+            
+            if (options.onBack) {
+                document.querySelectorAll('#tools-ai-panel .panel-back').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.body.classList.remove('ai-chat-open');
+                        options.onBack();
+                    });
+                });
+            }
+            return { onPanelOpen: () => {}, refreshLimitState: () => {}, sendMessage: () => {}, pingNetwork: () => {} };
+        }
+
         bindChatEvents();
         applyAiTranslations();
 

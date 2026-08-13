@@ -2,6 +2,9 @@
 <resources>
     <string name="app_name">SmartStudyHub</string>
     <string name="title_activity_main">SmartStudyHub</string>
-    <string name="package_name">com.kamil.smartstudy</string>
-    <string name="custom_url_scheme">com.kamil.smartstudy</string>
+    <string name="package_name">com.smartstudyhub.mobile</string>
+    <string name="custom_url_scheme">com.smartstudyhub.mobile</string>
+    <string name="default_web_client_id">545571047137-mrag831bjpg8vhbhu6jocl87of56g0m4.apps.googleusercontent.com</string>
+    <string name="vk_app_id">54715317</string>
 </resources>
+

@@ -96,26 +96,23 @@ function initTabNavigation() {
     });
 }
 
-function loadGradesForCurrentUser(retryCount = 0) {
+function loadGradesForCurrentUser() {
     if (!currentUser) return Promise.resolve();
 
-    const gradeCalc = document.querySelector('grade-average-calculator');
-    if (!gradeCalc || typeof gradeCalc.loadFromDatabase !== 'function') {
-        if (retryCount < 30) {
-            return new Promise((resolve) => {
-                setTimeout(() => resolve(loadGradesForCurrentUser(retryCount + 1)), 50);
-            });
+    return customElements.whenDefined('grade-average-calculator').then(() => {
+        const gradeCalc = document.querySelector('grade-average-calculator');
+        if (!gradeCalc || typeof gradeCalc.loadFromDatabase !== 'function') {
+            return Promise.resolve();
         }
-        return Promise.resolve();
-    }
 
-    return currentUser
-        .getIdToken(true)
-        .then(() => gradeCalc.loadFromDatabase())
-        .then(() => switchToGradesTab())
-        .catch((err) => {
-            console.error('Failed to load grades after sign-in:', err);
-        });
+        // We do not await currentUser.getIdToken(true) here anymore because if it fails,
+        // it breaks the chain and grades never load. loadFromDatabase does it internally anyway.
+        return gradeCalc.loadFromDatabase()
+            .then(() => switchToGradesTab())
+            .catch((err) => {
+                console.error('Failed to load grades after sign-in:', err);
+            });
+    });
 }
 
 async function handleSignedInUser(user, signInResult) {
@@ -144,13 +141,88 @@ async function finalizeSignIn(signInResult) {
     await handleSignedInUser(user, signInResult);
 }
 
-const AUTH_PROVIDER_IDS = ['google.com', 'github.com'];
+const CIS_COUNTRY_CODES = new Set(['RU', 'BY', 'KZ', 'AM', 'AZ', 'KG', 'MD', 'TJ', 'TM', 'UZ']);
+
+let cachedUserRegionProviders = null;
+
+async function getAvailableAuthProviders() {
+    if (cachedUserRegionProviders) return cachedUserRegionProviders;
+
+    let isRuStore = false;
+    let simCountry = '';
+    let sysLang = (navigator.language || navigator.userLanguage || 'en').toLowerCase();
+
+    if (typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform()) {
+        try {
+            const AppChannel = window.Capacitor.Plugins?.AppChannel;
+            if (AppChannel) {
+                const info = await AppChannel.getInstaller();
+                if (info && info.installer === 'ru.vk.store') {
+                    isRuStore = true;
+                }
+            }
+        } catch (e) {
+            console.warn('[RegionDetect] AppChannel installer check error:', e);
+        }
+
+        if (isRuStore) {
+            cachedUserRegionProviders = ['google.com', 'github.com', 'oidc.vk-id'];
+            return cachedUserRegionProviders;
+        }
+
+        try {
+            const VkAuth = window.Capacitor.Plugins?.VkAuth;
+            if (VkAuth) {
+                const simInfo = await VkAuth.getSimCountry();
+                if (simInfo && simInfo.countryIso) {
+                    simCountry = simInfo.countryIso.toUpperCase();
+                }
+                if (simInfo && simInfo.language) {
+                    sysLang = simInfo.language.toLowerCase();
+                }
+            }
+        } catch (e) {
+            console.warn('[RegionDetect] VkAuth sim check error:', e);
+        }
+    }
+
+    const isLangRu = sysLang.startsWith('ru');
+    if (isLangRu || (simCountry && CIS_COUNTRY_CODES.has(simCountry))) {
+        cachedUserRegionProviders = ['google.com', 'github.com', 'oidc.vk-id'];
+        return cachedUserRegionProviders;
+    }
+
+    let ipCountry = '';
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch('https://ip-api.com/json', { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.countryCode) {
+                ipCountry = data.countryCode.toUpperCase();
+            }
+        }
+    } catch (e) {
+        console.warn('[RegionDetect] IP geolocation check bypassed/failed:', e.message);
+    }
+
+    if (ipCountry && CIS_COUNTRY_CODES.has(ipCountry)) {
+        cachedUserRegionProviders = ['google.com', 'github.com', 'oidc.vk-id'];
+    } else {
+        cachedUserRegionProviders = ['google.com', 'github.com'];
+    }
+
+    return cachedUserRegionProviders;
+}
 
 function getLinkedProviders(user) {
     const ids = new Set((user?.providerData || []).map((p) => p.providerId));
     return {
         hasGoogle: ids.has('google.com'),
         hasGithub: ids.has('github.com'),
+        hasVk: ids.has('oidc.vk-id'),
         count: ids.size,
         ids,
     };
@@ -184,37 +256,44 @@ function tpl(key, vars = {}) {
 }
 
 function getProviderLabel(providerId) {
+    if (providerId === 'oidc.vk-id') return t('providerVk');
     if (providerId === 'github.com') return t('providerGithub');
     if (providerId === 'google.com') return t('providerGoogle');
     return providerId;
 }
 
 function getProviderCssClass(providerId) {
+    if (providerId === 'oidc.vk-id') return 'vk';
     if (providerId === 'github.com') return 'github';
     return 'google';
 }
 
 function getProviderButtonClass(providerId) {
+    if (providerId === 'oidc.vk-id') return 'vk-signin-btn';
     if (providerId === 'github.com') return 'github-signin-btn';
     return 'google-signin-btn';
 }
 
 function getLinkButtonId(providerId) {
+    if (providerId === 'oidc.vk-id') return 'link-vk-btn';
     if (providerId === 'github.com') return 'link-github-btn';
     return 'link-google-btn';
 }
 
 function getSignInButtonId(providerId) {
+    if (providerId === 'oidc.vk-id') return 'vk-signin-btn';
     if (providerId === 'github.com') return 'github-signin-btn';
     return 'google-signin-btn';
 }
 
 function getLinkLabelKey(providerId) {
+    if (providerId === 'oidc.vk-id') return 'linkVkToProfile';
     if (providerId === 'github.com') return 'linkGithubToProfile';
     return 'linkGoogleToProfile';
 }
 
 function getSignInLabelKey(providerId) {
+    if (providerId === 'oidc.vk-id') return 'signInWithVk';
     if (providerId === 'github.com') return 'signInWithGithub';
     return 'signInWithGoogle';
 }
@@ -225,6 +304,9 @@ function getCurrentProviderId(user) {
 }
 
 function createAuthProvider(providerId) {
+    if (providerId === 'oidc.vk-id') {
+        return new firebase.auth.OAuthProvider('oidc.vk-id');
+    }
     if (providerId === 'github.com') {
         const provider = new firebase.auth.GithubAuthProvider();
         provider.addScope('read:user');
@@ -250,11 +332,15 @@ function materialIcon(name, extraClasses = '') {
 }
 
 function getProviderIconSvg(providerId, iconClass = 'auth-flow-icon-svg') {
+    if (providerId === 'oidc.vk-id') {
+        return `<svg class="${iconClass}" viewBox="0 0 24 24" aria-hidden="true"><path fill="#0077FF" d="M15.684 0H8.316C2.692 0 0 2.692 0 8.316v7.368C0 21.308 2.692 24 8.316 24h7.368C21.308 24 24 21.308 24 15.684V8.316C24 2.692 21.308 0 15.684 0zm3.692 17.129h-1.644c-.624 0-.816-.496-1.936-1.616-1.024-1.008-1.472-1.136-1.728-1.136-.368 0-.48.104-.48.608v1.44c0 .4-.128.656-1.184.656-1.744 0-3.68-1.056-5.04-3.024-2.048-2.928-2.608-5.12-2.608-5.568 0-.24.096-.464.56-.464h1.644c.416 0 .576.192.736.64.8 2.32 2.144 4.352 2.688 4.352.208 0 .304-.096.304-.624V9.825c-.064-1.12-.656-1.216-.656-1.616 0-.192.16-.384.416-.384h2.576c.352 0 .48.176.48.592v3.184c0 .352.16.48.272.48.208 0 .384-.128.768-.512 1.184-1.328 2.032-3.376 2.032-3.376.112-.24.288-.384.704-.384h1.644c.496 0 .608.256.496.608-.208.976-2.256 3.872-2.256 3.872-.192.304-.272.448 0 .8.192.256.848.832 1.28 1.328.784.896 1.392 1.648 1.552 2.176.176.496-.08.752-.576.752z"/></svg>`;
+    }
     if (providerId === 'github.com') {
         return `<svg class="${iconClass}" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>`;
     }
     return `<svg class="${iconClass}" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>`;
 }
+
 
 function paintAuthFlowDiagram(containerId, fromProviderId, toProviderId, options = {}) {
     const container = document.getElementById(containerId);
@@ -767,11 +853,73 @@ window.signInWithProvider = (providerId, triggerOrRetry = 0) => {
             window.electronAPI.send('google-signin');
         } else if (providerId === 'github.com') {
             window.electronAPI.send('github-signin');
+        } else if (providerId === 'oidc.vk-id') {
+            window.electronAPI.send('vk-signin');
         } else {
             showToast(t('accountLinkElectronUnsupported'), 'warning', 3000);
         }
         return Promise.resolve();
     }
+
+    if (typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform()) {
+        if (providerId === 'oidc.vk-id') {
+            const VkAuth = window.Capacitor.Plugins?.VkAuth;
+            if (VkAuth) {
+                return runAuthAction(button, async () => {
+                    try {
+                        const result = await VkAuth.startVkAuth();
+                        if (result && result.webFallback) {
+                            const provider = new firebase.auth.OAuthProvider('oidc.vk-id');
+                            const res = await firebaseAuth.signInWithPopup(provider);
+                            return finalizeSignIn(res);
+                        }
+                        const token = result.idToken || result.token;
+                        if (!token) throw new Error('Не удалось получить токен VK ID');
+                        const provider = new firebase.auth.OAuthProvider('oidc.vk-id');
+                        const credential = provider.credential({ idToken: token });
+                        const userCredential = await firebaseAuth.signInWithCredential(credential);
+                        return finalizeSignIn(userCredential);
+                    } catch (error) {
+                        console.error('VK Sign-in error:', error);
+                        if (isIgnorableAuthError(error)) return;
+                        showToast(error.message || t('accountLinkError'), 'error', 3000);
+                    }
+                });
+            }
+        }
+        const FirebaseAuthentication = window.Capacitor.Plugins?.FirebaseAuthentication;
+        if (FirebaseAuthentication) {
+            return runAuthAction(button, async () => {
+                try {
+                    let credential;
+                    if (providerId === 'google.com') {
+                        const result = await FirebaseAuthentication.signInWithGoogle();
+                        const idToken = result.credential?.idToken || result.idToken;
+                        if (!idToken) throw new Error('Не удалось получить токен Google');
+                        credential = firebase.auth.GoogleAuthProvider.credential(idToken);
+                    } else if (providerId === 'github.com') {
+                        const result = await FirebaseAuthentication.signInWithGithub();
+                        const accessToken = result.credential?.accessToken || result.accessToken;
+                        if (!accessToken) throw new Error('Не удалось получить токен GitHub');
+                        credential = firebase.auth.GithubAuthProvider.credential(accessToken);
+                    } else if (providerId === 'oidc.vk-id') {
+                        const provider = new firebase.auth.OAuthProvider('oidc.vk-id');
+                        const userCredential = await firebaseAuth.signInWithPopup(provider);
+                        return finalizeSignIn(userCredential);
+                    } else {
+                        throw new Error('Unsupported provider for Capacitor');
+                    }
+                    const userCredential = await firebaseAuth.signInWithCredential(credential);
+                    return finalizeSignIn(userCredential);
+                } catch (error) {
+                    console.error('Sign-in error:', error);
+                    if (isIgnorableAuthError(error)) return;
+                    showToast(error.message || t('accountLinkError'), 'error', 3000);
+                }
+            });
+        }
+    }
+
 
     const provider = createAuthProvider(providerId);
     return runAuthAction(button, () =>
@@ -835,6 +983,7 @@ function initAuthDialogs() {
 
 if (window.firebase && window.firebase.auth) {
     firebaseAuth = window.firebase.auth();
+
     firebaseAuth.onAuthStateChanged((user) => {
         currentUser = user;
         if (!user) {
@@ -848,14 +997,35 @@ if (window.firebase && window.firebase.auth) {
         updateTranslations();
         handleSignedInUser(user, null);
     });
+
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+        setTimeout(() => {
+            const FirebaseAuthentication = window.Capacitor.Plugins?.FirebaseAuthentication;
+            if (FirebaseAuthentication && typeof FirebaseAuthentication.getIdToken === 'function') {
+                FirebaseAuthentication.getIdToken().then(async (result) => {
+                    if (result && result.token && !firebaseAuth.currentUser) {
+                        try {
+                            const credential = firebase.auth.GoogleAuthProvider.credential(result.token);
+                            await firebaseAuth.signInWithCredential(credential);
+                            console.log('✅ [Auth] Restored native Google Auth session into JS Firebase Auth SDK!');
+                        } catch (e) {
+                            console.warn('[Auth] Native auth restore warning:', e.message);
+                        }
+                    }
+                }).catch((err) => console.warn('[Auth] Native auth restore info:', err?.message || err));
+            }
+        }, 500);
+    }
 }
 
-function updateAuthUI() {
+async function updateAuthUI() {
     const settingsComponent = document.querySelector('settings-component');
     if (!settingsComponent || !settingsComponent.shadowRoot) return;
     
     const authContent = settingsComponent.shadowRoot.querySelector('#auth-content');
     if (!authContent) return;
+
+    const availableProviders = await getAvailableAuthProviders();
 
     if (currentUser) {
         const signOutText = translations[currentLang]['signOut'] || 'Sign Out';
@@ -871,7 +1041,7 @@ function updateAuthUI() {
                </div>`
             : '';
 
-        const linkButtonsHtml = AUTH_PROVIDER_IDS
+        const linkButtonsHtml = availableProviders
             .filter((id) => !linked.ids.has(id))
             .map((id) => buildProviderActionButton(id, 'link'))
             .join('');
@@ -894,7 +1064,7 @@ function updateAuthUI() {
     } else {
         authContent.innerHTML = `
             <div class="auth-signin-stack" style="display: flex; flex-direction: column; gap: 10px;">
-                ${AUTH_PROVIDER_IDS.map((id) => buildProviderActionButton(id, 'signin')).join('')}
+                ${availableProviders.map((id) => buildProviderActionButton(id, 'signin')).join('')}
             </div>`;
         bindAuthContentActions(authContent);
     }
@@ -902,6 +1072,7 @@ function updateAuthUI() {
 
 window.signInWithGoogle = (button) => window.signInWithProvider('google.com', button);
 window.signInWithGithub = (button) => window.signInWithProvider('github.com', button);
+window.signInWithVk = (button) => window.signInWithProvider('oidc.vk-id', button);
 
 window.signOutUser = () => {
     if (!firebaseAuth) return;
@@ -2496,12 +2667,14 @@ class GradeAverageCalculator extends HTMLElement {
         this.render();
     }
     
-    // This listener is no longer needed here, handled globally
-    // setupAuthListener() {}
+    connectedCallback() {
+        if (currentUser) {
+            this.loadFromDatabase();
+        }
+    }
     
-    saveToDatabase() {
-        if (!currentUser || !window.firebase || !window.firebase.database) return;
-        const uid = currentUser.uid;
+    async saveToDatabase() {
+        if (!currentUser || !window.firebase) return Promise.resolve();
 
         const subjectsToSave = { ...this.subjects };
         delete subjectsToSave['__QUICK_CALC__'];
@@ -2514,15 +2687,38 @@ class GradeAverageCalculator extends HTMLElement {
             }
         };
 
-        const userRef = window.firebase.database().ref(`users/${uid}`);
-        const save = () => userRef.set(dataToSave)
-            .then(() => console.log('✅ Data saved to Firebase.'))
-            .catch((e) => console.error('❌ Error saving data:', e));
+        const uid = currentUser.uid;
+        const email = (currentUser.email || '').toLowerCase().trim();
+        const sanitizedEmail = email ? email.replace(/\./g, '_') : null;
 
-        if (typeof currentUser.getIdToken === 'function') {
-            currentUser.getIdToken(true).then(save).catch(save);
-        } else {
-            save();
+        // 1. Save to Realtime Database (by UID and by Sanitized Email)
+        if (window.firebase.database) {
+            try {
+                if (uid) {
+                    await window.firebase.database().ref(`users/${uid}`).update(dataToSave);
+                }
+                if (sanitizedEmail) {
+                    await window.firebase.database().ref(`users_by_email/${sanitizedEmail}`).update(dataToSave);
+                }
+                console.log('✅ [Grades] Saved to Realtime DB.');
+            } catch (e) {
+                console.error('❌ Error saving to Realtime DB:', e);
+            }
+        }
+
+        // 2. Save to Firestore (by Email and UID)
+        if (window.firebase.firestore) {
+            try {
+                if (email) {
+                    await window.firebase.firestore().collection('users').doc(email).set(dataToSave, { merge: true });
+                }
+                if (uid) {
+                    await window.firebase.firestore().collection('users').doc(uid).set(dataToSave, { merge: true });
+                }
+                console.log('✅ [Grades] Saved to Firestore.');
+            } catch (e) {
+                console.warn('ℹ️ Firestore save info:', e.message);
+            }
         }
     }
 
@@ -3832,7 +4028,7 @@ class GradeAverageCalculator extends HTMLElement {
 
     loadFromDatabase() {
         this.quickCalcGrades = []; // Reset local quick calc on load
-        if (!currentUser) {
+        if (!currentUser || !window.firebase) {
             this.subjects = {};
             this.currentSubject = '__QUICK_CALC__';
             this.update();
@@ -3840,13 +4036,11 @@ class GradeAverageCalculator extends HTMLElement {
         }
 
         const uid = currentUser.uid;
-        const userRef = window.firebase.database().ref(`users/${uid}`);
+        const email = (currentUser.email || '').toLowerCase().trim();
+        const sanitizedEmail = email ? email.replace(/\./g, '_') : null;
 
-        const fetchData = () => userRef.once('value')
-            .then((snapshot) => {
-                const data = snapshot.val() || {};
-                const subjects = data.subjects || {};
-                
+        const applyData = (data) => {
+            if (data && data.subjects && Object.keys(data.subjects).length > 0) {
                 this.gradingSystem = (data.settings && data.settings.gradingSystem) || '5-point';
 
                 const defaultThresholds = {
@@ -3854,41 +4048,65 @@ class GradeAverageCalculator extends HTMLElement {
                     'us-letter': { 'A': 90, 'B': 80, 'C': 70, 'D': 60, 'F': 0 }
                 };
                 
-                // Merge loaded thresholds with defaults to ensure all keys exist
                 const loadedThresholds = (data.settings && data.settings.thresholds) || {};
                 this.thresholds = {
                     '5-point': { ...defaultThresholds['5-point'], ...loadedThresholds['5-point'] },
                     'us-letter': { ...defaultThresholds['us-letter'], ...loadedThresholds['us-letter'] }
                 };
 
-                this.subjects = subjects;
-
-                console.log('✅ Loaded data from Firebase.');
+                this.subjects = data.subjects;
 
                 const subjectKeys = Object.keys(this.subjects);
-                if (subjectKeys.length > 0 && subjectKeys.length <= 2) {
-                    this.currentSubject = subjectKeys[subjectKeys.length - 1];
-                } else {
-                    this.currentSubject = '__QUICK_CALC__';
+                if (subjectKeys.length > 0 && (!this.currentSubject || !this.subjects[this.currentSubject] || this.currentSubject === '__QUICK_CALC__')) {
+                    this.currentSubject = subjectKeys[0];
                 }
                 this.update();
-                 // Also update the settings component buttons
                 const settingsComp = document.querySelector('settings-component');
                 if (settingsComp) {
                     settingsComp.updateGradingSystemButtons();
                 }
-            })
-            .catch(error => {
-                console.error('❌ Error loading from Firebase:', error);
-                this.subjects = {};
-                this.currentSubject = '__QUICK_CALC__';
-                this.update();
-            });
+                return true;
+            }
+            return false;
+        };
+
+        // 1. Realtime Database listener by UID
+        if (window.firebase.database && uid) {
+            if (this._databaseRef) this._databaseRef.off('value');
+            this._databaseRef = window.firebase.database().ref(`users/${uid}`);
+            this._databaseRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data && applyData(data)) {
+                    console.log('✅ [Grades] Loaded from Realtime DB (UID)');
+                } else if (sanitizedEmail) {
+                    // Fallback to Realtime DB by Email
+                    window.firebase.database().ref(`users_by_email/${sanitizedEmail}`).once('value').then((snap) => {
+                        const emailData = snap.val();
+                        if (emailData) {
+                            console.log('✅ [Grades] Loaded from Realtime DB (Email)');
+                            applyData(emailData);
+                        }
+                    }).catch(() => {});
+                }
+            }, (err) => console.warn('Realtime DB listener info:', err));
+        }
+
+        // 2. Firestore listener by Email
+        if (window.firebase.firestore && email) {
+            if (this._unsubscribeFirestore) this._unsubscribeFirestore();
+            this._unsubscribeFirestore = window.firebase.firestore().collection('users').doc(email)
+                .onSnapshot((docSnap) => {
+                    if (docSnap.exists) {
+                        console.log('✅ [Grades] Loaded from Firestore (Email)');
+                        applyData(docSnap.data());
+                    }
+                }, (err) => console.warn('Firestore listener info:', err.message));
+        }
 
         if (typeof currentUser.getIdToken === 'function') {
-            return currentUser.getIdToken(true).then(fetchData).catch(fetchData);
+            return currentUser.getIdToken(true).catch(() => {});
         }
-        return fetchData();
+        return Promise.resolve();
     }
 
     syncGrades() {
@@ -3899,6 +4117,12 @@ customElements.define('grade-average-calculator', GradeAverageCalculator);
 
 // --- MAIN APP INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen) {
+        try {
+            window.Capacitor.Plugins.SplashScreen.hide();
+        } catch (e) {}
+    }
+
     const savedTheme = localStorage.getItem('theme') || 'dark';
     const initialLang = getInitialUserLanguage();
     setTheme(savedTheme);
@@ -3931,10 +4155,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (provider === 'google' && googleAccessToken) {
                 localStorage.setItem('google_access_token', googleAccessToken);
             }
-            const authProvider = provider === 'github' ? 'github' : 'google';
-            const credential = authProvider === 'github'
-                ? firebase.auth.GithubAuthProvider.credential(token)
-                : firebase.auth.GoogleAuthProvider.credential(token);
+            let credential;
+            if (provider === 'vk' || provider === 'oidc.vk-id') {
+                const vkProvider = new firebase.auth.OAuthProvider('oidc.vk-id');
+                credential = vkProvider.credential({ idToken: token });
+            } else if (provider === 'github') {
+                credential = firebase.auth.GithubAuthProvider.credential(token);
+            } else {
+                credential = firebase.auth.GoogleAuthProvider.credential(token);
+            }
             firebaseAuth.signInWithCredential(credential)
                 .then((result) => {
                     console.log('Sign-in success (desktop).');
@@ -3948,6 +4177,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     openAccountErrorModal('Sign-in failed: ' + (e && e.message ? e.message : e));
                 });
         });
+
     }
 
     initTabNavigation();
@@ -3955,12 +4185,81 @@ document.addEventListener('DOMContentLoaded', () => {
     feather.replace();
     updateTranslations();
 
-    // ─── Auto-Updater UI (Electron) ────────────────────────────────
-    initElectronAutoUpdater();
+    // Auto-Updater disabled per user request
+    // initElectronAutoUpdater();
+    // if (typeof initAndroidUpdater === 'function') {
+    //     initAndroidUpdater();
+    // }
 
-    // ─── Auto-Updater (Android / Capacitor) ────────────────────────
-    if (typeof initAndroidUpdater === 'function') {
-        initAndroidUpdater();
+    // ─── Hide Splash Screen ────────────────────────
+    setTimeout(() => {
+        const splash = document.getElementById('app-splash-screen');
+        if (splash) {
+            splash.classList.add('fade-out');
+            setTimeout(() => splash.remove(), 600);
+        }
+    }, 1800);
+
+    // ─── Capacitor Android Init ────────────────────────
+    if (typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform()) {
+        const App = window.Capacitor.Plugins.App;
+        if (App) {
+            App.addListener('backButton', () => {
+                const openModal = document.querySelector('.modal.active');
+                if (openModal) {
+                    openModal.classList.remove('active');
+                    return;
+                }
+                if (document.body.classList.contains('ai-chat-open')) {
+                    document.body.classList.remove('ai-chat-open');
+                    return;
+                }
+                const activePanel = document.querySelector('.tool-panel:not(.hidden)');
+                if (activePanel) {
+                    activePanel.classList.add('hidden');
+                    const toolsHub = document.getElementById('tools-hub');
+                    if (toolsHub) toolsHub.classList.remove('hidden');
+                    return;
+                }
+                const activeTab = document.querySelector('.nav-tab.active')?.dataset.tab || 'tools';
+                if (activeTab !== 'tools') {
+                    const toolsTab = document.querySelector('.nav-tab[data-tab="tools"]');
+                    if (toolsTab) toolsTab.click();
+                    return;
+                }
+                App.minimizeApp();
+            });
+        }
+        
+        const AppChannel = window.Capacitor.Plugins.AppChannel;
+        if (AppChannel) {
+            AppChannel.getInstaller().then(res => {
+                const installer = res.installer || 'UNKNOWN';
+                // Allow developers to test RuStore mode locally by setting a flag in localStorage
+                const forceRuStore = localStorage.getItem('FORCE_RUSTORE') === '1';
+
+                if (installer.includes('ru.vk.store') || forceRuStore) {
+                    window.INSTALLATION_CHANNEL = 'RU_STORE';
+                    document.body.classList.add('rustore-mode');
+                    document.body.classList.remove('global-mode');
+                } else {
+                    window.INSTALLATION_CHANNEL = 'GLOBAL';
+                    document.body.classList.add('global-mode');
+                    document.body.classList.remove('rustore-mode');
+                }
+                console.log('[AppChannel] Detected channel:', window.INSTALLATION_CHANNEL, '(', installer, ')');
+            }).catch(e => {
+                window.INSTALLATION_CHANNEL = 'GLOBAL';
+                document.body.classList.add('global-mode');
+                console.error('[AppChannel] Error detecting channel', e);
+            });
+        } else {
+            window.INSTALLATION_CHANNEL = 'GLOBAL';
+            document.body.classList.add('global-mode');
+        }
+    } else {
+        window.INSTALLATION_CHANNEL = 'GLOBAL';
+        document.body.classList.add('global-mode');
     }
 });
 

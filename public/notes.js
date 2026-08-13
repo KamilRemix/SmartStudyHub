@@ -99,32 +99,100 @@
     /* =========================================================
        FIREBASE
     ========================================================= */
+    let notesListenerAttached = false;
+
     function fbUser() {
         return window.firebase?.auth?.()?.currentUser ?? null;
     }
 
+    /* --- Local Notification helper (only for a single note) --- */
+    function getNotificationId(str) {
+        let hash = 0;
+        if (!str) return 1;
+        for (let i = 0; i < str.length; i++) {
+            hash = (hash << 5) - hash + str.charCodeAt(i);
+            hash |= 0;
+        }
+        return Math.abs(hash) % 2147483647 || 1;
+    }
+
+    async function scheduleOneLocalNotification(note) {
+        const LocalNotifications = window.Capacitor?.Plugins?.LocalNotifications;
+        if (!LocalNotifications || !note || !note.reminder) return;
+        const now = Date.now();
+        if (note.reminder <= now || note.reminderFired) return;
+        try {
+            if (typeof LocalNotifications.requestPermissions === 'function') {
+                const perms = await LocalNotifications.requestPermissions();
+                if (perms?.display === 'denied') return;
+            }
+            await LocalNotifications.schedule({
+                notifications: [{
+                    id: getNotificationId(note.id),
+                    title: note.title || 'SmartStudyHub',
+                    body: note.text || (note.checklist ? note.checklist.map(i => i.text).join(', ') : 'Напоминание'),
+                    schedule: { at: new Date(note.reminder) },
+                    sound: null,
+                    attachments: null,
+                    actionTypeId: '',
+                    extra: { noteId: note.id }
+                }]
+            });
+            console.log('[LocalNotifications] Scheduled for note', note.id);
+        } catch (e) {
+            console.error('[LocalNotifications] schedule error:', e);
+        }
+    }
+
+    async function cancelLocalNotification(noteId) {
+        const LocalNotifications = window.Capacitor?.Plugins?.LocalNotifications;
+        if (!LocalNotifications) return;
+        try {
+            await LocalNotifications.cancel({ notifications: [{ id: getNotificationId(noteId) }] });
+        } catch (e) { /* ignore */ }
+    }
+
+    /* --- Realtime Database save (await) --- */
     async function saveToFirebase() {
         const user = fbUser();
         if (!user || !window.firebase?.database) return;
         try {
             await window.firebase.database().ref(`users/${user.uid}/notes`).set(notesData);
+            console.log('✅ [Notes] Saved to Realtime DB.');
         } catch (e) { console.error('[Notes] save failed', e); }
     }
 
-    async function loadFromFirebase() {
+    /* --- Realtime Database listener (on 'value') --- */
+    function setupRealtimeNotesListener() {
         const user = fbUser();
         if (!user || !window.firebase?.database) return;
-        try {
-            const snap = await window.firebase.database().ref(`users/${user.uid}/notes`).once('value');
+        if (notesListenerAttached) return; // prevent duplicate listeners
+        notesListenerAttached = true;
+        const ref = window.firebase.database().ref(`users/${user.uid}/notes`);
+        ref.on('value', (snap) => {
             const val = snap.val();
-            notesData = val || {};
-            renderAll();
-        } catch (e) { console.error('[Notes] load failed', e); }
+            if (val !== null && val !== undefined) {
+                notesData = val;
+                renderAll();
+                console.log('✅ [Notes] Realtime update received.');
+            }
+        }, (err) => {
+            console.error('[Notes] Realtime listener error:', err);
+        });
+    }
+
+    async function loadFromFirebase() {
+        setupRealtimeNotesListener();
     }
 
     // Auth listener
     if (window.firebase?.auth) {
-        window.firebase.auth().onAuthStateChanged(u => { if (u) loadFromFirebase(); });
+        window.firebase.auth().onAuthStateChanged(u => {
+            if (u) {
+                notesListenerAttached = false; // reset for new user
+                setupRealtimeNotesListener();
+            }
+        });
     }
 
     /* =========================================================
@@ -230,8 +298,8 @@
         applyCreatorColor();
     }
 
-    function collapseCreator(save = true) {
-        if (save) saveNewNote();
+    async function collapseCreator(save = true) {
+        if (save) await saveNewNote();
         creatorCollapsed?.classList.remove('hidden');
         creatorExpanded?.classList.add('hidden');
         if (titleInput) titleInput.value = '';
@@ -437,6 +505,7 @@
             notesData[reminderTargetId].reminder = timestamp;
             notesData[reminderTargetId].reminderFired = false;
             notesData[reminderTargetId].updatedAt = Date.now();
+            scheduleOneLocalNotification(notesData[reminderTargetId]);
             saveToFirebase();
             renderAll();
         }
@@ -447,6 +516,7 @@
         if (notesData[id]) {
             notesData[id].reminder = null;
             notesData[id].reminderFired = false;
+            cancelLocalNotification(id);
             saveToFirebase();
             renderAll();
         }
@@ -486,20 +556,25 @@
     setInterval(() => {
         const now = Date.now();
         let changed = false;
+        const isCapacitor = typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform();
+
         Object.values(notesData).forEach(note => {
             if (note.reminder && now >= note.reminder && !note.reminderFired) {
                 note.reminderFired = true;
                 changed = true;
                 
-                const title = "SmartStudyHub: Напоминание";
-                const body = note.title || note.text || "Пришло время для вашей заметки!";
-                
-                playNotificationSound();
-                
-                if (window.electronAPI?.showNotification) {
-                    window.electronAPI.showNotification(title, body);
-                } else if (window.Notification && Notification.permission === 'granted') {
-                    new Notification(title, { body });
+                // Only show HTML5 notifications and play custom sounds on Web/Electron
+                if (!isCapacitor) {
+                    const title = "SmartStudyHub: Напоминание";
+                    const body = note.title || note.text || "Пришло время для вашей заметки!";
+                    
+                    playNotificationSound();
+                    
+                    if (window.electronAPI?.showNotification) {
+                        window.electronAPI.showNotification(title, body);
+                    } else if (window.Notification && Notification.permission === 'granted') {
+                        new Notification(title, { body });
+                    }
                 }
             }
         });
@@ -508,6 +583,26 @@
             renderAll();
         }
     }, 8000);
+
+    // Navigate to notes tab when a notification is clicked on Android
+    if (typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform()) {
+        const LocalNotifications = window.Capacitor.Plugins.LocalNotifications;
+        if (LocalNotifications) {
+            LocalNotifications.addListener('localNotificationActionPerformed', (notificationAction) => {
+                // Switch to the notes tab
+                const notesTabBtn = document.querySelector('.nav-tab[data-tab="notes"]');
+                if (notesTabBtn) {
+                    notesTabBtn.click();
+                }
+                
+                // Optional: open the specific note if extra data is provided
+                const noteId = notificationAction.notification?.extra?.noteId;
+                if (noteId && notesData[noteId]) {
+                    setTimeout(() => openEditModal(noteId), 100);
+                }
+            });
+        }
+    }
 
     function formatReminderDate(ts) {
         const d = new Date(ts);
@@ -597,7 +692,7 @@
     /* =========================================================
        SAVE / CREATE NOTE
     ========================================================= */
-    function saveNewNote() {
+    async function saveNewNote() {
         const title = titleInput ? titleInput.value.trim() : '';
         let text = '';
         let checklist = null;
@@ -611,7 +706,7 @@
         }
 
         const id = 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-        notesData[id] = {
+        const newNote = {
             id, title, text,
             checklist: checklist || null,
             image: creatorImage,
@@ -622,7 +717,11 @@
             createdAt: Date.now(),
             updatedAt: Date.now()
         };
-        saveToFirebase();
+        notesData[id] = newNote;
+        if (newNote.reminder) {
+            scheduleOneLocalNotification(newNote);
+        }
+        await saveToFirebase();
         renderAll();
     }
 
@@ -802,6 +901,7 @@
 
     function deleteNote(id) {
         if (!notesData[id]) return;
+        cancelLocalNotification(id);
         delete notesData[id];
         saveToFirebase();
         renderAll();
@@ -844,7 +944,7 @@
         }, 50);
     }
 
-    function closeEditModal(save = true) {
+    async function closeEditModal(save = true) {
         if (save && editingId && notesData[editingId]) {
             notesData[editingId].title = editTitle ? editTitle.value.trim() : '';
             if (notesData[editingId].checklist !== null && notesData[editingId].checklist !== undefined) {
@@ -853,7 +953,10 @@
                 notesData[editingId].text = editText ? editText.value.trim() : '';
             }
             notesData[editingId].updatedAt = Date.now();
-            saveToFirebase();
+            if (notesData[editingId].reminder) {
+                scheduleOneLocalNotification(notesData[editingId]);
+            }
+            await saveToFirebase();
             renderAll();
         }
         editModal?.classList.add('hidden');

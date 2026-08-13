@@ -45,22 +45,34 @@
         authDomain: "smartstudyhub-46d44.firebaseapp.com",
         databaseURL: "https://smartstudyhub-46d44-default-rtdb.firebaseio.com",
         projectId: "smartstudyhub-46d44",
-        storageBucket: "smartstudyhub-46d44.appspot.com",
+        storageBucket: "smartstudyhub-46d44.firebasestorage.app",
         messagingSenderId: "545571047137",
-        appId: "1:545571047137:web:fe3442d477094f8b5559a0",
-        measurementId: "G-ZVV9MYERVP"
+        appId: "1:545571047137:web:fe3442d477094f8b5559a0"
       };
       
-      // Initialize Firebase
-      firebase.initializeApp(firebaseConfig);
-    // expose config for modular Firebase modules
-    window.firebaseConfig = firebaseConfig;
-
-      // Make firebase services available globally
-      window.firebaseAuth = firebase.auth();
+      // Initialize Firebase safely
+      window.firebaseConfig = firebaseConfig;
+      if (typeof firebase !== 'undefined') {
+          try {
+              firebase.initializeApp(firebaseConfig);
+              window.firebaseAuth = firebase.auth();
+          } catch (e) {
+              console.warn('Firebase init warning:', e);
+          }
+      }
     </script>
 </head>
 <body>
+    <!-- App Splash Screen (Logo in center, SmartStudyHub at bottom) -->
+    <div id="app-splash-screen" class="app-splash-screen">
+        <div class="splash-center">
+            <img src="favicon.png" alt="SmartStudyHub Logo" class="splash-logo" draggable="false">
+        </div>
+        <div class="splash-bottom">
+            <span class="splash-app-name">SmartStudyHub</span>
+        </div>
+    </div>
+
     <!-- Floating Web Download Button (Shown ONLY on website version) -->
     <button id="download-desktop-btn" class="download-desktop-btn web-download-trigger" type="button" aria-label="Скачать приложение для ПК и телефона">
         <span class="pulse-dot"></span>
@@ -1054,7 +1066,9 @@
     <script src="updater-android.js"></script>
     <script src="renderer.js"></script>
     <script>
-      feather.replace();
+      if (typeof feather !== 'undefined') {
+          try { feather.replace(); } catch (e) {}
+      }
     </script>
 </body>
 </html>

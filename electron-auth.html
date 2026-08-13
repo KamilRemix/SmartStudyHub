@@ -11,11 +11,19 @@
     .card { background: #1e1e1e; padding: 2rem; border-radius: 12px; text-align: center; max-width: 400px; border: 1px solid rgba(0, 255, 255, 0.35); box-shadow: 0 0 24px rgba(0, 255, 255, 0.15); }
     h1 { margin: 0 0 1rem; font-size: 1.25rem; text-shadow: 0 0 10px rgba(0, 255, 255, 0.35); }
     p { margin: 0 0 1.5rem; color: #a0a0a0; font-size: 0.9rem; line-height: 1.4; }
-    button { width: 100%; color: #fff; border: none; padding: 12px 24px; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s, background 0.2s; }
-    button.google { background: #4285f4; }
+    button { width: 100%; color: #fff; border: none; padding: 12px 24px; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s, background 0.2s; margin-top: 10px; }
+    button.google { background: #4285f4; margin-top: 0; }
     button.google:hover { background: #3367d6; transform: translateY(-1px); }
+    button.vk {
+      background: linear-gradient(135deg, #0077FF 0%, #0055C4 100%);
+      box-shadow: 0 0 14px rgba(0, 119, 255, 0.35);
+    }
+    button.vk:hover {
+      background: linear-gradient(135deg, #0066E0 0%, #0044B0 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 0 22px rgba(0, 119, 255, 0.5);
+    }
     button.github {
-      margin-top: 10px;
       background: linear-gradient(135deg, rgba(0, 255, 255, 0.18) 0%, rgba(148, 0, 211, 0.22) 100%);
       border: 1px solid rgba(0, 255, 255, 0.55);
       box-shadow: 0 0 14px rgba(0, 255, 255, 0.25);
@@ -39,6 +47,7 @@
   <div class="card">
     <h1>SmartStudyHub</h1>
     <p id="auth-desc">Click below to complete sign-in for the desktop app.</p>
+    <button id="vk-signin-btn" class="vk" type="button">Войти через VK ID</button>
     <button id="signin-btn" class="google" type="button">Sign in with Google</button>
     <button id="github-signin-btn" class="github" type="button">Sign in with GitHub</button>
     <div id="status" class="status"></div>
@@ -59,14 +68,17 @@
     const DEEP_LINK = 'smartstudyhub://auth';
     const params = new URLSearchParams(window.location.search);
     const requestedProvider = (params.get('provider') || 'google').toLowerCase();
-    const isGithub = requestedProvider === 'github';
 
     const statusEl = document.getElementById('status');
     const btn = document.getElementById('signin-btn');
     const githubBtn = document.getElementById('github-signin-btn');
+    const vkBtn = document.getElementById('vk-signin-btn');
     const descEl = document.getElementById('auth-desc');
 
-    if (isGithub) {
+    if (requestedProvider === 'vk' || requestedProvider === 'oidc.vk-id') {
+      vkBtn.classList.add('pulse');
+      descEl.textContent = 'Нажмите «Войти через VK ID» для авторизации в приложении.';
+    } else if (requestedProvider === 'github') {
       githubBtn.classList.add('pulse');
       descEl.textContent = 'Click "Sign in with GitHub" to link your account to the desktop app.';
     } else {
@@ -93,7 +105,10 @@
     function tokenFromResult(result, provider) {
       if (!result) return Promise.reject(new Error('No result returned from auth'));
       const cred = result.credential;
-      const prov = provider || (cred && cred.providerId && cred.providerId.includes('github') ? 'github' : 'google');
+      const prov = provider || (cred && cred.providerId && cred.providerId.includes('vk') ? 'vk' : cred && cred.providerId && cred.providerId.includes('github') ? 'github' : 'google');
+      if ((prov === 'vk' || prov === 'oidc.vk-id') && cred && cred.accessToken) {
+        return Promise.resolve({ token: cred.accessToken, provider: 'vk' });
+      }
       if (prov === 'github' && cred && cred.accessToken) {
         return Promise.resolve({ token: cred.accessToken, provider: 'github' });
       }
@@ -106,7 +121,6 @@
       return Promise.reject(new Error('Failed to retrieve user token'));
     }
 
-    // Check for redirect result when returning from redirect auth
     firebase.auth().getRedirectResult()
       .then((result) => {
         if (result && result.user) {
@@ -125,14 +139,18 @@
       setStatus('Signing in…');
       btn.disabled = true;
       githubBtn.disabled = true;
+      vkBtn.disabled = true;
       btn.classList.remove('pulse');
       githubBtn.classList.remove('pulse');
+      vkBtn.classList.remove('pulse');
 
-      const provider = providerName === 'github'
-        ? new firebase.auth.GithubAuthProvider()
-        : new firebase.auth.GoogleAuthProvider();
-
-      if (providerName === 'google') {
+      let provider;
+      if (providerName === 'vk' || providerName === 'oidc.vk-id') {
+        provider = new firebase.auth.OAuthProvider('oidc.vk-id');
+      } else if (providerName === 'github') {
+        provider = new firebase.auth.GithubAuthProvider();
+      } else {
+        provider = new firebase.auth.GoogleAuthProvider();
         provider.addScope('https://www.googleapis.com/auth/calendar');
         provider.addScope('https://www.googleapis.com/auth/tasks');
         provider.addScope('https://www.googleapis.com/auth/youtube.readonly');
@@ -156,10 +174,12 @@
             setStatus(err.message || 'Sign-in failed.', true);
             btn.disabled = false;
             githubBtn.disabled = false;
+            vkBtn.disabled = false;
           }
         });
     }
 
+    vkBtn.addEventListener('click', () => runSignIn('vk'));
     btn.addEventListener('click', () => runSignIn('google'));
     githubBtn.addEventListener('click', () => runSignIn('github'));
   </script>

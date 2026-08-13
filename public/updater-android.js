@@ -116,7 +116,7 @@ function androidShowStabilityWarning(version) {
     const btnSecondary = modal.querySelector('.update-modal-btn-secondary');
     const progress = modal.querySelector('.update-modal-progress-container');
 
-    if (title) title.textContent = '⚠️ Проблема после обновления';
+    if (title) title.textContent = 'Ошибка обновления';
     if (body) body.innerHTML = '<p>Приложение нестабильно после обновления до версии <strong>' + version + '</strong>. ' +
         'Пожалуйста, попробуйте переустановить приложение или свяжитесь с нами через GitHub Issues.</p>';
     if (btnPrimary) {
@@ -145,6 +145,22 @@ function androidShowStabilityWarning(version) {
  */
 async function androidCheckForUpdates() {
     if (!isCapacitorAndroid()) return;
+    if (window.INSTALLATION_CHANNEL === 'RU_STORE') {
+        console.log('[AndroidUpdater] Disabled for RU_STORE channel');
+        return;
+    }
+
+    let currentVersion = ANDROID_UPDATER_CONFIG.CURRENT_VERSION;
+    try {
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+            const info = await window.Capacitor.Plugins.App.getInfo();
+            if (info && info.version) {
+                currentVersion = info.version;
+            }
+        }
+    } catch (e) {
+        console.warn('[AndroidUpdater] Error fetching App info:', e);
+    }
 
     // Throttle: don't check too frequently
     const lastCheck = parseInt(localStorage.getItem(ANDROID_UPDATER_CONFIG.LAST_CHECK_KEY) || '0', 10);
@@ -168,8 +184,8 @@ async function androidCheckForUpdates() {
         localStorage.setItem(ANDROID_UPDATER_CONFIG.LAST_CHECK_KEY, String(Date.now()));
 
         const remoteVersion = release.tag_name;
-        if (androidCompareVersions(remoteVersion, ANDROID_UPDATER_CONFIG.CURRENT_VERSION) <= 0) {
-            console.log('[AndroidUpdater] Already on latest version:', ANDROID_UPDATER_CONFIG.CURRENT_VERSION);
+        if (androidCompareVersions(remoteVersion, currentVersion) <= 0) {
+            console.log('[AndroidUpdater] Already on latest version:', currentVersion);
             return;
         }
 
@@ -207,7 +223,7 @@ function androidShowUpdateModal(release, apkAsset) {
     const btnSecondary = modal.querySelector('.update-modal-btn-secondary');
     const progress = modal.querySelector('.update-modal-progress-container');
 
-    if (title) title.textContent = '🎉 Доступно обновление ' + release.tag_name;
+    if (title) title.textContent = 'Доступно обновление ' + release.tag_name;
     if (body) {
         // Convert markdown body to simple HTML
         const changelog = (release.body || 'Нет описания').replace(/\n/g, '<br>');
@@ -216,7 +232,7 @@ function androidShowUpdateModal(release, apkAsset) {
     if (progress) progress.style.display = 'none';
 
     if (btnPrimary) {
-        btnPrimary.textContent = '⬇️ Скачать и установить';
+        btnPrimary.textContent = 'Скачать и установить';
         btnPrimary.style.display = '';
         btnPrimary.onclick = () => {
             androidDownloadAndInstall(release.tag_name, apkAsset, modal);
@@ -331,7 +347,7 @@ async function androidDownloadAndInstall(version, apkAsset, modal) {
         if (progressText) progressText.textContent = 'Ошибка: ' + err.message;
         if (progressBar) progressBar.style.width = '0%';
         if (btnPrimary) {
-            btnPrimary.textContent = '🔄 Повторить';
+            btnPrimary.textContent = 'Повторить';
             btnPrimary.style.display = '';
         }
     }
@@ -342,15 +358,6 @@ async function androidDownloadAndInstall(version, apkAsset, modal) {
  * Called from the main renderer on DOMContentLoaded.
  */
 function initAndroidUpdater() {
-    if (!isCapacitorAndroid()) return;
-
-    console.log('[AndroidUpdater] Initializing for Android platform');
-
-    // Check stability of previous update
-    androidMonitorStability();
-
-    // Check for updates after a short delay to not block app startup
-    setTimeout(() => {
-        androidCheckForUpdates();
-    }, 5000);
+    // Disabled per user request
+    return;
 }

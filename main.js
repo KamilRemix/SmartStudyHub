@@ -7,7 +7,7 @@ const { checkForUpdates, initCrashDetection, registerUpdateIPC } = require('./up
 
 // Auth page opened in system browser; after login it redirects to smartstudyhub://auth?token=...
 // Host electron-auth.html at this URL (e.g. Firebase Hosting: smartstudyhub-46d44.web.app/electron-auth.html)
-const AUTH_PAGE_URL = 'https://smartstudyhub-46d44.web.app/electron-auth.html';
+const AUTH_PAGE_URL = 'https://studio-9933447149-80d6a.web.app/electron-auth.html';
 
 const PROTOCOL = 'smartstudyhub';
 
@@ -119,6 +119,11 @@ ipcMain.on('google-signin', () => {
 
 ipcMain.on('github-signin', () => {
   const url = AUTH_PAGE_URL + (AUTH_PAGE_URL.includes('?') ? '&' : '?') + 'provider=github';
+  shell.openExternal(url);
+});
+
+ipcMain.on('vk-signin', () => {
+  const url = AUTH_PAGE_URL + (AUTH_PAGE_URL.includes('?') ? '&' : '?') + 'provider=vk';
   shell.openExternal(url);
 });
 

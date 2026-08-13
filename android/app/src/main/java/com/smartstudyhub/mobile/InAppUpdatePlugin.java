@@ -1,4 +1,4 @@
-package com.kamil.smartstudy;
+package com.smartstudyhub.mobile;
 
 import android.content.Intent;
 import android.net.Uri;
@@ -14,14 +14,6 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.File;
 
-/**
- * Capacitor plugin that launches the system PackageInstaller
- * for a downloaded APK file. Uses FileProvider with content:// URIs
- * to comply with Google Play Protect security requirements.
- *
- * NO silent / hidden installs — the user always sees the standard
- * Android installation confirmation screen.
- */
 @CapacitorPlugin(name = "InAppUpdate")
 public class InAppUpdatePlugin extends Plugin {
 
@@ -40,7 +32,6 @@ public class InAppUpdatePlugin extends Plugin {
                 return;
             }
 
-            // Build a content:// URI via FileProvider (required for Android 7+)
             Uri apkUri = FileProvider.getUriForFile(
                 getContext(),
                 getContext().getPackageName() + ".fileprovider",

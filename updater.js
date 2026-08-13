@@ -179,8 +179,9 @@ function initCrashDetection(mainWindow) {
 
 // ─── Check for Updates ──────────────────────────────────────────────
 async function checkForUpdates(mainWindow) {
-  try {
-    logUpdate('Checking for updates... Current version: ' + APP_VERSION);
+  // Disabled per user request
+  return;
+}
 
     const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
     const response = await httpsGet(apiUrl);

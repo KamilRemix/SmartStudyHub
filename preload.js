@@ -6,7 +6,9 @@ const ALLOWED_SEND_CHANNELS = [
   'window-close',
   'google-signin',
   'github-signin',
+  'vk-signin',
   'show-notification',
+
   'open-external',
   // Auto-updater channels
   'update-info-received',

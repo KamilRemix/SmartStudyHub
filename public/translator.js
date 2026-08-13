@@ -293,8 +293,8 @@ const SmartTranslator = (() => {
     function getFirestoreFavRef() {
         try {
             const user = firebase?.auth()?.currentUser;
-            if (user && firebase.firestore) {
-                return firebase.firestore().collection('users').doc(user.uid).collection('translator_favorites');
+            if (user && firebase.firestore && user.email) {
+                return firebase.firestore().collection('users').doc(user.email).collection('translator_favorites');
             }
         } catch (_) {}
         return null;
