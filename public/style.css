@@ -2100,13 +2100,6 @@ h2 {
 .vk-signin-btn {
     width: 100%;
     padding: 12px 20px;
-    border: none;
-    background: linear-gradient(135deg, #0077FF 0%, #0055C4 100%);
-    color: #ffffff;
-    border-radius: 10px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
     transition: all 0.3s ease;
     display: flex;
     align-items: center;
@@ -4598,6 +4591,34 @@ input, textarea, [contenteditable="true"] {
     visibility: visible;
     transition: opacity 0.5s ease, visibility 0.5s ease;
 }
+
+.vk-signin-btn {
+    width: 100%;
+    padding: 12px 20px;
+    border: 1px solid color-mix(in srgb, #0077FF 35%, #d0d0d0);
+    background: #ffffff;
+    color: #0077FF;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    font-family: var(--font-family);
+    position: relative;
+}
+
+.vk-signin-btn:hover {
+    transform: translateY(-2px);
+    background: #f4f8ff;
+    border-color: #0077FF;
+    box-shadow: 0 4px 14px rgba(0, 119, 255, 0.25);
+}
+
 .app-splash-screen.fade-out {
     opacity: 0;
     visibility: hidden;
