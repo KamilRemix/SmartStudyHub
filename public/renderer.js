@@ -903,9 +903,20 @@ window.signInWithProvider = (providerId, triggerOrRetry = 0) => {
                         if (!accessToken) throw new Error('Не удалось получить токен GitHub');
                         credential = firebase.auth.GithubAuthProvider.credential(accessToken);
                     } else if (providerId === 'oidc.vk-id') {
-                        const provider = new firebase.auth.OAuthProvider('oidc.vk-id');
-                        const userCredential = await firebaseAuth.signInWithPopup(provider);
-                        return finalizeSignIn(userCredential);
+                        if (typeof VKIDSDK !== 'undefined') {
+                            VKIDSDK.Auth.login().then(async (response) => {
+                                if (response.payload && (response.payload.token || response.payload.uuid)) {
+                                    const provider = new firebase.auth.OAuthProvider('oidc.vk-id');
+                                    const credential = provider.credential({ idToken: response.payload.token || response.payload.uuid });
+                                    const userCredential = await firebaseAuth.signInWithCredential(credential);
+                                    return finalizeSignIn(userCredential);
+                                }
+                            }).catch(e => { console.error('VK ID Auth Error:', e); throw e; });
+                        } else {
+                            const provider = new firebase.auth.OAuthProvider('oidc.vk-id');
+                            const userCredential = await firebaseAuth.signInWithPopup(provider);
+                            return finalizeSignIn(userCredential);
+                        }
                     } else {
                         throw new Error('Unsupported provider for Capacitor');
                     }

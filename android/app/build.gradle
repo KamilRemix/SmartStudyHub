@@ -16,10 +16,10 @@ android {
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders = [
-            VKIDClientID: "1234567",
-            VKIDClientSecret: "secret",
+            VKIDClientID: "54715317",
+            VKIDClientSecret: "bNvTlZZc3yghWUQVRtKE",
             VKIDRedirectHost: "vk.com",
-            VKIDRedirectScheme: "vk1234567"
+            VKIDRedirectScheme: "vk54715317"
         ]
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

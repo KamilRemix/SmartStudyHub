@@ -39,15 +39,17 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://unpkg.com/@vkid/sdk@<2.0.0/dist-sdk/umd/index.js"></script>
     <script>
       const firebaseConfig = {
-        apiKey: "AIzaSyCBX64ItDxwK_coTZGmmIrujDKQzUCckjI",
+        apiKey: "AIzaSyDSgNxVrCXDGIrA-yZzAAYuWKtC13BmJLY",
         authDomain: "studio-9933447149-80d6a.firebaseapp.com",
         databaseURL: "https://studio-9933447149-80d6a-default-rtdb.firebaseio.com",
         projectId: "studio-9933447149-80d6a",
-        storageBucket: "studio-9933447149-80d6a.appspot.com",
-        messagingSenderId: "545571047137",
-        appId: "1:545571047137:web:fe3442d477094f8b5559a0"
+        storageBucket: "studio-9933447149-80d6a.firebasestorage.app",
+        messagingSenderId: "121615915195",
+        appId: "1:121615915195:web:f2eb26c4c23530ef8e719e",
+        measurementId: "G-F02D7YK7S3"
       };
 
       
@@ -57,6 +59,15 @@
           try {
               firebase.initializeApp(firebaseConfig);
               window.firebaseAuth = firebase.auth();
+
+      if (typeof VKIDSDK !== 'undefined') {
+          VKIDSDK.Config.init({
+              app: 54715318,
+              redirectUrl: "https://studio-9933447149-80d6a.web.app",
+              responseMode: VKIDSDK.Config.ResponseMode.Callback
+          });
+      }
+
           } catch (e) {
               console.warn('Firebase init warning:', e);
           }
