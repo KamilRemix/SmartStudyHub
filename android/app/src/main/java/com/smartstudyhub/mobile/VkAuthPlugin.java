@@ -37,34 +37,9 @@ public class VkAuthPlugin extends Plugin {
 
     @PluginMethod
     public void startVkAuth(PluginCall call) {
-        try {
-            com.vk.id.VKID.Companion.init(getContext());
-            com.vk.id.VKID vkid = com.vk.id.VKID.Companion.getInstance();
-
-            vkid.authorize(
-                getActivity(),
-                new com.vk.id.VKIDAuthCallback() {
-                    @Override
-                    public void onSuccess(com.vk.id.AccessToken accessToken) {
-                        JSObject ret = new JSObject();
-                        ret.put("token", accessToken.getToken());
-                        ret.put("idToken", accessToken.getIdToken());
-                        ret.put("userId", String.valueOf(accessToken.getUserId()));
-                        call.resolve(ret);
-                    }
-
-                    @Override
-                    public void Fail(com.vk.id.VKIDAuthFail fail) {
-                        call.reject("VK Auth failed: " + fail.getDescription());
-                    }
-                },
-                new com.vk.id.auth.VKIDAuthParams.Builder().build()
-            );
-        } catch (Throwable t) {
-            JSObject ret = new JSObject();
-            ret.put("webFallback", true);
-            ret.put("reason", t.getMessage() != null ? t.getMessage() : "Native SDK unavailable");
-            call.resolve(ret);
-        }
+        JSObject ret = new JSObject();
+        ret.put("webFallback", true);
+        ret.put("reason", "Native SDK compilation issue with 2.4.0");
+        call.resolve(ret);
     }
 }
