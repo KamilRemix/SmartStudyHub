@@ -1300,142 +1300,106 @@ class GradeAverageCalculator extends HTMLElement {
                     color: var(--primary-accent);
                     font-size: 1.1rem;
                 }
-                /* Custom Subject Dropdown */
-                .custom-subject-dropdown-wrapper {
+                /* Horizontal Scrollable Subjects Panel */
+                .subjects-bar-container {
                     position: relative;
-                    max-width: 380px;
-                    margin: 0 auto 1.5rem;
-                }
-                .custom-subject-btn {
                     width: 100%;
-                    padding: 0.9rem 1.2rem;
+                    margin: 0 0 1.25rem 0;
+                }
+                .subjects-scroll-track {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.65rem;
+                    overflow-x: auto;
+                    overflow-y: hidden;
+                    padding: 0.4rem 0.2rem 0.75rem;
+                    scroll-behavior: smooth;
+                    -webkit-overflow-scrolling: touch;
+                    scrollbar-width: thin;
+                    scrollbar-color: color-mix(in srgb, var(--primary-accent) 40%, transparent) transparent;
+                    cursor: grab;
+                    user-select: none;
+                    -webkit-user-select: none;
+                }
+                .subjects-scroll-track.is-dragging {
+                    cursor: grabbing;
+                    scroll-behavior: auto;
+                }
+                .subjects-scroll-track::-webkit-scrollbar {
+                    height: 4px;
+                }
+                .subjects-scroll-track::-webkit-scrollbar-track {
+                    background: rgba(255, 255, 255, 0.03);
+                    border-radius: 999px;
+                }
+                .subjects-scroll-track::-webkit-scrollbar-thumb {
+                    background: color-mix(in srgb, var(--primary-accent) 45%, transparent);
+                    border-radius: 999px;
+                }
+                .subjects-scroll-track::-webkit-scrollbar-thumb:hover {
+                    background: var(--primary-accent);
+                }
+                .subject-chip {
+                    flex-shrink: 0;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.55rem;
+                    padding: 0.65rem 1.15rem;
+                    border-radius: 12px;
                     background: var(--component-background);
-                    border: 1px solid color-mix(in srgb, var(--primary-accent) 55%, transparent);
-                    border-radius: 14px;
+                    border: 1px solid color-mix(in srgb, var(--primary-accent) 35%, transparent);
                     color: var(--text-color);
                     font-family: inherit;
-                    font-size: 1.05rem;
-                    font-weight: 600;
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    gap: 0.75rem;
-                    cursor: pointer;
-                    box-shadow: 0 4px 16px var(--shadow-color-lift);
-                    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-                    box-sizing: border-box;
-                }
-                .custom-subject-btn:hover {
-                    border-color: var(--primary-accent);
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 20px color-mix(in srgb, var(--primary-accent) 25%, transparent);
-                }
-                .custom-subject-btn.open {
-                    border-color: var(--primary-accent);
-                    box-shadow: 0 0 16px var(--glow-color-primary);
-                }
-                .custom-subject-btn-icon {
-                    font-size: 1.25rem;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: var(--primary-accent);
-                    flex-shrink: 0;
-                }
-                .custom-subject-btn-label {
-                    flex: 1;
-                    text-align: left;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
-                .custom-subject-btn-arrow {
-                    font-size: 0.85rem;
-                    color: var(--primary-accent);
-                    transition: transform 0.3s ease;
-                    flex-shrink: 0;
-                }
-                .custom-subject-btn.open .custom-subject-btn-arrow {
-                    transform: rotate(180deg);
-                }
-                .custom-subject-menu {
-                    position: absolute;
-                    top: calc(100% + 8px);
-                    left: 0;
-                    right: 0;
-                    background: color-mix(in srgb, var(--component-background) 88%, var(--background-color));
-                    border: 1px solid color-mix(in srgb, var(--primary-accent) 50%, transparent);
-                    border-radius: 14px;
-                    box-shadow: 0 14px 35px var(--shadow-color-deep);
-                    backdrop-filter: blur(16px);
-                    -webkit-backdrop-filter: blur(16px);
-                    z-index: 1000;
-                    padding: 0.6rem;
-                    opacity: 0;
-                    visibility: hidden;
-                    transform: translateY(-8px);
-                    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
-                    display: flex;
-                    flex-direction: column;
-                    box-sizing: border-box;
-                }
-                .custom-subject-menu.open {
-                    opacity: 1;
-                    visibility: visible;
-                    transform: translateY(0);
-                }
-                .custom-subject-menu-header {
-                    font-size: 0.75rem;
-                    font-weight: 700;
-                    text-transform: uppercase;
-                    letter-spacing: 0.06em;
-                    color: var(--text-color-secondary);
-                    padding: 0.4rem 0.6rem 0.6rem;
-                    border-bottom: 1px solid color-mix(in srgb, var(--primary-accent) 15%, transparent);
-                    margin-bottom: 0.4rem;
-                }
-                .custom-subject-list {
-                    overflow-y: auto;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 4px;
-                    max-height: 220px;
-                }
-                .custom-subject-item {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    gap: 0.75rem;
-                    padding: 0.75rem 0.9rem;
-                    border-radius: 10px;
-                    cursor: pointer;
                     font-size: 0.95rem;
                     font-weight: 600;
-                    color: var(--text-color);
-                    transition: all 0.2s ease;
-                    border: 1px solid transparent;
+                    cursor: pointer;
+                    transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1), background 0.2s, border-color 0.2s, box-shadow 0.2s;
+                    white-space: nowrap;
+                    box-shadow: 0 3px 10px var(--shadow-color-lift);
+                    outline: none;
                 }
-                .custom-subject-item:hover {
-                    background: color-mix(in srgb, var(--primary-accent) 12%, transparent);
-                    border-color: color-mix(in srgb, var(--primary-accent) 40%, transparent);
-                    transform: translateX(3px);
+                .subject-chip:hover {
+                    border-color: var(--primary-accent);
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 16px color-mix(in srgb, var(--primary-accent) 25%, transparent);
                 }
-                .custom-subject-item.active {
-                    background: var(--primary-accent);
+                .subject-chip.active {
+                    background: linear-gradient(135deg, var(--primary-accent), #005eff);
                     color: #ffffff;
-                    box-shadow: 0 4px 14px var(--glow-color-primary);
+                    border-color: transparent;
+                    box-shadow: 0 4px 18px var(--glow-color-primary);
+                    transform: translateY(-2px);
                 }
-                .custom-subject-item.active .custom-subject-item-badge {
+                .subject-chip-icon {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 16px;
+                    height: 16px;
+                    flex-shrink: 0;
+                }
+                .subject-chip-icon svg {
+                    width: 15px;
+                    height: 15px;
+                    stroke: currentColor;
+                    fill: none;
+                    display: block;
+                }
+                .subject-chip-title {
+                    white-space: nowrap;
+                }
+                .subject-chip-badge {
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                    padding: 1px 7px;
+                    border-radius: 999px;
+                    background: color-mix(in srgb, var(--primary-accent) 18%, transparent);
+                    color: var(--primary-accent);
+                    line-height: 1.3;
+                }
+                .subject-chip.active .subject-chip-badge {
                     background: rgba(255, 255, 255, 0.25);
                     color: #ffffff;
-                }
-                .custom-subject-item-badge {
-                    font-size: 0.75rem;
-                    padding: 2px 8px;
-                    border-radius: 999px;
-                    background: color-mix(in srgb, var(--primary-accent) 15%, transparent);
-                    color: var(--primary-accent);
-                    font-weight: 700;
                 }
 
                 /* Target Grade Selector (Cards / Segmented) */
@@ -1758,15 +1722,9 @@ class GradeAverageCalculator extends HTMLElement {
 
                 <!-- INPUT TAB -->
                 <div id="input" class="tab-content">
-                    <div class="custom-subject-dropdown-wrapper" id="custom-subject-wrapper">
-                        <button type="button" class="custom-subject-btn" id="custom-subject-trigger">
-                            <span class="custom-subject-btn-icon" id="custom-subject-icon">⚡</span>
-                            <span class="custom-subject-btn-label" id="custom-subject-label">Быстрый подсчет (локально)</span>
-                            <span class="custom-subject-btn-arrow">▼</span>
-                        </button>
-                        <div class="custom-subject-menu" id="custom-subject-menu">
-                            <div class="custom-subject-menu-header" data-i18n="chooseSubject">Выбор предмета</div>
-                            <div class="custom-subject-list" id="custom-subject-list"></div>
+                    <div class="subjects-bar-container">
+                        <div class="subjects-scroll-track" id="subjects-scroll-track" role="tablist" aria-label="Subjects">
+                            <!-- Dynamically populated subject chips -->
                         </div>
                         <select id="subject-select" style="display: none;">
                             <option value="">-- Выбери предмет --</option>
@@ -1894,22 +1852,51 @@ class GradeAverageCalculator extends HTMLElement {
             });
         }
 
-        // CUSTOM SUBJECT DROPDOWN
-        const customTrigger = this.shadowRoot.querySelector('#custom-subject-trigger');
-        const customMenu = this.shadowRoot.querySelector('#custom-subject-menu');
-        if (customTrigger && customMenu) {
-            customTrigger.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isOpen = customMenu.classList.toggle('open');
-                customTrigger.classList.toggle('open', isOpen);
+        // DRAG-TO-SCROLL FOR SUBJECTS PANEL
+        const scrollTrack = this.shadowRoot.querySelector('#subjects-scroll-track');
+        if (scrollTrack) {
+            let isDown = false;
+            let startX = 0;
+            let scrollLeft = 0;
+            let hasDragged = false;
+
+            scrollTrack.addEventListener('mousedown', (e) => {
+                isDown = true;
+                hasDragged = false;
+                scrollTrack.classList.add('is-dragging');
+                startX = e.pageX - scrollTrack.offsetLeft;
+                scrollLeft = scrollTrack.scrollLeft;
             });
 
-            this.shadowRoot.addEventListener('click', (e) => {
-                if (!e.target.closest('#custom-subject-wrapper')) {
-                    customTrigger.classList.remove('open');
-                    customMenu.classList.remove('open');
-                }
+            scrollTrack.addEventListener('mouseleave', () => {
+                isDown = false;
+                scrollTrack.classList.remove('is-dragging');
             });
+
+            scrollTrack.addEventListener('mouseup', () => {
+                isDown = false;
+                scrollTrack.classList.remove('is-dragging');
+            });
+
+            scrollTrack.addEventListener('mousemove', (e) => {
+                if (!isDown) return;
+                e.preventDefault();
+                const x = e.pageX - scrollTrack.offsetLeft;
+                const walk = (x - startX) * 1.5;
+                if (Math.abs(walk) > 4) {
+                    hasDragged = true;
+                }
+                scrollTrack.scrollLeft = scrollLeft - walk;
+            });
+
+            scrollTrack.addEventListener('wheel', (e) => {
+                if (e.deltaY !== 0) {
+                    e.preventDefault();
+                    scrollTrack.scrollLeft += e.deltaY;
+                }
+            }, { passive: false });
+
+            this._hasDragged = () => hasDragged;
         }
 
         // Use event delegation for all controls
@@ -2072,9 +2059,7 @@ class GradeAverageCalculator extends HTMLElement {
     
     renderInputTab() {
         const subjectSelect = this.shadowRoot.querySelector('#subject-select');
-        const customLabel = this.shadowRoot.querySelector('#custom-subject-label');
-        const customIcon = this.shadowRoot.querySelector('#custom-subject-icon');
-        const customList = this.shadowRoot.querySelector('#custom-subject-list');
+        const scrollTrack = this.shadowRoot.querySelector('#subjects-scroll-track');
         const resultLabel = this.shadowRoot.querySelector('#result-label');
 
         if (this.gradingSystem === '5-point') {
@@ -2084,72 +2069,80 @@ class GradeAverageCalculator extends HTMLElement {
         }
 
         subjectSelect.innerHTML = '';
-        if (customList) customList.innerHTML = '';
+        if (scrollTrack) scrollTrack.innerHTML = '';
 
         const quickCalcText = (translations[currentLang]?.quickCalc || 'Быстрый подсчет (локально)');
 
-        // 1. Quick Calc option
+        // 1. Quick Calc option (hidden select + chip)
         const quickCalcOption = document.createElement('option');
         quickCalcOption.value = '__QUICK_CALC__';
         quickCalcOption.textContent = quickCalcText;
         subjectSelect.appendChild(quickCalcOption);
 
-        if (customList) {
+        if (scrollTrack) {
             const isQuick = this.currentSubject === '__QUICK_CALC__';
-            const quickItem = document.createElement('div');
-            quickItem.className = `custom-subject-item ${isQuick ? 'active' : ''}`;
-            quickItem.dataset.value = '__QUICK_CALC__';
-            quickItem.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
-                    <span style="font-size: 1.15rem; color: #ffd600;">⚡</span>
-                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${quickCalcText}</span>
-                </div>
-                <span class="custom-subject-item-badge">${this.quickCalcGrades.length}</span>
+            const quickChip = document.createElement('button');
+            quickChip.type = 'button';
+            quickChip.className = `subject-chip ${isQuick ? 'active' : ''}`;
+            quickChip.dataset.value = '__QUICK_CALC__';
+            quickChip.setAttribute('role', 'tab');
+            quickChip.setAttribute('aria-selected', isQuick ? 'true' : 'false');
+            
+            const flashSvg = `<svg viewBox="0 0 24 24" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
+            
+            quickChip.innerHTML = `
+                <span class="subject-chip-icon">${flashSvg}</span>
+                <span class="subject-chip-title">${quickCalcText}</span>
+                <span class="subject-chip-badge">${this.quickCalcGrades.length}</span>
             `;
-            quickItem.addEventListener('click', () => {
+            quickChip.addEventListener('click', () => {
+                if (this._hasDragged && this._hasDragged()) return;
                 this.selectSubject('__QUICK_CALC__');
             });
-            customList.appendChild(quickItem);
+            scrollTrack.appendChild(quickChip);
         }
 
         // 2. Custom user subjects
+        const bookSvg = `<svg viewBox="0 0 24 24" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`;
+
         Object.keys(this.subjects).forEach(subjectName => {
             const option = document.createElement('option');
             option.value = subjectName;
             option.textContent = subjectName;
             subjectSelect.appendChild(option);
 
-            if (customList) {
+            if (scrollTrack) {
                 const isActive = this.currentSubject === subjectName;
                 const gradesCount = (this.subjects[subjectName] || []).length;
-                const item = document.createElement('div');
-                item.className = `custom-subject-item ${isActive ? 'active' : ''}`;
-                item.dataset.value = subjectName;
-                item.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
-                        <span style="font-size: 1.15rem; color: var(--primary-accent);">📚</span>
-                        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${subjectName}</span>
-                    </div>
-                    <span class="custom-subject-item-badge">${gradesCount}</span>
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = `subject-chip ${isActive ? 'active' : ''}`;
+                chip.dataset.value = subjectName;
+                chip.setAttribute('role', 'tab');
+                chip.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                chip.innerHTML = `
+                    <span class="subject-chip-icon">${bookSvg}</span>
+                    <span class="subject-chip-title">${subjectName}</span>
+                    <span class="subject-chip-badge">${gradesCount}</span>
                 `;
-                item.addEventListener('click', () => {
+                chip.addEventListener('click', () => {
+                    if (this._hasDragged && this._hasDragged()) return;
                     this.selectSubject(subjectName);
                 });
-                customList.appendChild(item);
+                scrollTrack.appendChild(chip);
             }
         });
 
         // Set selected option
         subjectSelect.value = this.currentSubject;
 
-        // Update trigger button label and icon
-        if (customLabel) {
-            if (this.currentSubject === '__QUICK_CALC__') {
-                customLabel.textContent = quickCalcText;
-                if (customIcon) customIcon.textContent = '⚡';
-            } else {
-                customLabel.textContent = this.currentSubject || quickCalcText;
-                if (customIcon) customIcon.textContent = '📚';
+        // Smoothly scroll active chip into view
+        if (scrollTrack) {
+            const activeChip = scrollTrack.querySelector('.subject-chip.active');
+            if (activeChip) {
+                setTimeout(() => {
+                    activeChip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }, 50);
             }
         }
     }
@@ -2157,10 +2150,6 @@ class GradeAverageCalculator extends HTMLElement {
     selectSubject(subjectName) {
         this.currentSubject = subjectName || '__QUICK_CALC__';
         this.simulatedGrade = null;
-        const trigger = this.shadowRoot.querySelector('#custom-subject-trigger');
-        const menu = this.shadowRoot.querySelector('#custom-subject-menu');
-        if (trigger) trigger.classList.remove('open');
-        if (menu) menu.classList.remove('open');
         this.update();
     }
     
