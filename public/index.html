@@ -40,39 +40,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://unpkg.com/@vkid/sdk@<2.0.0/dist-sdk/umd/index.js"></script>
-    <script>
-      const firebaseConfig = {
-        apiKey: "AIzaSyDSgNxVrCXDGIrA-yZzAAYuWKtC13BmJLY",
-        authDomain: "studio-9933447149-80d6a.firebaseapp.com",
-        databaseURL: "https://studio-9933447149-80d6a-default-rtdb.firebaseio.com",
-        projectId: "studio-9933447149-80d6a",
-        storageBucket: "studio-9933447149-80d6a.firebasestorage.app",
-        messagingSenderId: "121615915195",
-        appId: "1:121615915195:web:f2eb26c4c23530ef8e719e",
-        measurementId: "G-F02D7YK7S3"
-      };
-
-      
-      // Initialize Firebase safely
-      window.firebaseConfig = firebaseConfig;
-      if (typeof firebase !== 'undefined') {
-          try {
-              firebase.initializeApp(firebaseConfig);
-              window.firebaseAuth = firebase.auth();
-
-      if (typeof VKIDSDK !== 'undefined') {
-          VKIDSDK.Config.init({
-              app: 54715318,
-              redirectUrl: "https://studio-9933447149-80d6a.web.app",
-              responseMode: VKIDSDK.Config.ResponseMode.Callback
-          });
-      }
-
-          } catch (e) {
-              console.warn('Firebase init warning:', e);
-          }
-      }
-    </script>
+    <!-- Firebase initialization moved to js/firebase-init.js -->
 </head>
 <body>
     <!-- App Splash Screen (Logo in center, SmartStudyHub at bottom) -->
@@ -1068,19 +1036,32 @@
     <!-- Toast container for notifications -->
     <div id="app-toast-container"></div>
     
-    <!-- Yandex login removed -->
+    <!-- Translations (must be first - all modules depend on window.translations) -->
     <script src="translations.js"></script>
-    <!-- Tool Implementations -->
+
+    <!-- Core modules: Firebase → Auth → UI -->
+    <script src="js/firebase-init.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/ui.js"></script>
+
+    <!-- Tool implementations (original scripts) -->
     <script src="notes.js"></script>
-    <script src="ai-assistant.js"></script>
+    <script src="js/notes.js"></script>
     <script src="translator.js"></script>
+    <script src="js/translator.js"></script>
     <script src="genpass.js"></script>
+    <script src="js/genpass.js"></script>
+
+    <!-- Tools hub: unit converter + currency converter -->
+    <script src="js/calculator.js"></script>
+
+    <!-- AI Assistant -->
+    <script src="ai-assistant.js"></script>
+
+    <!-- Android updater -->
     <script src="updater-android.js"></script>
+
+    <!-- Main dispatcher + Web Components (SettingsComponent, SmartCalculator, GradeAverageCalculator) -->
     <script src="renderer.js"></script>
-    <script>
-      if (typeof feather !== 'undefined') {
-          try { feather.replace(); } catch (e) {}
-      }
-    </script>
 </body>
 </html>
