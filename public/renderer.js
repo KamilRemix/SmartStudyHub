@@ -1300,26 +1300,191 @@ class GradeAverageCalculator extends HTMLElement {
                     color: var(--primary-accent);
                     font-size: 1.1rem;
                 }
-                .strategy-box {
+                /* Custom Subject Dropdown */
+                .custom-subject-dropdown-wrapper {
+                    position: relative;
+                    max-width: 380px;
+                    margin: 0 auto 1.5rem;
+                }
+                .custom-subject-btn {
+                    width: 100%;
+                    padding: 0.9rem 1.2rem;
+                    background: var(--component-background);
+                    border: 1px solid color-mix(in srgb, var(--primary-accent) 55%, transparent);
+                    border-radius: 14px;
+                    color: var(--text-color);
+                    font-family: inherit;
+                    font-size: 1.05rem;
+                    font-weight: 600;
                     display: flex;
                     align-items: center;
-                    gap: 1rem;
-                    margin-bottom: 1rem;
-                }
-                .strategy-box label {
-                    min-width: 120px;
-                    font-weight: 600;
-                    color: var(--text-color);
-                }
-                #target-select {
-                    background: var(--component-background);
-                    color: var(--text-color);
-                    padding: 0.5rem 1rem;
-                    border-radius: 8px;
-                    border: 1px solid var(--primary-accent);
-                    font-family: inherit;
-                    font-weight: 600;
+                    justify-content: space-between;
+                    gap: 0.75rem;
                     cursor: pointer;
+                    box-shadow: 0 4px 16px var(--shadow-color-lift);
+                    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+                    box-sizing: border-box;
+                }
+                .custom-subject-btn:hover {
+                    border-color: var(--primary-accent);
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px color-mix(in srgb, var(--primary-accent) 25%, transparent);
+                }
+                .custom-subject-btn.open {
+                    border-color: var(--primary-accent);
+                    box-shadow: 0 0 16px var(--glow-color-primary);
+                }
+                .custom-subject-btn-icon {
+                    font-size: 1.25rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--primary-accent);
+                    flex-shrink: 0;
+                }
+                .custom-subject-btn-label {
+                    flex: 1;
+                    text-align: left;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .custom-subject-btn-arrow {
+                    font-size: 0.85rem;
+                    color: var(--primary-accent);
+                    transition: transform 0.3s ease;
+                    flex-shrink: 0;
+                }
+                .custom-subject-btn.open .custom-subject-btn-arrow {
+                    transform: rotate(180deg);
+                }
+                .custom-subject-menu {
+                    position: absolute;
+                    top: calc(100% + 8px);
+                    left: 0;
+                    right: 0;
+                    background: color-mix(in srgb, var(--component-background) 88%, var(--background-color));
+                    border: 1px solid color-mix(in srgb, var(--primary-accent) 50%, transparent);
+                    border-radius: 14px;
+                    box-shadow: 0 14px 35px var(--shadow-color-deep);
+                    backdrop-filter: blur(16px);
+                    -webkit-backdrop-filter: blur(16px);
+                    z-index: 1000;
+                    padding: 0.6rem;
+                    opacity: 0;
+                    visibility: hidden;
+                    transform: translateY(-8px);
+                    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+                    display: flex;
+                    flex-direction: column;
+                    box-sizing: border-box;
+                }
+                .custom-subject-menu.open {
+                    opacity: 1;
+                    visibility: visible;
+                    transform: translateY(0);
+                }
+                .custom-subject-menu-header {
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.06em;
+                    color: var(--text-color-secondary);
+                    padding: 0.4rem 0.6rem 0.6rem;
+                    border-bottom: 1px solid color-mix(in srgb, var(--primary-accent) 15%, transparent);
+                    margin-bottom: 0.4rem;
+                }
+                .custom-subject-list {
+                    overflow-y: auto;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    max-height: 220px;
+                }
+                .custom-subject-item {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 0.75rem;
+                    padding: 0.75rem 0.9rem;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-size: 0.95rem;
+                    font-weight: 600;
+                    color: var(--text-color);
+                    transition: all 0.2s ease;
+                    border: 1px solid transparent;
+                }
+                .custom-subject-item:hover {
+                    background: color-mix(in srgb, var(--primary-accent) 12%, transparent);
+                    border-color: color-mix(in srgb, var(--primary-accent) 40%, transparent);
+                    transform: translateX(3px);
+                }
+                .custom-subject-item.active {
+                    background: var(--primary-accent);
+                    color: #ffffff;
+                    box-shadow: 0 4px 14px var(--glow-color-primary);
+                }
+                .custom-subject-item.active .custom-subject-item-badge {
+                    background: rgba(255, 255, 255, 0.25);
+                    color: #ffffff;
+                }
+                .custom-subject-item-badge {
+                    font-size: 0.75rem;
+                    padding: 2px 8px;
+                    border-radius: 999px;
+                    background: color-mix(in srgb, var(--primary-accent) 15%, transparent);
+                    color: var(--primary-accent);
+                    font-weight: 700;
+                }
+
+                /* Target Grade Selector (Cards / Segmented) */
+                .target-grade-selector {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+                    gap: 0.75rem;
+                    margin-bottom: 0.5rem;
+                }
+                .target-grade-card {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 1rem 0.5rem;
+                    border-radius: 14px;
+                    background: var(--component-background);
+                    border: 1.5px solid color-mix(in srgb, var(--primary-accent) 35%, transparent);
+                    color: var(--text-color);
+                    cursor: pointer;
+                    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+                    box-shadow: 0 4px 12px var(--shadow-color-lift);
+                    user-select: none;
+                }
+                .target-grade-card:hover {
+                    border-color: var(--primary-accent);
+                    transform: translateY(-3px);
+                    box-shadow: 0 6px 18px color-mix(in srgb, var(--primary-accent) 30%, transparent);
+                }
+                .target-grade-card.active {
+                    background: linear-gradient(135deg, var(--primary-accent), #005eff);
+                    color: #ffffff;
+                    border-color: transparent;
+                    box-shadow: 0 8px 24px var(--glow-color-primary);
+                    transform: translateY(-2px) scale(1.02);
+                }
+                .target-grade-val {
+                    font-size: 1.7rem;
+                    font-weight: 800;
+                    line-height: 1;
+                    margin-bottom: 0.35rem;
+                }
+                .target-grade-label {
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    opacity: 0.85;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                    text-align: center;
                 }
 
                 #strategy-verdict {
@@ -1593,8 +1758,17 @@ class GradeAverageCalculator extends HTMLElement {
 
                 <!-- INPUT TAB -->
                 <div id="input" class="tab-content">
-                    <div style="text-align: center; margin-bottom: 1.5rem;">
-                        <select id="subject-select" style="padding: 0.8rem; border-radius: 8px; border: 1px solid var(--primary-accent); background: var(--component-background); color: var(--text-color); font-family: inherit; font-weight: 600; cursor: pointer; width: 100%; max-width: 300px;">
+                    <div class="custom-subject-dropdown-wrapper" id="custom-subject-wrapper">
+                        <button type="button" class="custom-subject-btn" id="custom-subject-trigger">
+                            <span class="custom-subject-btn-icon" id="custom-subject-icon">⚡</span>
+                            <span class="custom-subject-btn-label" id="custom-subject-label">Быстрый подсчет (локально)</span>
+                            <span class="custom-subject-btn-arrow">▼</span>
+                        </button>
+                        <div class="custom-subject-menu" id="custom-subject-menu">
+                            <div class="custom-subject-menu-header" data-i18n="chooseSubject">Выбор предмета</div>
+                            <div class="custom-subject-list" id="custom-subject-list"></div>
+                        </div>
+                        <select id="subject-select" style="display: none;">
                             <option value="">-- Выбери предмет --</option>
                         </select>
                     </div>
@@ -1623,12 +1797,8 @@ class GradeAverageCalculator extends HTMLElement {
                 <div id="strategy" class="tab-content">
                     <div class="strategy-section">
                         <h3 data-i18n="chooseTarget">Выбери целевую оценку:</h3>
-                        <div class="strategy-box">
-                            <label data-i18n="wantToGet">Хочу получить:</label>
-                            <select id="target-select">
-                                <!-- Options are now dynamically rendered -->
-                            </select>
-                        </div>
+                        <div class="target-grade-selector" id="target-grade-selector"></div>
+                        <select id="target-select" style="display: none;"></select>
                     </div>
 
                     <div class="strategy-section">
@@ -1721,6 +1891,24 @@ class GradeAverageCalculator extends HTMLElement {
                 this.currentSubject = e.target.value || '__QUICK_CALC__';
                 this.simulatedGrade = null;
                 this.update();
+            });
+        }
+
+        // CUSTOM SUBJECT DROPDOWN
+        const customTrigger = this.shadowRoot.querySelector('#custom-subject-trigger');
+        const customMenu = this.shadowRoot.querySelector('#custom-subject-menu');
+        if (customTrigger && customMenu) {
+            customTrigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = customMenu.classList.toggle('open');
+                customTrigger.classList.toggle('open', isOpen);
+            });
+
+            this.shadowRoot.addEventListener('click', (e) => {
+                if (!e.target.closest('#custom-subject-wrapper')) {
+                    customTrigger.classList.remove('open');
+                    customMenu.classList.remove('open');
+                }
             });
         }
 
@@ -1884,6 +2072,9 @@ class GradeAverageCalculator extends HTMLElement {
     
     renderInputTab() {
         const subjectSelect = this.shadowRoot.querySelector('#subject-select');
+        const customLabel = this.shadowRoot.querySelector('#custom-subject-label');
+        const customIcon = this.shadowRoot.querySelector('#custom-subject-icon');
+        const customList = this.shadowRoot.querySelector('#custom-subject-list');
         const resultLabel = this.shadowRoot.querySelector('#result-label');
 
         if (this.gradingSystem === '5-point') {
@@ -1892,23 +2083,85 @@ class GradeAverageCalculator extends HTMLElement {
             resultLabel.setAttribute('data-i18n', 'gpa');
         }
 
-        subjectSelect.innerHTML = ''; // Clear previous options
+        subjectSelect.innerHTML = '';
+        if (customList) customList.innerHTML = '';
 
-        // Add Quick Calc as the first option
+        const quickCalcText = (translations[currentLang]?.quickCalc || 'Быстрый подсчет (локально)');
+
+        // 1. Quick Calc option
         const quickCalcOption = document.createElement('option');
         quickCalcOption.value = '__QUICK_CALC__';
-        quickCalcOption.textContent = 'Быстрый подсчет (локально)';
+        quickCalcOption.textContent = quickCalcText;
         subjectSelect.appendChild(quickCalcOption);
 
+        if (customList) {
+            const isQuick = this.currentSubject === '__QUICK_CALC__';
+            const quickItem = document.createElement('div');
+            quickItem.className = `custom-subject-item ${isQuick ? 'active' : ''}`;
+            quickItem.dataset.value = '__QUICK_CALC__';
+            quickItem.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                    <span style="font-size: 1.15rem; color: #ffd600;">⚡</span>
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${quickCalcText}</span>
+                </div>
+                <span class="custom-subject-item-badge">${this.quickCalcGrades.length}</span>
+            `;
+            quickItem.addEventListener('click', () => {
+                this.selectSubject('__QUICK_CALC__');
+            });
+            customList.appendChild(quickItem);
+        }
+
+        // 2. Custom user subjects
         Object.keys(this.subjects).forEach(subjectName => {
             const option = document.createElement('option');
             option.value = subjectName;
             option.textContent = subjectName;
             subjectSelect.appendChild(option);
+
+            if (customList) {
+                const isActive = this.currentSubject === subjectName;
+                const gradesCount = (this.subjects[subjectName] || []).length;
+                const item = document.createElement('div');
+                item.className = `custom-subject-item ${isActive ? 'active' : ''}`;
+                item.dataset.value = subjectName;
+                item.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                        <span style="font-size: 1.15rem; color: var(--primary-accent);">📚</span>
+                        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${subjectName}</span>
+                    </div>
+                    <span class="custom-subject-item-badge">${gradesCount}</span>
+                `;
+                item.addEventListener('click', () => {
+                    this.selectSubject(subjectName);
+                });
+                customList.appendChild(item);
+            }
         });
-        
+
         // Set selected option
         subjectSelect.value = this.currentSubject;
+
+        // Update trigger button label and icon
+        if (customLabel) {
+            if (this.currentSubject === '__QUICK_CALC__') {
+                customLabel.textContent = quickCalcText;
+                if (customIcon) customIcon.textContent = '⚡';
+            } else {
+                customLabel.textContent = this.currentSubject || quickCalcText;
+                if (customIcon) customIcon.textContent = '📚';
+            }
+        }
+    }
+
+    selectSubject(subjectName) {
+        this.currentSubject = subjectName || '__QUICK_CALC__';
+        this.simulatedGrade = null;
+        const trigger = this.shadowRoot.querySelector('#custom-subject-trigger');
+        const menu = this.shadowRoot.querySelector('#custom-subject-menu');
+        if (trigger) trigger.classList.remove('open');
+        if (menu) menu.classList.remove('open');
+        this.update();
     }
     
     async showSimulator() {
@@ -2062,27 +2315,87 @@ class GradeAverageCalculator extends HTMLElement {
         }
         controls.innerHTML = buttonsHTML;
         
-        // Render target select options
+        // Render target select options and custom target cards
         const targetSelect = this.shadowRoot.querySelector('#target-select');
+        const targetContainer = this.shadowRoot.querySelector('#target-grade-selector');
         let optionsHTML = '';
+        if (targetContainer) targetContainer.innerHTML = '';
+
         if (this.gradingSystem === '5-point') {
             optionsHTML = `
-                <option value="5" data-i18n="grade5"></option>
-                <option value="4" data-i18n="grade4"></option>
-                <option value="3" data-i18n="grade3"></option>
+                <option value="5" data-i18n="grade5">5</option>
+                <option value="4" data-i18n="grade4">4</option>
+                <option value="3" data-i18n="grade3">3</option>
             `;
-            this.targetGrade = 5;
+            if (!this.targetGrade || typeof this.targetGrade === 'string') {
+                this.targetGrade = 5;
+            }
+
+            const targets = [
+                { val: 5, label: (translations[currentLang]?.grade5 || 'Пятёрка') },
+                { val: 4, label: (translations[currentLang]?.grade4 || 'Четвёрка') },
+                { val: 3, label: (translations[currentLang]?.grade3 || 'Тройка') }
+            ];
+
+            if (targetContainer) {
+                targets.forEach(t => {
+                    const card = document.createElement('div');
+                    card.className = `target-grade-card ${this.targetGrade === t.val ? 'active' : ''}`;
+                    card.innerHTML = `
+                        <span class="target-grade-val">${t.val}</span>
+                        <span class="target-grade-label">${t.label}</span>
+                    `;
+                    card.addEventListener('click', () => {
+                        this.targetGrade = t.val;
+                        if (targetSelect) targetSelect.value = t.val;
+                        targetContainer.querySelectorAll('.target-grade-card').forEach(c => c.classList.remove('active'));
+                        card.classList.add('active');
+                        this.updateStrategy();
+                    });
+                    targetContainer.appendChild(card);
+                });
+            }
         } else { // us-letter
             optionsHTML = `
-                <option value="A" data-i18n="gradeA"></option>
-                <option value="B" data-i18n="gradeB"></option>
-                <option value="C" data-i18n="gradeC"></option>
-                <option value="D" data-i18n="gradeD"></option>
+                <option value="A" data-i18n="gradeA">A</option>
+                <option value="B" data-i18n="gradeB">B</option>
+                <option value="C" data-i18n="gradeC">C</option>
+                <option value="D" data-i18n="gradeD">D</option>
             `;
-            this.targetGrade = 'A';
+            if (!this.targetGrade || typeof this.targetGrade === 'number') {
+                this.targetGrade = 'A';
+            }
+
+            const targets = [
+                { val: 'A', label: 'GPA 4.0' },
+                { val: 'B', label: 'GPA 3.0' },
+                { val: 'C', label: 'GPA 2.0' },
+                { val: 'D', label: 'GPA 1.0' }
+            ];
+
+            if (targetContainer) {
+                targets.forEach(t => {
+                    const card = document.createElement('div');
+                    card.className = `target-grade-card ${this.targetGrade === t.val ? 'active' : ''}`;
+                    card.innerHTML = `
+                        <span class="target-grade-val">${t.val}</span>
+                        <span class="target-grade-label">${t.label}</span>
+                    `;
+                    card.addEventListener('click', () => {
+                        this.targetGrade = t.val;
+                        if (targetSelect) targetSelect.value = t.val;
+                        targetContainer.querySelectorAll('.target-grade-card').forEach(c => c.classList.remove('active'));
+                        card.classList.add('active');
+                        this.updateStrategy();
+                    });
+                    targetContainer.appendChild(card);
+                });
+            }
         }
-        targetSelect.innerHTML = optionsHTML;
-        targetSelect.value = this.targetGrade;
+        if (targetSelect) {
+            targetSelect.innerHTML = optionsHTML;
+            targetSelect.value = this.targetGrade;
+        }
     }
 
     renderThresholds() {
