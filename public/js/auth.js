@@ -290,12 +290,8 @@ function createAuthProvider(providerId) {
         return provider;
     }
     const provider = new firebase.auth.GoogleAuthProvider();
-    provider.addScope('https://www.googleapis.com/auth/gmail.modify');
-    provider.addScope('https://www.googleapis.com/auth/drive.file');
-    provider.addScope('https://www.googleapis.com/auth/documents');
-    provider.addScope('https://www.googleapis.com/auth/calendar');
-    provider.addScope('https://www.googleapis.com/auth/tasks');
-    provider.addScope('https://www.googleapis.com/auth/youtube.readonly');
+    // Do not request conflicting scopes unless actually needed later via incremental auth.
+    // Basic profile and email are included by default.
     return provider;
 }
 
@@ -838,75 +834,7 @@ window.signInWithProvider = (providerId, triggerOrRetry = 0) => {
         return Promise.resolve();
     }
 
-    if (typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform()) {
-        if (providerId === 'oidc.vk-id') {
-            const VkAuth = window.Capacitor.Plugins?.VkAuth;
-            if (VkAuth) {
-                return runAuthAction(button, async () => {
-                    try {
-                        const result = await VkAuth.startVkAuth();
-                        if (result && result.webFallback) {
-                            const provider = new firebase.auth.OAuthProvider('oidc.vk-id');
-                            const res = await firebaseAuth.signInWithPopup(provider);
-                            return finalizeSignIn(res);
-                        }
-                        const token = result.idToken || result.token;
-                        if (!token) throw new Error('Не удалось получить токен VK ID');
-                        const provider = new firebase.auth.OAuthProvider('oidc.vk-id');
-                        const credential = provider.credential({ idToken: token });
-                        const userCredential = await firebaseAuth.signInWithCredential(credential);
-                        return finalizeSignIn(userCredential);
-                    } catch (error) {
-                        console.error('VK Sign-in error:', error);
-                        if (isIgnorableAuthError(error)) return;
-                        showToast(error.message || t('accountLinkError'), 'error', 3000);
-                    }
-                });
-            }
-        }
-        const FirebaseAuthentication = window.Capacitor.Plugins?.FirebaseAuthentication;
-        if (FirebaseAuthentication) {
-            return runAuthAction(button, async () => {
-                try {
-                    let credential;
-                    if (providerId === 'google.com') {
-                        const result = await FirebaseAuthentication.signInWithGoogle();
-                        const idToken = result.credential?.idToken || result.idToken;
-                        if (!idToken) throw new Error('Не удалось получить токен Google');
-                        credential = firebase.auth.GoogleAuthProvider.credential(idToken);
-                    } else if (providerId === 'github.com') {
-                        const result = await FirebaseAuthentication.signInWithGithub();
-                        const accessToken = result.credential?.accessToken || result.accessToken;
-                        if (!accessToken) throw new Error('Не удалось получить токен GitHub');
-                        credential = firebase.auth.GithubAuthProvider.credential(accessToken);
-                    } else if (providerId === 'oidc.vk-id') {
-                        if (typeof VKIDSDK !== 'undefined') {
-                            VKIDSDK.Auth.login().then(async (response) => {
-                                if (response.payload && (response.payload.token || response.payload.uuid)) {
-                                    const provider = new firebase.auth.OAuthProvider('oidc.vk-id');
-                                    const credential = provider.credential({ idToken: response.payload.token || response.payload.uuid });
-                                    const userCredential = await firebaseAuth.signInWithCredential(credential);
-                                    return finalizeSignIn(userCredential);
-                                }
-                            }).catch(e => { console.error('VK ID Auth Error:', e); throw e; });
-                        } else {
-                            const provider = new firebase.auth.OAuthProvider('oidc.vk-id');
-                            const userCredential = await firebaseAuth.signInWithPopup(provider);
-                            return finalizeSignIn(userCredential);
-                        }
-                    } else {
-                        throw new Error('Unsupported provider for Capacitor');
-                    }
-                    const userCredential = await firebaseAuth.signInWithCredential(credential);
-                    return finalizeSignIn(userCredential);
-                } catch (error) {
-                    console.error('Sign-in error:', error);
-                    if (isIgnorableAuthError(error)) return;
-                    showToast(error.message || t('accountLinkError'), 'error', 3000);
-                }
-            });
-        }
-    }
+    // Native Capacitor auth is skipped to use Web SDK for the correct Firebase project
 
 
     const provider = createAuthProvider(providerId);
