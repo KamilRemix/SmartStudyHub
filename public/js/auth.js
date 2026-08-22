@@ -224,8 +224,9 @@ function createAuthProvider(providerId) {
         return provider;
     }
     const provider = new firebase.auth.GoogleAuthProvider();
-    // Do not request conflicting scopes unless actually needed later via incremental auth.
-    // Basic profile and email are included by default.
+    provider.setCustomParameters({
+        prompt: 'select_account'
+    });
     return provider;
 }
 
@@ -878,42 +879,37 @@ async function updateAuthUI() {
     const availableProviders = await getAvailableAuthProviders();
 
     if (currentUser) {
-        const signOutText = t('signOut') || 'Sign Out';
+        const signOutText = t('signOut') || 'Выйти';
         const userLabel = escapeHtml(getUserDisplayLabel(currentUser));
-        const linked = getLinkedProviders(currentUser);
-        const providerRows = (currentUser.providerData || []);
-        const canUnlink = providerRows.length >= 2;
+        const email = escapeHtml(currentUser.email || '');
+        const photo = currentUser.photoURL;
+        const providerId = (currentUser.providerData && currentUser.providerData[0]?.providerId) || 'google.com';
+        const providerName = getProviderLabel(providerId);
 
-        const linkedListHtml = providerRows.length
-            ? `<p class="accounts-linked-intro">${escapeHtml(t('accountsLinkedIntro'))}</p>
-               <div class="linked-providers-list">
-                   ${providerRows.map((p) => buildLinkedProviderRow(p.providerId, canUnlink)).join('')}
-               </div>`
-            : '';
-
-        const linkButtonsHtml = availableProviders
-            .filter((id) => !linked.ids.has(id))
-            .map((id) => buildProviderActionButton(id, 'link'))
-            .join('');
+        const avatarHtml = photo
+            ? `<img src="${photo}" alt="Avatar" style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-accent); margin: 0 auto 0.75rem; display: block;" onerror="this.style.display='none'">`
+            : `<div style="width: 52px; height: 52px; border-radius: 50%; background: var(--primary-accent); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; font-weight: 700; margin: 0 auto 0.75rem;">${(userLabel[0] || 'U').toUpperCase()}</div>`;
 
         authContent.innerHTML = `
-            <div class="user-info" style="text-align: center; padding: 1.5rem 1rem 1rem;">
-                <p style="margin: 0; font-size: 1rem; color: var(--text-color); font-weight: 500;">
+            <div class="user-info" style="text-align: center; padding: 1.5rem 1rem; border-radius: 12px; margin-bottom: 1rem; background: var(--component-background); border: 1px solid color-mix(in srgb, var(--primary-accent) 30%, transparent);">
+                ${avatarHtml}
+                <p style="margin: 0 0 0.25rem; font-size: 1.1rem; color: var(--text-color); font-weight: 600;">
                     ${userLabel}
                 </p>
+                ${email ? `<p style="margin: 0 0 0.6rem; font-size: 0.85rem; color: var(--text-color-secondary);">${email}</p>` : ''}
+                <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; background: color-mix(in srgb, var(--primary-accent) 15%, transparent); font-size: 0.8rem; color: var(--primary-accent); font-weight: 600;">
+                    ${getProviderIconSvg(providerId, 'provider-badge-icon')}
+                    <span>${providerName}</span>
+                </div>
             </div>
-            ${linkedListHtml}
-            <div class="auth-provider-actions" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1rem;">
-                ${linkButtonsHtml}
-            </div>
-            <button class="signout-btn" id="signout-btn" data-i18n="signOut" style="font-size: 0.9rem; padding: 8px 16px; width: 100%;">
+            <button class="signout-btn" id="signout-btn" data-i18n="signOut" style="width: 100%; padding: 12px 20px; font-size: 0.95rem; font-weight: 600; cursor: pointer; border-radius: 10px; border: 1.5px solid var(--primary-accent); background: transparent; color: var(--primary-accent); transition: all 0.3s ease;">
                 ${signOutText}
             </button>`;
 
         bindAuthContentActions(authContent);
     } else {
         authContent.innerHTML = `
-            <div class="auth-signin-stack" style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="auth-signin-stack" style="display: flex; flex-direction: column; gap: 12px;">
                 ${availableProviders.map((id) => buildProviderActionButton(id, 'signin')).join('')}
             </div>`;
         bindAuthContentActions(authContent);
@@ -934,12 +930,15 @@ window.signOutUser = () => {
 
     firebaseAuth.signOut()
         .then(() => {
-            // Clear local data on logout
+            currentUser = null;
+            // Clear local cached tokens
             localStorage.removeItem('google_access_token');
             if (gradeCalc) {
                 gradeCalc.subjects = {};
                 gradeCalc.render();
             }
+            updateAuthUI();
+            showToast(t('signOutSuccess') || 'Вы вышли из аккаунта', 'info', 2500);
         })
         .catch(error => {
             console.error('Sign-out error:', error);

@@ -822,45 +822,7 @@
 
     <div id="app-toast-container" class="app-toast-container" aria-live="polite" aria-atomic="true"></div>
 
-    <!-- Connect accounts -->
-    <div id="account-link-modal" class="app-dialog-modal account-link-modal" aria-hidden="true">
-        <div class="account-link-modal-content" role="dialog" aria-modal="true" aria-labelledby="account-link-modal-title">
-            <button type="button" class="account-link-modal-close" data-dialog-close="account-link" aria-label="Close">×</button>
-            <h2 id="account-link-modal-title" class="account-link-modal-title"></h2>
-            <div id="account-link-flow" class="auth-flow-diagram" aria-hidden="true"></div>
-            <p id="account-link-message" class="account-link-message-primary"></p>
-            <div class="account-link-modal-actions">
-                <button type="button" id="account-link-confirm-btn" class="account-link-btn account-link-btn-primary auth-action-btn"></button>
-                <button type="button" id="account-link-cancel-btn" class="account-link-btn account-link-btn-secondary auth-action-btn"></button>
-            </div>
-        </div>
-    </div>
 
-    <!-- Account already has its own grades -->
-    <div id="account-conflict-modal" class="app-dialog-modal account-conflict-modal" aria-hidden="true">
-        <div class="account-link-modal-content account-conflict-modal-content" role="dialog" aria-modal="true" aria-labelledby="account-conflict-modal-title">
-            <button type="button" class="account-link-modal-close" data-dialog-close="account-conflict" aria-label="Close">×</button>
-            <h2 id="account-conflict-modal-title" class="account-link-modal-title"></h2>
-            <div id="account-conflict-flow" class="auth-flow-diagram auth-flow-diagram--conflict" aria-hidden="true"></div>
-            <p id="account-conflict-message" class="account-link-message-primary"></p>
-            <div class="account-link-modal-actions">
-                <button type="button" id="account-conflict-switch-btn" class="account-link-btn account-link-btn-primary auth-action-btn"></button>
-                <button type="button" id="account-conflict-cancel-btn" class="account-link-btn account-link-btn-secondary auth-action-btn"></button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Generic auth / link error -->
-    <div id="account-error-modal" class="app-dialog-modal account-error-modal" aria-hidden="true">
-        <div class="account-link-modal-content account-error-modal-content" role="dialog" aria-modal="true" aria-labelledby="account-error-modal-title">
-            <button type="button" class="account-link-modal-close" data-dialog-close="account-error" aria-label="Close">×</button>
-            <h2 id="account-error-modal-title" class="account-link-modal-title"></h2>
-            <p id="account-error-message" class="account-link-message-primary"></p>
-            <div class="account-link-modal-actions">
-                <button type="button" id="account-error-ok-btn" class="account-link-btn account-link-btn-primary auth-action-btn"></button>
-            </div>
-        </div>
-    </div>
 
     <!-- Generic app dialog for confirmations, prompts and alerts -->
     <div id="app-generic-modal" class="app-dialog-modal" aria-hidden="true">
@@ -1037,32 +999,32 @@
     <div id="app-toast-container"></div>
     
     <!-- Translations (must be first - all modules depend on window.translations) -->
-    <script src="translations.js?v=3.0"></script>
+    <script src="translations.js?v=3.1"></script>
 
     <!-- Core modules: Firebase → Auth → UI -->
-    <script src="js/firebase-init.js?v=3.0"></script>
-    <script src="js/auth.js?v=3.0"></script>
-    <script src="js/ui.js?v=3.0"></script>
+    <script src="js/firebase-init.js?v=3.1"></script>
+    <script src="js/auth.js?v=3.1"></script>
+    <script src="js/ui.js?v=3.1"></script>
 
     <!-- Tool implementations (original scripts) -->
-    <script src="notes.js?v=3.0"></script>
-    <script src="js/notes.js?v=3.0"></script>
-    <script src="translator.js?v=3.0"></script>
-    <script src="js/translator.js?v=3.0"></script>
-    <script src="genpass.js?v=3.0"></script>
-    <script src="js/genpass.js?v=3.0"></script>
+    <script src="notes.js?v=3.1"></script>
+    <script src="js/notes.js?v=3.1"></script>
+    <script src="translator.js?v=3.1"></script>
+    <script src="js/translator.js?v=3.1"></script>
+    <script src="genpass.js?v=3.1"></script>
+    <script src="js/genpass.js?v=3.1"></script>
 
     <!-- Tools hub: unit converter + currency converter -->
-    <script src="js/calculator.js?v=3.0"></script>
+    <script src="js/calculator.js?v=3.1"></script>
 
     <!-- AI Assistant -->
-    <script src="ai-assistant.js?v=3.0"></script>
+    <script src="ai-assistant.js?v=3.1"></script>
 
     <!-- Android updater -->
-    <script src="updater-android.js?v=3.0"></script>
+    <script src="updater-android.js?v=3.1"></script>
 
     <!-- Main dispatcher + Web Components (SettingsComponent, SmartCalculator, GradeAverageCalculator) -->
-    <script src="renderer.js?v=3.0"></script>
+    <script src="renderer.js?v=3.1"></script>
 
     <!-- Bulletproof emergency splash dismiss: runs unconditionally regardless of module errors -->
     <script>
