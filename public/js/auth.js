@@ -216,11 +216,19 @@ function getCurrentProviderId(user) {
 
 function createAuthProvider(providerId) {
     if (providerId === 'oidc.vk-id') {
-        return new firebase.auth.OAuthProvider('oidc.vk-id');
+        const provider = new firebase.auth.OAuthProvider('oidc.vk-id');
+        provider.setCustomParameters({
+            prompt: 'login'
+        });
+        return provider;
     }
     if (providerId === 'github.com') {
         const provider = new firebase.auth.GithubAuthProvider();
         provider.addScope('read:user');
+        provider.setCustomParameters({
+            prompt: 'consent',
+            allow_signup: 'true'
+        });
         return provider;
     }
     const provider = new firebase.auth.GoogleAuthProvider();
