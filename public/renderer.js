@@ -2411,123 +2411,173 @@ document.addEventListener('DOMContentLoaded', function() {
         try { window.Capacitor.Plugins.SplashScreen.hide(); } catch (e) {}
     }
 
-    // Apply saved theme and language (functions from ui.js)
-    var savedTheme = localStorage.getItem('theme') || 'dark';
-    var initialLang = typeof getInitialUserLanguage === 'function' ? getInitialUserLanguage() : 'en';
-    if (typeof setTheme === 'function') setTheme(savedTheme);
-    if (typeof setLanguage === 'function') setLanguage(initialLang);
+    try {
+        // Apply saved theme and language (functions from ui.js)
+        var savedTheme = localStorage.getItem('theme') || 'dark';
+        var initialLang = typeof getInitialUserLanguage === 'function' ? getInitialUserLanguage() : 'en';
+        if (typeof setTheme === 'function') setTheme(savedTheme);
+        if (typeof setLanguage === 'function') setLanguage(initialLang);
+    } catch (e) {
+        console.warn('[renderer] Theme/Language init warning:', e);
+    }
 
     setTimeout(function() {
-        if (typeof updateTranslations === 'function') updateTranslations();
+        try {
+            if (typeof updateTranslations === 'function') updateTranslations();
+        } catch (e) {
+            console.warn('[renderer] updateTranslations warning:', e);
+        }
     }, 50);
 
     // Initialize desktop download modal and auth dialogs (functions from ui.js + auth.js)
-    if (typeof initDesktopDownloadModal === 'function') initDesktopDownloadModal();
-    if (typeof initAuthDialogs === 'function') initAuthDialogs();
+    try {
+        if (typeof initDesktopDownloadModal === 'function') initDesktopDownloadModal();
+    } catch (e) {
+        console.warn('[renderer] initDesktopDownloadModal warning:', e);
+    }
+    try {
+        if (typeof initAuthDialogs === 'function') initAuthDialogs();
+    } catch (e) {
+        console.warn('[renderer] initAuthDialogs warning:', e);
+    }
 
     // Electron: custom titlebar + OAuth result handler
     if (typeof window.electronAPI !== 'undefined' && window.electronAPI.isElectron) {
-        var minimizeBtn = document.querySelector('.titlebar-minimize');
-        var maximizeBtn = document.querySelector('.titlebar-maximize');
-        var closeBtn = document.querySelector('.titlebar-close');
-        if (minimizeBtn) minimizeBtn.addEventListener('click', function() { window.electronAPI.send('window-minimize'); });
-        if (maximizeBtn) maximizeBtn.addEventListener('click', function() { window.electronAPI.send('window-maximize'); });
-        if (closeBtn) closeBtn.addEventListener('click', function() { window.electronAPI.send('window-close'); });
+        try {
+            var minimizeBtn = document.querySelector('.titlebar-minimize');
+            var maximizeBtn = document.querySelector('.titlebar-maximize');
+            var closeBtn = document.querySelector('.titlebar-close');
+            if (minimizeBtn) minimizeBtn.addEventListener('click', function() { window.electronAPI.send('window-minimize'); });
+            if (maximizeBtn) maximizeBtn.addEventListener('click', function() { window.electronAPI.send('window-maximize'); });
+            if (closeBtn) closeBtn.addEventListener('click', function() { window.electronAPI.send('window-close'); });
 
-        window.electronAPI.onGoogleSigninResult(function(err, token, provider, googleAccessToken) {
-            if (err) { console.error('OAuth sign-in (desktop):', err); openAccountErrorModal('Sign-in failed: ' + err); return; }
-            if (!token || !firebaseAuth) return;
-            if (provider === 'google' && googleAccessToken) localStorage.setItem('google_access_token', googleAccessToken);
-            var credential;
-            if (provider === 'vk' || provider === 'oidc.vk-id') {
-                var vkProvider = new firebase.auth.OAuthProvider('oidc.vk-id');
-                credential = vkProvider.credential({ idToken: token });
-            } else if (provider === 'github') {
-                credential = firebase.auth.GithubAuthProvider.credential(token);
-            } else {
-                credential = firebase.auth.GoogleAuthProvider.credential(token);
-            }
-            firebaseAuth.signInWithCredential(credential)
-                .then(function(result) {
-                    console.log('Sign-in success (desktop).');
-                    if (provider === 'google' && googleAccessToken) localStorage.setItem('google_access_token', googleAccessToken);
-                    return finalizeSignIn(result);
-                })
-                .catch(function(e) {
-                    console.error(e);
-                    openAccountErrorModal('Sign-in failed: ' + (e && e.message ? e.message : e));
-                });
-        });
+            window.electronAPI.onGoogleSigninResult(function(err, token, provider, googleAccessToken) {
+                if (err) { console.error('OAuth sign-in (desktop):', err); openAccountErrorModal('Sign-in failed: ' + err); return; }
+                if (!token || !firebaseAuth) return;
+                if (provider === 'google' && googleAccessToken) localStorage.setItem('google_access_token', googleAccessToken);
+                var credential;
+                if (provider === 'vk' || provider === 'oidc.vk-id') {
+                    var vkProvider = new firebase.auth.OAuthProvider('oidc.vk-id');
+                    credential = vkProvider.credential({ idToken: token });
+                } else if (provider === 'github') {
+                    credential = firebase.auth.GithubAuthProvider.credential(token);
+                } else {
+                    credential = firebase.auth.GoogleAuthProvider.credential(token);
+                }
+                firebaseAuth.signInWithCredential(credential)
+                    .then(function(result) {
+                        console.log('Sign-in success (desktop).');
+                        if (provider === 'google' && googleAccessToken) localStorage.setItem('google_access_token', googleAccessToken);
+                        return finalizeSignIn(result);
+                    })
+                    .catch(function(e) {
+                        console.error(e);
+                        openAccountErrorModal('Sign-in failed: ' + (e && e.message ? e.message : e));
+                    });
+            });
+        } catch (e) {
+            console.warn('[renderer] Electron titlebar init warning:', e);
+        }
     }
 
     // Tab navigation (function from ui.js)
-    if (typeof initTabNavigation === 'function') initTabNavigation();
+    try {
+        if (typeof initTabNavigation === 'function') initTabNavigation();
+    } catch (e) {
+        console.warn('[renderer] initTabNavigation warning:', e);
+    }
 
     // Feather icons
     if (typeof feather !== 'undefined') {
         try { feather.replace(); } catch (e) { console.warn('feather.replace() failed:', e); }
     }
 
-    if (typeof updateTranslations === 'function') updateTranslations();
+    try {
+        if (typeof updateTranslations === 'function') updateTranslations();
+    } catch (e) {
+        console.warn('[renderer] second updateTranslations warning:', e);
+    }
 
-    // Hide splash screen with animation
-    setTimeout(function() {
-        var splash = document.getElementById('app-splash-screen');
-        if (splash) {
-            splash.classList.add('fade-out');
-            setTimeout(function() { splash.remove(); }, 600);
+    // Hide splash screen safely
+    try {
+        if (typeof hideSplashScreen === 'function') {
+            setTimeout(hideSplashScreen, 600);
+        } else {
+            setTimeout(function() {
+                try {
+                    var splash = document.getElementById('app-splash-screen')
+                        || document.querySelector('.splash-screen')
+                        || document.querySelector('.loading-screen');
+                    if (splash) {
+                        splash.classList.add('fade-out');
+                        splash.style.opacity = '0';
+                        splash.style.transition = 'opacity 0.4s ease';
+                        setTimeout(function() {
+                            try { splash.remove(); } catch (e) {}
+                        }, 400);
+                    }
+                } catch (e) {
+                    console.warn('[renderer] Splash remove error:', e);
+                }
+            }, 600);
         }
-    }, 1800);
+    } catch (e) {
+        console.warn('[renderer] Splash dismissal setup error:', e);
+    }
 
     // Capacitor Android: back button + channel detection
     if (typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform()) {
-        var App = window.Capacitor.Plugins.App;
-        if (App) {
-            App.addListener('backButton', function() {
-                var openModal = document.querySelector('.modal.active');
-                if (openModal) { openModal.classList.remove('active'); return; }
-                if (document.body.classList.contains('ai-chat-open')) { document.body.classList.remove('ai-chat-open'); return; }
-                var activePanel = document.querySelector('.tool-panel:not(.hidden)');
-                if (activePanel) {
-                    activePanel.classList.add('hidden');
-                    var toolsHub = document.getElementById('tools-hub');
-                    if (toolsHub) toolsHub.classList.remove('hidden');
-                    return;
-                }
-                var activeTabEl = document.querySelector('.nav-tab.active');
-                var activeTab = activeTabEl ? (activeTabEl.dataset.tab || 'tools') : 'tools';
-                if (activeTab !== 'tools') {
-                    var toolsTab = document.querySelector('.nav-tab[data-tab="tools"]');
-                    if (toolsTab) toolsTab.click();
-                    return;
-                }
-                App.minimizeApp();
-            });
-        }
+        try {
+            var App = window.Capacitor.Plugins.App;
+            if (App) {
+                App.addListener('backButton', function() {
+                    var openModal = document.querySelector('.modal.active');
+                    if (openModal) { openModal.classList.remove('active'); return; }
+                    if (document.body.classList.contains('ai-chat-open')) { document.body.classList.remove('ai-chat-open'); return; }
+                    var activePanel = document.querySelector('.tool-panel:not(.hidden)');
+                    if (activePanel) {
+                        activePanel.classList.add('hidden');
+                        var toolsHub = document.getElementById('tools-hub');
+                        if (toolsHub) toolsHub.classList.remove('hidden');
+                        return;
+                    }
+                    var activeTabEl = document.querySelector('.nav-tab.active');
+                    var activeTab = activeTabEl ? (activeTabEl.dataset.tab || 'tools') : 'tools';
+                    if (activeTab !== 'tools') {
+                        var toolsTab = document.querySelector('.nav-tab[data-tab="tools"]');
+                        if (toolsTab) toolsTab.click();
+                        return;
+                    }
+                    App.minimizeApp();
+                });
+            }
 
-        var AppChannel = window.Capacitor.Plugins.AppChannel;
-        if (AppChannel) {
-            AppChannel.getInstaller().then(function(res) {
-                var installer = (res && res.installer) || 'UNKNOWN';
-                var forceRuStore = localStorage.getItem('FORCE_RUSTORE') === '1';
-                if (installer.includes('ru.vk.store') || forceRuStore) {
-                    window.INSTALLATION_CHANNEL = 'RU_STORE';
-                    document.body.classList.add('rustore-mode');
-                    document.body.classList.remove('global-mode');
-                } else {
+            var AppChannel = window.Capacitor.Plugins.AppChannel;
+            if (AppChannel) {
+                AppChannel.getInstaller().then(function(res) {
+                    var installer = (res && res.installer) || 'UNKNOWN';
+                    var forceRuStore = localStorage.getItem('FORCE_RUSTORE') === '1';
+                    if (installer.includes('ru.vk.store') || forceRuStore) {
+                        window.INSTALLATION_CHANNEL = 'RU_STORE';
+                        document.body.classList.add('rustore-mode');
+                        document.body.classList.remove('global-mode');
+                    } else {
+                        window.INSTALLATION_CHANNEL = 'GLOBAL';
+                        document.body.classList.add('global-mode');
+                        document.body.classList.remove('rustore-mode');
+                    }
+                    console.log('[AppChannel] Detected channel:', window.INSTALLATION_CHANNEL, '(', installer, ')');
+                }).catch(function(e) {
                     window.INSTALLATION_CHANNEL = 'GLOBAL';
                     document.body.classList.add('global-mode');
-                    document.body.classList.remove('rustore-mode');
-                }
-                console.log('[AppChannel] Detected channel:', window.INSTALLATION_CHANNEL, '(', installer, ')');
-            }).catch(function(e) {
+                    console.error('[AppChannel] Error detecting channel', e);
+                });
+            } else {
                 window.INSTALLATION_CHANNEL = 'GLOBAL';
                 document.body.classList.add('global-mode');
-                console.error('[AppChannel] Error detecting channel', e);
-            });
-        } else {
-            window.INSTALLATION_CHANNEL = 'GLOBAL';
-            document.body.classList.add('global-mode');
+            }
+        } catch (e) {
+            console.warn('[renderer] Capacitor platform init warning:', e);
         }
     } else {
         window.INSTALLATION_CHANNEL = 'GLOBAL';

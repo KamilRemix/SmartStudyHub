@@ -1063,5 +1063,27 @@
 
     <!-- Main dispatcher + Web Components (SettingsComponent, SmartCalculator, GradeAverageCalculator) -->
     <script src="renderer.js"></script>
+
+    <!-- Bulletproof emergency splash dismiss: runs unconditionally regardless of module errors -->
+    <script>
+      window.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+          try {
+            var splash = document.getElementById('app-splash-screen')
+              || document.querySelector('.splash-screen')
+              || document.querySelector('.loading-screen');
+            if (splash) {
+              splash.style.opacity = '0';
+              splash.style.transition = 'opacity 0.4s ease';
+              setTimeout(function() {
+                try { splash.remove(); } catch(e) {}
+              }, 400);
+            }
+          } catch(e) {
+            console.warn('[splash-guard] Emergency dismiss error:', e);
+          }
+        }, 800);
+      });
+    </script>
 </body>
 </html>
