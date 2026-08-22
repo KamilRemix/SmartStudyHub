@@ -42,7 +42,7 @@
         console.warn('[firebase-init] Firebase initialization warning:', e);
     }
 
-    if (typeof VKIDSDK !== 'undefined') {
+    if (typeof VKIDSDK !== 'undefined' && VKIDSDK.Config && VKIDSDK.Config.ResponseMode) {
         try {
             VKIDSDK.Config.init({
                 app: 54715318,

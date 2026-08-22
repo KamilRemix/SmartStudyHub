@@ -72,39 +72,6 @@ async function syncUserProfileFromProviders(user, oauthProfile) {
     }
 }
 
-const tabMap = {
-    'calculator-tab': 'calculator-page',
-    'grades-tab': 'grades-page',
-    'tools-tab': 'tools-page'
-};
-
-function switchToTab(tabId) {
-    document.body.classList.remove('ai-chat-open');
-    const pageId = tabMap[tabId];
-    if (!pageId) return;
-
-    document.querySelectorAll('.nav-tab').forEach((t) => t.classList.remove('active'));
-    const tab = document.getElementById(tabId);
-    if (tab) tab.classList.add('active');
-
-    document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
-    const targetPage = document.getElementById(pageId);
-    if (targetPage) targetPage.classList.add('active');
-
-    if (pageId === 'tools-page') {
-        try { initTools(); } catch (e) { console.warn('initTools failed', e); }
-    }
-}
-
-function switchToGradesTab() {
-    switchToTab('grades-tab');
-}
-
-function initTabNavigation() {
-    document.querySelectorAll('.nav-tab').forEach((tab) => {
-        tab.addEventListener('click', () => switchToTab(tab.id));
-    });
-}
 
 function loadGradesForCurrentUser() {
     if (!currentUser) return Promise.resolve();
