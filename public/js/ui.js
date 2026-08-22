@@ -7,7 +7,7 @@
                js/auth.js (updateAuthUI)
    ========================================================= */
 
-const tabMap = {
+var tabMap = window.tabMap || {
     'calculator-tab': 'calculator-page',
     'grades-tab': 'grades-page',
     'tools-tab': 'tools-page'
@@ -77,7 +77,7 @@ function setTheme(theme) {
 }
 
 // --- LANGUAGE & TRANSLATION ---
-let currentLang = 'en'; // Default language
+var currentLang = window.currentLang || 'ru';
 window.currentLang = currentLang;
 
 function getInitialUserLanguage() {

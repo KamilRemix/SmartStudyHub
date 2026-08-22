@@ -123,75 +123,7 @@ const CIS_COUNTRY_CODES = new Set(['RU', 'BY', 'KZ', 'AM', 'AZ', 'KG', 'MD', 'TJ
 let cachedUserRegionProviders = null;
 
 async function getAvailableAuthProviders() {
-    if (cachedUserRegionProviders) return cachedUserRegionProviders;
-
-    let isRuStore = false;
-    let simCountry = '';
-    let sysLang = (navigator.language || navigator.userLanguage || 'en').toLowerCase();
-
-    if (typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform()) {
-        try {
-            const AppChannel = window.Capacitor.Plugins?.AppChannel;
-            if (AppChannel) {
-                const info = await AppChannel.getInstaller();
-                if (info && info.installer === 'ru.vk.store') {
-                    isRuStore = true;
-                }
-            }
-        } catch (e) {
-            console.warn('[RegionDetect] AppChannel installer check error:', e);
-        }
-
-        if (isRuStore) {
-            cachedUserRegionProviders = ['google.com', 'github.com', 'oidc.vk-id'];
-            return cachedUserRegionProviders;
-        }
-
-        try {
-            const VkAuth = window.Capacitor.Plugins?.VkAuth;
-            if (VkAuth) {
-                const simInfo = await VkAuth.getSimCountry();
-                if (simInfo && simInfo.countryIso) {
-                    simCountry = simInfo.countryIso.toUpperCase();
-                }
-                if (simInfo && simInfo.language) {
-                    sysLang = simInfo.language.toLowerCase();
-                }
-            }
-        } catch (e) {
-            console.warn('[RegionDetect] VkAuth sim check error:', e);
-        }
-    }
-
-    const isLangRu = sysLang.startsWith('ru');
-    if (isLangRu || (simCountry && CIS_COUNTRY_CODES.has(simCountry))) {
-        cachedUserRegionProviders = ['google.com', 'github.com', 'oidc.vk-id'];
-        return cachedUserRegionProviders;
-    }
-
-    let ipCountry = '';
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
-        const res = await fetch('https://ip-api.com/json', { signal: controller.signal });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-            const data = await res.json();
-            if (data && data.countryCode) {
-                ipCountry = data.countryCode.toUpperCase();
-            }
-        }
-    } catch (e) {
-        console.warn('[RegionDetect] IP geolocation check bypassed/failed:', e.message);
-    }
-
-    if (ipCountry && CIS_COUNTRY_CODES.has(ipCountry)) {
-        cachedUserRegionProviders = ['google.com', 'github.com', 'oidc.vk-id'];
-    } else {
-        cachedUserRegionProviders = ['google.com', 'github.com'];
-    }
-
-    return cachedUserRegionProviders;
+    return ['google.com', 'github.com', 'oidc.vk-id'];
 }
 
 function getLinkedProviders(user) {
@@ -221,7 +153,9 @@ const IGNORABLE_AUTH_ERRORS = [
 ];
 
 function t(key) {
-    return translations[currentLang][key] || translations.en[key] || key;
+    const lang = (typeof currentLang !== 'undefined' ? currentLang : window.currentLang) || window.currentLanguage || 'ru';
+    const dict = (typeof translations !== 'undefined' ? translations : window.translations) || {};
+    return (dict[lang] && dict[lang][key]) || (dict.ru && dict.ru[key]) || (dict.en && dict.en[key]) || key;
 }
 
 function tpl(key, vars = {}) {
@@ -944,7 +878,7 @@ async function updateAuthUI() {
     const availableProviders = await getAvailableAuthProviders();
 
     if (currentUser) {
-        const signOutText = translations[currentLang]['signOut'] || 'Sign Out';
+        const signOutText = t('signOut') || 'Sign Out';
         const userLabel = escapeHtml(getUserDisplayLabel(currentUser));
         const linked = getLinkedProviders(currentUser);
         const providerRows = (currentUser.providerData || []);

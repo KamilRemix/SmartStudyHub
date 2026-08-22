@@ -192,32 +192,69 @@ class SettingsComponent extends HTMLElement {
                 }
 
                 /* Unified Sign-In Button Styles */
-                .auth-section { margin-top: 2rem; padding-top: 2rem; border-top: 1px solid color-mix(in srgb, var(--primary-accent) 10%, transparent); display: flex; flex-direction: column; gap: 10px; }
-                .google-signin-btn, .github-signin-btn {
+                .auth-section { margin-top: 2rem; padding-top: 2rem; border-top: 1px solid color-mix(in srgb, var(--primary-accent) 10%, transparent); display: flex; flex-direction: column; gap: 12px; }
+                .google-signin-btn, .github-signin-btn, .vk-signin-btn {
                     width: 100%;
                     padding: 12px 20px;
-                    border: 1px solid #d0d0d0;
-                    background: #ffffff;
-                    color: var(--text-color);
                     border-radius: 10px;
                     font-size: 1rem;
                     font-weight: 600;
                     cursor: pointer;
-                    transition: all 0.18s ease;
+                    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     gap: 12px;
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
                     font-family: 'Poppins', sans-serif;
                     position: relative;
                     overflow: visible;
+                    box-sizing: border-box;
                 }
-                .google-signin-btn:hover, .github-signin-btn:hover {
-                    transform: translateY(-1px);
-                    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+
+                .google-signin-btn {
+                    border: 1px solid #dadce0;
+                    background: #ffffff;
+                    color: #3c4043;
+                    box-shadow: 0 1px 3px rgba(60,64,67,0.3), 0 2px 6px 2px rgba(60,64,67,0.15);
                 }
-                .google-signin-btn:active, .github-signin-btn:active { transform: translateY(0); }
+                .google-signin-btn:hover {
+                    background: #f8f9fa;
+                    box-shadow: 0 2px 6px rgba(60,64,67,0.3), 0 3px 10px 3px rgba(60,64,67,0.15);
+                    border-color: #d2e3fc;
+                    transform: translateY(-2px);
+                }
+
+                .github-signin-btn {
+                    border: none;
+                    background: #24292e;
+                    color: #ffffff;
+                    box-shadow: 0 2px 8px rgba(36, 41, 46, 0.3);
+                }
+                .github-signin-btn:hover {
+                    background: #000000;
+                    box-shadow: 0 4px 12px rgba(36, 41, 46, 0.45);
+                    transform: translateY(-2px);
+                }
+                .github-signin-btn .auth-btn-icon-svg path {
+                    fill: #ffffff;
+                }
+
+                .vk-signin-btn {
+                    border: none;
+                    background: #0077FF;
+                    color: #ffffff;
+                    box-shadow: 0 2px 10px rgba(0, 119, 255, 0.3);
+                }
+                .vk-signin-btn:hover {
+                    background: #0056cc;
+                    box-shadow: 0 4px 16px rgba(0, 119, 255, 0.45);
+                    transform: translateY(-2px);
+                }
+                .vk-signin-btn .auth-btn-icon-svg path {
+                    fill: #ffffff;
+                }
+
+                .google-signin-btn:active, .github-signin-btn:active, .vk-signin-btn:active { transform: translateY(0); }
 
                 /* Icon on the left, centered label */
                 .auth-btn-icon-svg { position: absolute; left: 14px; width: 20px; height: 20px; flex-shrink: 0; }
@@ -268,6 +305,10 @@ class SettingsComponent extends HTMLElement {
                     background: linear-gradient(135deg, #1f1f1f, #333);
                     color: #e8e8e8;
                 }
+                .linked-provider-icon--vk {
+                    background: linear-gradient(135deg, #0077FF, #0055C4);
+                    color: #fff;
+                }
                 .linked-provider-icon--apple {
                     background: linear-gradient(135deg, #FF2E00, #DD0000);
                     color: #fff;
@@ -308,6 +349,7 @@ class SettingsComponent extends HTMLElement {
                 }
                 .google-signin-btn.is-loading::after,
                 .github-signin-btn.is-loading::after,
+                .vk-signin-btn.is-loading::after,
                 .apple-signin-btn.is-loading::after,
                 .unlink-provider-btn.is-loading::after {
                     content: '';

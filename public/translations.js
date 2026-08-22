@@ -1560,4 +1560,15 @@ for (const key of Object.keys(__extraLabels)) {
             }
         }
     }
+    window.translations = translations;
+    window.currentLang = (function() {
+        try {
+            const saved = localStorage.getItem('language');
+            if (saved && translations[saved]) return saved;
+            const bLang = (navigator.language || navigator.userLanguage || 'ru').toLowerCase().split(/[-_]/)[0];
+            return translations[bLang] ? bLang : 'ru';
+        } catch(e) {
+            return 'ru';
+        }
+    })();
 })();
