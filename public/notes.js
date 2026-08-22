@@ -102,7 +102,7 @@
     let notesListenerAttached = false;
 
     function fbUser() {
-        return window.firebase?.auth?.()?.currentUser ?? null;
+        return (window.getCurrentUser ? window.getCurrentUser() : null) || (window.firebase?.auth?.()?.currentUser ?? null);
     }
 
     /* --- Local Notification helper (only for a single note) --- */

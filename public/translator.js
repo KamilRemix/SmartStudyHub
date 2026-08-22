@@ -292,9 +292,12 @@ const SmartTranslator = (() => {
      * ================================================================ */
     function getFirestoreFavRef() {
         try {
-            const user = firebase?.auth()?.currentUser;
-            if (user && firebase.firestore && user.email) {
-                return firebase.firestore().collection('users').doc(user.email).collection('translator_favorites');
+            const user = (window.getCurrentUser ? window.getCurrentUser() : null) || firebase?.auth()?.currentUser;
+            if (user && firebase.firestore) {
+                const docId = user.email || user.uid;
+                if (docId) {
+                    return firebase.firestore().collection('users').doc(docId).collection('translator_favorites');
+                }
             }
         } catch (_) {}
         return null;

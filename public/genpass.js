@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let savedPasswords = [];
 
     function getActiveUser() {
-        return window.firebase?.auth?.()?.currentUser ?? null;
+        return (window.getCurrentUser ? window.getCurrentUser() : null) || (window.firebase?.auth?.()?.currentUser ?? null);
     }
 
     // Determine auth provider for display text

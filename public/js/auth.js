@@ -761,6 +761,10 @@ window.signInWithProvider = (providerId, triggerOrRetry = 0) => {
     const retryCount = typeof triggerOrRetry === 'number' ? triggerOrRetry : 0;
     const button = triggerOrRetry instanceof HTMLElement ? triggerOrRetry : null;
 
+    if (providerId === 'oidc.vk-id' || providerId === 'vk') {
+        return window.signInWithVk(button);
+    }
+
     if (!firebase || !firebase.apps.length) {
         if (retryCount < 5) {
             setTimeout(() => window.signInWithProvider(providerId, retryCount + 1), 100);
@@ -779,8 +783,8 @@ window.signInWithProvider = (providerId, triggerOrRetry = 0) => {
             window.electronAPI.send('google-signin');
         } else if (providerId === 'github.com') {
             window.electronAPI.send('github-signin');
-        } else if (providerId === 'oidc.vk-id') {
-            window.electronAPI.send('vk-signin');
+        } else if (providerId === 'oidc.vk-id' || providerId === 'vk') {
+            return window.signInWithVk(button);
         } else {
             showToast(t('accountLinkElectronUnsupported'), 'warning', 3000);
         }
@@ -936,31 +940,288 @@ async function updateAuthUI() {
 
 window.signInWithGoogle = (button) => window.signInWithProvider('google.com', button);
 window.signInWithGithub = (button) => window.signInWithProvider('github.com', button);
-window.signInWithVk = (button) => window.signInWithProvider('oidc.vk-id', button);
+const VK_AUTH_CONFIG = {
+    appId: 54715318,
+    serviceToken: '11f86b0611f86b0611f86b066312ba88b0111f811f86b067b82724c736aafcecbd0b20b',
+    getRedirectUri() {
+        return (window.location.origin + window.location.pathname).replace(/\/$/, '') + '/';
+    }
+};
+
+// Fetch user profile from VK API via JSONP
+function fetchVKUserProfile(userId, accessToken) {
+    return new Promise((resolve) => {
+        const callbackName = 'vk_jsonp_cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+        const script = document.createElement('script');
+        const token = accessToken || VK_AUTH_CONFIG.serviceToken;
+        script.src = `https://api.vk.com/method/users.get?user_ids=${encodeURIComponent(userId)}&fields=photo_200,first_name,last_name&access_token=${encodeURIComponent(token)}&v=5.131&callback=${callbackName}`;
+        
+        const cleanup = () => {
+            try { delete window[callbackName]; } catch(e) {}
+            if (script.parentNode) script.parentNode.removeChild(script);
+        };
+
+        const timer = setTimeout(() => {
+            cleanup();
+            resolve(null);
+        }, 6000);
+
+        window[callbackName] = (data) => {
+            clearTimeout(timer);
+            cleanup();
+            if (data && data.response && data.response[0]) {
+                resolve(data.response[0]);
+            } else {
+                console.warn('[VK API] users.get warning:', data);
+                resolve(null);
+            }
+        };
+
+        script.onerror = () => {
+            clearTimeout(timer);
+            cleanup();
+            resolve(null);
+        };
+
+        document.head.appendChild(script);
+    });
+}
+
+// Establish authenticated VK user session in the app
+async function establishVKSession(userId, email, accessToken) {
+    let profile = null;
+    try {
+        profile = await fetchVKUserProfile(userId, accessToken);
+    } catch (e) {
+        console.warn('[VK Auth] Profile fetch error:', e);
+    }
+
+    const firstName = profile?.first_name || '';
+    const lastName = profile?.last_name || '';
+    const displayName = `${firstName} ${lastName}`.trim() || `Пользователь VK (${userId})`;
+    const photoURL = profile?.photo_200 || '';
+    const userEmail = email || `id${userId}@vk.com`;
+
+    const vkUser = {
+        uid: 'vk_' + userId,
+        id: userId,
+        displayName: displayName,
+        email: userEmail,
+        photoURL: photoURL,
+        isAnonymous: false,
+        providerData: [{
+            providerId: 'oidc.vk-id',
+            uid: 'vk_' + userId,
+            displayName: displayName,
+            email: userEmail,
+            photoURL: photoURL
+        }]
+    };
+
+    localStorage.setItem('ssh_vk_user', JSON.stringify(vkUser));
+    currentUser = vkUser;
+    window.currentUser = vkUser;
+
+    // Background anonymous sign-in to Firebase to satisfy Firestore rules if needed
+    if (window.firebase && window.firebase.auth && !firebaseAuth?.currentUser) {
+        try {
+            await firebaseAuth.signInAnonymously();
+            console.log('✅ [VK Auth] Background Firebase anonymous session active for Firestore.');
+        } catch (e) {
+            console.warn('[VK Auth] Background Firebase session info:', e.message);
+        }
+    }
+
+    // Load user data into calculators and notes
+    const gradeCalc = document.querySelector('grade-average-calculator');
+    if (gradeCalc) {
+        gradeCalc.loadFromDatabase();
+    }
+
+    updateAuthUI();
+    updateTranslations();
+    showToast(`Добро пожаловать, ${displayName}!`, 'success', 3000);
+}
+
+// VK Sign-in Trigger
+window.signInWithVk = function(button) {
+    return runAuthAction(button, () => {
+        return new Promise((resolve) => {
+            const redirectUri = VK_AUTH_CONFIG.getRedirectUri();
+            const authUrl = `https://oauth.vk.com/authorize?client_id=${VK_AUTH_CONFIG.appId}&display=popup&redirect_uri=${encodeURIComponent(redirectUri)}&scope=email&response_type=token&v=5.131`;
+
+            const width = 620;
+            const height = 580;
+            const left = window.screenX + (window.outerWidth - width) / 2;
+            const top = window.screenY + (window.outerHeight - height) / 2;
+
+            let popup = null;
+            try {
+                popup = window.open(
+                    authUrl,
+                    'vk_oauth_popup',
+                    `width=${width},height=${height},left=${left},top=${top},toolbar=0,scrollbars=1,status=1,resizable=1,location=1,menuBar=0`
+                );
+            } catch (e) {
+                console.warn('[VK Auth] Popup error, falling back to redirect:', e);
+            }
+
+            if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+                window.location.href = authUrl;
+                resolve();
+                return;
+            }
+
+            let resolved = false;
+
+            const pollTimer = setInterval(() => {
+                if (resolved) {
+                    clearInterval(pollTimer);
+                    return;
+                }
+
+                if (popup.closed) {
+                    clearInterval(pollTimer);
+                    if (!resolved) {
+                        resolve();
+                    }
+                    return;
+                }
+
+                try {
+                    const popupUrl = popup.location.href;
+                    if (popupUrl && (popupUrl.includes(redirectUri) || popupUrl.includes('access_token'))) {
+                        const hash = popup.location.hash || popupUrl.substring(popupUrl.indexOf('#'));
+                        const params = new URLSearchParams(hash.replace(/^#/, ''));
+                        const accessToken = params.get('access_token');
+                        const userId = params.get('user_id');
+                        const email = params.get('email');
+
+                        if (userId) {
+                            resolved = true;
+                            clearInterval(pollTimer);
+                            try { popup.close(); } catch(e) {}
+                            establishVKSession(userId, email, accessToken).then(resolve).catch(resolve);
+                        }
+                    } else if (popupUrl && popupUrl.includes('error=')) {
+                        resolved = true;
+                        clearInterval(pollTimer);
+                        try { popup.close(); } catch(e) {}
+                        const hash = popup.location.hash || popupUrl.substring(popupUrl.indexOf('#'));
+                        const params = new URLSearchParams(hash.replace(/^#/, ''));
+                        const errorReason = params.get('error_description') || params.get('error') || 'Авторизация отменена';
+                        showToast(errorReason, 'warning', 3000);
+                        resolve();
+                    }
+                } catch (e) {
+                    // Cross-origin access while on oauth.vk.com domain
+                }
+            }, 300);
+
+            // Timeout safety
+            setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    clearInterval(pollTimer);
+                    resolve();
+                }
+            }, 120000);
+        });
+    });
+};
+
+function initVKAuth() {
+    // 1. Check if redirected back with VK OAuth hash parameters
+    if (window.location.hash && window.location.hash.includes('access_token') && window.location.hash.includes('user_id')) {
+        const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const accessToken = params.get('access_token');
+        const userId = params.get('user_id');
+        const email = params.get('email');
+        if (userId) {
+            try {
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+            } catch (e) {}
+            establishVKSession(userId, email, accessToken);
+            return;
+        }
+    }
+
+    // 2. Check if VK session already saved in localStorage
+    const savedVK = localStorage.getItem('ssh_vk_user');
+    if (savedVK && (!firebaseAuth || !firebaseAuth.currentUser)) {
+        try {
+            const parsed = JSON.parse(savedVK);
+            if (parsed && parsed.uid) {
+                currentUser = parsed;
+                window.currentUser = parsed;
+                updateAuthUI();
+                const gradeCalc = document.querySelector('grade-average-calculator');
+                if (gradeCalc) {
+                    gradeCalc.loadFromDatabase();
+                }
+            }
+        } catch (e) {
+            console.warn('[VK Auth] restore warning:', e);
+        }
+    }
+}
+
+// Run VK auth check on load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initVKAuth);
+} else {
+    initVKAuth();
+}
+
+window.getCurrentUser = () => currentUser;
+window.fetchVKUserProfile = fetchVKUserProfile;
+window.establishVKSession = establishVKSession;
 
 window.signOutUser = () => {
-    if (!firebaseAuth) return;
-
     const gradeCalc = document.querySelector('grade-average-calculator');
     if (gradeCalc && currentUser) {
         gradeCalc.saveToDatabase();
     }
 
-    firebaseAuth.signOut()
-        .then(() => {
-            currentUser = null;
-            // Clear local cached tokens
-            localStorage.removeItem('google_access_token');
-            if (gradeCalc) {
-                gradeCalc.subjects = {};
-                gradeCalc.render();
-            }
-            updateAuthUI();
-            showToast(t('signOutSuccess') || 'Вы вышли из аккаунта', 'info', 2500);
-        })
-        .catch(error => {
-            console.error('Sign-out error:', error);
-        });
-};
+    const wasVK = currentUser && currentUser.uid && String(currentUser.uid).startsWith('vk_');
+    localStorage.removeItem('ssh_vk_user');
+    localStorage.removeItem('google_access_token');
 
-// Yandex integration removed: no geolocation-based hiding needed
+    if (wasVK) {
+        currentUser = null;
+        window.currentUser = null;
+        if (gradeCalc) {
+            gradeCalc.subjects = {};
+            gradeCalc.render();
+        }
+        updateAuthUI();
+        showToast(t('signOutSuccess') || 'Вы вышли из аккаунта', 'info', 2500);
+        return;
+    }
+
+    if (firebaseAuth && firebaseAuth.currentUser) {
+        firebaseAuth.signOut()
+            .then(() => {
+                currentUser = null;
+                window.currentUser = null;
+                if (gradeCalc) {
+                    gradeCalc.subjects = {};
+                    gradeCalc.render();
+                }
+                updateAuthUI();
+                showToast(t('signOutSuccess') || 'Вы вышли из аккаунта', 'info', 2500);
+            })
+            .catch(error => {
+                console.error('Sign-out error:', error);
+            });
+    } else {
+        currentUser = null;
+        window.currentUser = null;
+        if (gradeCalc) {
+            gradeCalc.subjects = {};
+            gradeCalc.render();
+        }
+        updateAuthUI();
+        showToast(t('signOutSuccess') || 'Вы вышли из аккаунта', 'info', 2500);
+    }
+};

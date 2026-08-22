@@ -167,7 +167,7 @@
     }
 
     function getFirebaseUser() {
-        return window.firebase && window.firebase.auth ? window.firebase.auth().currentUser : null;
+        return (window.getCurrentUser ? window.getCurrentUser() : null) || (window.firebase && window.firebase.auth ? window.firebase.auth().currentUser : null);
     }
 
     async function syncPersonalizationFromFirebase() {
