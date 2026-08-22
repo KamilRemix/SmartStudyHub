@@ -502,6 +502,7 @@ function showToast(message, type = 'info', durationMs = 3000) {
         hide();
     });
 }
+window.showToast = showToast;
 
 function updateAuthDialogTexts() {
     const linkTitle = document.getElementById('account-link-modal-title');

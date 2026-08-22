@@ -2114,12 +2114,6 @@ h2 {
 /* ========= Toast notifications ========= */
 .app-toast-container {
     position: fixed;
-    left: 50%;
-    bottom: 1.5rem;
-    transform: translateX(-50%);
-/* ========= Toast notifications ========= */
-.app-toast-container {
-    position: fixed;
     top: 1.5rem;
     left: 50%;
     transform: translateX(-50%);

@@ -523,8 +523,11 @@ const SmartTranslator = (() => {
         return d.innerHTML;
     }
 
-    function showToast(msg) {
-        /* Use app-level toast if available, or create it */
+    function showToast(msg, type = 'info') {
+        if (typeof window.showToast === 'function') {
+            window.showToast(msg, type);
+            return;
+        }
         let container = document.getElementById('app-toast-container');
         if (!container) {
             container = document.createElement('div');
@@ -536,9 +539,9 @@ const SmartTranslator = (() => {
         t.className = 'app-toast';
         t.textContent = msg;
         container.appendChild(t);
-        requestAnimationFrame(() => t.classList.add('show'));
+        requestAnimationFrame(() => t.classList.add('is-visible'));
         setTimeout(() => {
-            t.classList.remove('show');
+            t.classList.remove('is-visible');
             setTimeout(() => t.remove(), 350);
         }, 2200);
     }
