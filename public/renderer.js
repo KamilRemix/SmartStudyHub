@@ -1055,6 +1055,8 @@ class GradeAverageCalculator extends HTMLElement {
     setGradingSystem(system) {
         if (system === this.gradingSystem) return;
         this.gradingSystem = system;
+        this.convertGradesToSystem(system);
+        this.simulatedGrade = null;
         this.saveToDatabase();
         this.update();
         // Also update the settings component buttons
@@ -1063,9 +1065,64 @@ class GradeAverageCalculator extends HTMLElement {
             settingsComp.updateGradingSystemButtons();
         }
     }
+
+    convertGradesToSystem(targetSystem) {
+        const numToLetter = { 5: 'A', 4: 'B', 3: 'C', 2: 'D', 1: 'F' };
+        const letterToNum = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
+
+        const convertGrade = (g) => {
+            if (targetSystem === 'us-letter') {
+                if (typeof g === 'number' || (!isNaN(Number(g)) && String(g).trim() !== '')) {
+                    const n = Math.round(Number(g));
+                    return numToLetter[n] || (n >= 5 ? 'A' : n === 4 ? 'B' : n === 3 ? 'C' : n === 2 ? 'D' : 'F');
+                }
+                const upper = String(g).toUpperCase();
+                return this.gradeMap[upper] !== undefined ? upper : 'A';
+            } else { // 5-point
+                const upper = String(g).toUpperCase();
+                if (letterToNum[upper] !== undefined) {
+                    return letterToNum[upper];
+                }
+                const n = Number(g);
+                return isNaN(n) ? 5 : Math.max(1, Math.min(5, Math.round(n)));
+            }
+        };
+
+        if (Array.isArray(this.quickCalcGrades)) {
+            this.quickCalcGrades = this.quickCalcGrades.map(convertGrade);
+        }
+        if (this.subjects && typeof this.subjects === 'object') {
+            Object.keys(this.subjects).forEach(subj => {
+                if (Array.isArray(this.subjects[subj])) {
+                    this.subjects[subj] = this.subjects[subj].map(convertGrade);
+                }
+            });
+        }
+    }
     
     addGradeToSubject(subjectName, grade) {
-        const gradeToAdd = this.gradingSystem === '5-point' ? Number(grade) : grade;
+        const numToLetter = { 5: 'A', 4: 'B', 3: 'C', 2: 'D', 1: 'F' };
+        const letterToNum = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
+        let gradeToAdd = grade;
+
+        if (this.gradingSystem === '5-point') {
+            const upper = String(grade).toUpperCase();
+            if (letterToNum[upper] !== undefined) {
+                gradeToAdd = letterToNum[upper];
+            } else {
+                const n = Number(grade);
+                gradeToAdd = isNaN(n) ? 5 : Math.max(1, Math.min(5, Math.round(n)));
+            }
+        } else { // us-letter
+            if (typeof grade === 'number' || (!isNaN(Number(grade)) && String(grade).trim() !== '')) {
+                const n = Math.round(Number(grade));
+                gradeToAdd = numToLetter[n] || (n >= 5 ? 'A' : n === 4 ? 'B' : n === 3 ? 'C' : n === 2 ? 'D' : 'F');
+            } else {
+                const upper = String(grade).toUpperCase();
+                gradeToAdd = this.gradeMap[upper] !== undefined ? upper : 'A';
+            }
+        }
+
         if (subjectName === '__QUICK_CALC__') {
             this.quickCalcGrades.push(gradeToAdd);
         } else {
@@ -1090,20 +1147,59 @@ class GradeAverageCalculator extends HTMLElement {
     
     calculateAverageForSubject(subjectName) {
         const grades = (subjectName === '__QUICK_CALC__') ? this.quickCalcGrades : this.subjects[subjectName];
-        if (!grades || grades.length === 0) return 0;
+        if (!grades || grades.length === 0) return '0.00';
+
+        const letterToNum = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
+        const numToLetter = { 5: 'A', 4: 'B', 3: 'C', 2: 'D', 1: 'F' };
 
         if (this.gradingSystem === '5-point') {
-            return (grades.reduce((a, b) => a + b, 0) / grades.length).toFixed(2);
+            const nums = grades.map(g => {
+                const upper = String(g).toUpperCase();
+                if (letterToNum[upper] !== undefined) return letterToNum[upper];
+                const n = Number(g);
+                return isNaN(n) ? null : n;
+            }).filter(n => n !== null);
+            if (nums.length === 0) return '0.00';
+            return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2);
         } else { // us-letter
-            const totalPoints = grades.reduce((acc, grade) => acc + (this.gradeMap[grade] || 0), 0);
+            const totalPoints = grades.reduce((acc, g) => {
+                let letter = g;
+                if (typeof g === 'number' || (!isNaN(Number(g)) && String(g).trim() !== '')) {
+                    letter = numToLetter[Math.round(Number(g))] || 'F';
+                }
+                const pts = this.gradeMap[String(letter).toUpperCase()];
+                return acc + (pts !== undefined ? pts : 0);
+            }, 0);
             return (totalPoints / grades.length).toFixed(2);
         }
     }
     
     calculateGlobalAverage() {
         const allGrades = Object.values(this.subjects).flat();
-        if (allGrades.length === 0) return 0;
-        return (allGrades.reduce((a, b) => a + b, 0) / allGrades.length).toFixed(2);
+        if (allGrades.length === 0) return '0.00';
+        const letterToNum = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
+        const numToLetter = { 5: 'A', 4: 'B', 3: 'C', 2: 'D', 1: 'F' };
+
+        if (this.gradingSystem === '5-point') {
+            const nums = allGrades.map(g => {
+                const upper = String(g).toUpperCase();
+                if (letterToNum[upper] !== undefined) return letterToNum[upper];
+                const n = Number(g);
+                return isNaN(n) ? null : n;
+            }).filter(n => n !== null);
+            if (nums.length === 0) return '0.00';
+            return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2);
+        } else {
+            const totalPoints = allGrades.reduce((acc, g) => {
+                let letter = g;
+                if (typeof g === 'number' || (!isNaN(Number(g)) && String(g).trim() !== '')) {
+                    letter = numToLetter[Math.round(Number(g))] || 'F';
+                }
+                const pts = this.gradeMap[String(letter).toUpperCase()];
+                return acc + (pts !== undefined ? pts : 0);
+            }, 0);
+            return (totalPoints / allGrades.length).toFixed(2);
+        }
     }
 
     render() {
@@ -1945,17 +2041,12 @@ class GradeAverageCalculator extends HTMLElement {
                 const index = parseInt(deleteBtn.dataset.index, 10);
                 const grades = (this.currentSubject === '__QUICK_CALC__') ? this.quickCalcGrades : this.subjects[this.currentSubject];
                 
-                if (grades && !isNaN(index) && grades[index]) {
-                    const grade = grades[index];
-                    const confirmText = (translations[currentLang]['deleteGradeConfirm'] || "Delete grade {grade}?").replace('{grade}', grade);
-                    showAppConfirm(confirmText, '').then((confirmed) => {
-                        if (!confirmed) return;
-                        grades.splice(index, 1);
-                        if (this.currentSubject !== '__QUICK_CALC__') {
-                            this.saveToDatabase();
-                        }
-                        this.update();
-                    });
+                if (grades && !isNaN(index) && grades[index] !== undefined) {
+                    grades.splice(index, 1);
+                    if (this.currentSubject !== '__QUICK_CALC__') {
+                        this.saveToDatabase();
+                    }
+                    this.update();
                 }
             }
         });
@@ -2047,12 +2138,7 @@ class GradeAverageCalculator extends HTMLElement {
             
             const deleteBtn = subjectCard.querySelector(`#delete-${subjectName}`);
             deleteBtn.addEventListener('click', () => {
-                const confirmText = `Удалить ${subjectName}?`;
-                showAppConfirm(confirmText, '').then((confirmed) => {
-                    if (confirmed) {
-                        this.deleteSubject(subjectName);
-                    }
-                });
+                this.deleteSubject(subjectName);
             });
         });
     }
@@ -2502,19 +2588,35 @@ class GradeAverageCalculator extends HTMLElement {
 
     calculateAverage() {
         const grades = (this.currentSubject === '__QUICK_CALC__') ? this.quickCalcGrades : this.subjects[this.currentSubject];
-        if (!grades || grades.length === 0) return 0;
+        if (!grades || (grades.length === 0 && this.simulatedGrade === null)) return '0.00';
         
         let allGrades = [...grades];
         if (this.simulatedGrade !== null) {
             allGrades.push(this.simulatedGrade);
         }
-        if (allGrades.length === 0) return 0;
+        if (allGrades.length === 0) return '0.00';
         
+        const letterToNum = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
+        const numToLetter = { 5: 'A', 4: 'B', 3: 'C', 2: 'D', 1: 'F' };
+
         if (this.gradingSystem === '5-point') {
-            const total = allGrades.reduce((a, b) => a + b, 0);
-            return (total / allGrades.length).toFixed(2);
+            const nums = allGrades.map(g => {
+                const upper = String(g).toUpperCase();
+                if (letterToNum[upper] !== undefined) return letterToNum[upper];
+                const n = Number(g);
+                return isNaN(n) ? null : n;
+            }).filter(n => n !== null);
+            if (nums.length === 0) return '0.00';
+            return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2);
         } else { // us-letter
-            const totalPoints = allGrades.reduce((acc, grade) => acc + (this.gradeMap[grade] || 0), 0);
+            const totalPoints = allGrades.reduce((acc, g) => {
+                let letter = g;
+                if (typeof g === 'number' || (!isNaN(Number(g)) && String(g).trim() !== '')) {
+                    letter = numToLetter[Math.round(Number(g))] || 'F';
+                }
+                const pts = this.gradeMap[String(letter).toUpperCase()];
+                return acc + (pts !== undefined ? pts : 0);
+            }, 0);
             return (totalPoints / allGrades.length).toFixed(2);
         }
     }
