@@ -1,0 +1,1 @@
+int style VKID_Light_Transparent 0x0
