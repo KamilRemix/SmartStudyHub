@@ -1021,14 +1021,21 @@ class GradeAverageCalculator extends HTMLElement {
         const email = (currentUser.email || '').toLowerCase().trim();
         const sanitizedEmail = email ? email.replace(/\./g, '_') : null;
 
+        // 0. Instant local storage cache backup by UID so data is NEVER lost even before server confirms
+        if (uid) {
+            try {
+                localStorage.setItem('ssh_grades_' + uid, JSON.stringify(dataToSave));
+            } catch (e) {}
+        }
+
         // 1. Save to Realtime Database (by UID and by Sanitized Email)
         if (window.firebase.database) {
             try {
                 if (uid) {
-                    await window.firebase.database().ref(`users/${uid}`).update(dataToSave);
+                    await window.firebase.database().ref(`users/${uid}`).set(dataToSave);
                 }
                 if (sanitizedEmail) {
-                    await window.firebase.database().ref(`users_by_email/${sanitizedEmail}`).update(dataToSave);
+                    await window.firebase.database().ref(`users_by_email/${sanitizedEmail}`).set(dataToSave);
                 }
                 console.log('✅ [Grades] Saved to Realtime DB.');
             } catch (e) {
@@ -2804,6 +2811,18 @@ class GradeAverageCalculator extends HTMLElement {
             return false;
         };
 
+        // 0. Instant load from local cache by UID
+        if (uid) {
+            try {
+                const cached = localStorage.getItem('ssh_grades_' + uid);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    applyData(parsed);
+                    console.log('✅ [Grades] Loaded immediately from local cache');
+                }
+            } catch (e) {}
+        }
+
         // 1. Realtime Database listener by UID
         if (window.firebase.database && uid) {
             if (this._databaseRef) this._databaseRef.off('value');
@@ -2825,16 +2844,29 @@ class GradeAverageCalculator extends HTMLElement {
             }, (err) => console.warn('Realtime DB listener info:', err));
         }
 
-        // 2. Firestore listener by Email
-        if (window.firebase.firestore && email) {
+        // 2. Firestore listener by UID and by Email
+        if (window.firebase.firestore) {
+            if (this._unsubscribeFirestoreUid) this._unsubscribeFirestoreUid();
+            if (uid) {
+                this._unsubscribeFirestoreUid = window.firebase.firestore().collection('users').doc(uid)
+                    .onSnapshot((docSnap) => {
+                        if (docSnap.exists) {
+                            console.log('✅ [Grades] Loaded from Firestore (UID)');
+                            applyData(docSnap.data());
+                        }
+                    }, (err) => console.warn('Firestore UID listener info:', err?.message || err));
+            }
+
             if (this._unsubscribeFirestore) this._unsubscribeFirestore();
-            this._unsubscribeFirestore = window.firebase.firestore().collection('users').doc(email)
-                .onSnapshot((docSnap) => {
-                    if (docSnap.exists) {
-                        console.log('✅ [Grades] Loaded from Firestore (Email)');
-                        applyData(docSnap.data());
-                    }
-                }, (err) => console.warn('Firestore listener info:', err.message));
+            if (email) {
+                this._unsubscribeFirestore = window.firebase.firestore().collection('users').doc(email)
+                    .onSnapshot((docSnap) => {
+                        if (docSnap.exists) {
+                            console.log('✅ [Grades] Loaded from Firestore (Email)');
+                            applyData(docSnap.data());
+                        }
+                    }, (err) => console.warn('Firestore Email listener info:', err?.message || err));
+            }
         }
 
         if (typeof currentUser.getIdToken === 'function') {

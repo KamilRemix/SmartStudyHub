@@ -42,17 +42,6 @@
         console.warn('[firebase-init] Firebase initialization warning:', e);
     }
 
-    if (typeof VKIDSDK !== 'undefined' && VKIDSDK.Config && VKIDSDK.Config.ResponseMode) {
-        try {
-            VKIDSDK.Config.init({
-                app: 54715318,
-                redirectUrl: "https://studio-9933447149-80d6a.web.app",
-                responseMode: VKIDSDK.Config.ResponseMode.Callback
-            });
-        } catch (e) {
-            console.warn('[firebase-init] VKIDSDK init warning:', e);
-        }
-    }
 
     console.log('[firebase-init] Firebase initialized for project:', firebaseConfig.projectId);
 }());

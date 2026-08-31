@@ -297,10 +297,19 @@ function setAuthButtonLoading(button, loading) {
     button.setAttribute('aria-busy', loading ? 'true' : 'false');
 }
 
+let authActionTimeout = null;
+
 function runAuthAction(button, actionFn) {
     if (authActionInFlight) return Promise.resolve();
     authActionInFlight = true;
     setAuthButtonLoading(button, true);
+
+    if (authActionTimeout) clearTimeout(authActionTimeout);
+    authActionTimeout = setTimeout(() => {
+        authActionInFlight = false;
+        setAuthButtonLoading(button, false);
+        console.warn('[Auth] Auth action timed out and was forcefully unlocked.');
+    }, 60000);
 
     return Promise.resolve()
         .then(actionFn)
@@ -311,6 +320,7 @@ function runAuthAction(button, actionFn) {
         .finally(() => {
             authActionInFlight = false;
             setAuthButtonLoading(button, false);
+            if (authActionTimeout) clearTimeout(authActionTimeout);
         });
 }
 
@@ -858,6 +868,24 @@ if (window.firebase && window.firebase.auth) {
     firebaseAuth = window.firebase.auth();
 
     firebaseAuth.onAuthStateChanged((user) => {
+        const savedVK = localStorage.getItem('ssh_vk_user');
+        if (savedVK) {
+            try {
+                const vkUser = JSON.parse(savedVK);
+                if (vkUser && vkUser.uid) {
+                    currentUser = vkUser;
+                    window.currentUser = vkUser;
+                    updateAuthUI();
+                    updateTranslations();
+                    const gradeCalc = document.querySelector('grade-average-calculator');
+                    if (gradeCalc && typeof gradeCalc.loadFromDatabase === 'function') {
+                        gradeCalc.loadFromDatabase();
+                    }
+                    return;
+                }
+            } catch (e) {}
+        }
+
         currentUser = user;
         if (!user) {
             lastOAuthProfile = null;
@@ -944,12 +972,94 @@ const VK_AUTH_CONFIG = {
     appId: 54715318,
     serviceToken: '11f86b0611f86b0611f86b066312ba88b0111f811f86b067b82724c736aafcecbd0b20b',
     getRedirectUri() {
-        return (window.location.origin + window.location.pathname).replace(/\/$/, '') + '/';
+        // VK API strictly validates the redirect_uri. If localhost is not whitelisted
+        // in the VK App dashboard, VK throws "Ошибка загрузки".
+        // Using the production URL ensures the VK popup loads successfully.
+        return 'https://studio-9933447149-80d6a.web.app';
     }
 };
 
+function generateRandomString(length = 48) {
+    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    let result = '';
+    const values = new Uint8Array(length);
+    if (window.crypto && window.crypto.getRandomValues) {
+        window.crypto.getRandomValues(values);
+        for (let i = 0; i < length; i++) {
+            result += charset[values[i] % charset.length];
+        }
+    } else {
+        for (let i = 0; i < length; i++) {
+            result += charset[Math.floor(Math.random() * charset.length)];
+        }
+    }
+    return result;
+}
+
+async function generateCodeChallenge(verifier) {
+    if (window.crypto && window.crypto.subtle && window.crypto.subtle.digest) {
+        try {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(verifier);
+            const digest = await window.crypto.subtle.digest('SHA-256', data);
+            const bytes = new Uint8Array(digest);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary)
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+        } catch (e) {
+            console.warn('[VK Auth] generateCodeChallenge error:', e);
+        }
+    }
+    return verifier;
+}
+
+function getVKCookie(name) {
+    try {
+        const match = document.cookie.match(new RegExp('(?:^|; )vkid_sdk:' + name + '=([^;]*)'));
+        return match ? decodeURIComponent(match[1]) : '';
+    } catch(e) {
+        return '';
+    }
+}
+
+// Exchange authorization code for VK ID tokens via PKCE endpoint
+async function exchangeVKCodeForToken(code, deviceId, codeVerifier, state) {
+    const redirectUri = VK_AUTH_CONFIG.getRedirectUri();
+    const verifier = codeVerifier || localStorage.getItem('vk_code_verifier') || getVKCookie('codeVerifier') || '';
+    
+    const params = new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: String(VK_AUTH_CONFIG.appId),
+        code: code,
+        redirect_uri: redirectUri
+    });
+    if (deviceId) params.set('device_id', deviceId);
+    if (verifier) params.set('code_verifier', verifier);
+    if (state) params.set('state', state);
+
+    const response = await fetch('https://id.vk.com/oauth2/auth', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+    });
+
+    const data = await response.json();
+    if (data.error) {
+        throw new Error(data.error_description || data.error);
+    }
+    return data; // { access_token, id_token, user_id, email, phone, expires_in }
+}
+
 // Fetch user profile from VK API via JSONP
 function fetchVKUserProfile(userId, accessToken) {
+    if (!userId) return Promise.resolve(null);
     return new Promise((resolve) => {
         const callbackName = 'vk_jsonp_cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
         const script = document.createElement('script');
@@ -988,19 +1098,27 @@ function fetchVKUserProfile(userId, accessToken) {
 }
 
 // Establish authenticated VK user session in the app
-async function establishVKSession(userId, email, accessToken) {
-    let profile = null;
-    try {
-        profile = await fetchVKUserProfile(userId, accessToken);
-    } catch (e) {
-        console.warn('[VK Auth] Profile fetch error:', e);
+async function establishVKSession(userId, email, accessToken, initialProfile) {
+    if (!userId) {
+        console.error('[VK Auth] Cannot establish session: userId is required.');
+        showToast('Не удалось получить данные аккаунта VK.', 'error', 3000);
+        return;
+    }
+
+    let profile = initialProfile || null;
+    if (!profile || !profile.first_name) {
+        try {
+            profile = await fetchVKUserProfile(userId, accessToken);
+        } catch (e) {
+            console.warn('[VK Auth] Profile fetch error:', e);
+        }
     }
 
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
     const displayName = `${firstName} ${lastName}`.trim() || `Пользователь VK (${userId})`;
-    const photoURL = profile?.photo_200 || '';
-    const userEmail = email || `id${userId}@vk.com`;
+    const photoURL = profile?.photo_200 || profile?.avatar || '';
+    const userEmail = email || (profile?.email ? profile.email : `id${userId}@vk.com`);
 
     const vkUser = {
         uid: 'vk_' + userId,
@@ -1034,7 +1152,7 @@ async function establishVKSession(userId, email, accessToken) {
 
     // Load user data into calculators and notes
     const gradeCalc = document.querySelector('grade-average-calculator');
-    if (gradeCalc) {
+    if (gradeCalc && typeof gradeCalc.loadFromDatabase === 'function') {
         gradeCalc.loadFromDatabase();
     }
 
@@ -1045,36 +1163,48 @@ async function establishVKSession(userId, email, accessToken) {
 
 // VK Sign-in Trigger
 window.signInWithVk = function(button) {
-    return runAuthAction(button, () => {
-        return new Promise((resolve) => {
-            const redirectUri = VK_AUTH_CONFIG.getRedirectUri();
-            const authUrl = `https://oauth.vk.com/authorize?client_id=${VK_AUTH_CONFIG.appId}&display=popup&redirect_uri=${encodeURIComponent(redirectUri)}&scope=email&response_type=token&v=5.131`;
+    return runAuthAction(button, async () => {
+        const redirectUri = VK_AUTH_CONFIG.getRedirectUri();
+        const verifier = generateRandomString(64);
+        const challenge = await generateCodeChallenge(verifier);
+        const state = generateRandomString(32);
 
-            const width = 620;
-            const height = 580;
-            const left = window.screenX + (window.outerWidth - width) / 2;
-            const top = window.screenY + (window.outerHeight - height) / 2;
+        localStorage.setItem('vk_code_verifier', verifier);
+        localStorage.setItem('vk_auth_state', state);
 
-            let popup = null;
-            try {
-                popup = window.open(
-                    authUrl,
-                    'vk_oauth_popup',
-                    `width=${width},height=${height},left=${left},top=${top},toolbar=0,scrollbars=1,status=1,resizable=1,location=1,menuBar=0`
-                );
-            } catch (e) {
-                console.warn('[VK Auth] Popup error, falling back to redirect:', e);
-            }
+        // 1. SDK-based login is temporarily bypassed because VKIDSDK throws 'Ошибка загрузки'
+        // on local environments due to strict redirect_uri domain matching.
+        // We will directly use the standard OAuth 2.1 PKCE authorization URL.
+        /*
+        if (typeof VKIDSDK !== 'undefined' && VKIDSDK.Config && VKIDSDK.Auth) {
+            // ... SDK Code ...
+        }
+        */
+
+        // 2. Direct PKCE Popup Flow (Standard OAuth 2.1 VK ID)
+        return new Promise(async (resolve) => {
+
+
+            const authUrl = `https://id.vk.com/authorize?client_id=${VK_AUTH_CONFIG.appId}&response_type=code&code_challenge=${encodeURIComponent(challenge)}&code_challenge_method=s256&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&scope=vkid.personal_info%20email`;
+
+            const width = 600;
+            const height = 650;
+            const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
+            const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
+
+            let popup = window.open(
+                authUrl,
+                'vk_oauth_popup',
+                `width=${width},height=${height},left=${left},top=${top},toolbar=0,scrollbars=1,status=1,resizable=1,location=1,menuBar=0`
+            );
 
             if (!popup || popup.closed || typeof popup.closed === 'undefined') {
                 window.location.href = authUrl;
-                resolve();
-                return;
+                return resolve();
             }
 
             let resolved = false;
-
-            const pollTimer = setInterval(() => {
+            const pollTimer = setInterval(async () => {
                 if (resolved) {
                     clearInterval(pollTimer);
                     return;
@@ -1082,56 +1212,106 @@ window.signInWithVk = function(button) {
 
                 if (popup.closed) {
                     clearInterval(pollTimer);
-                    if (!resolved) {
-                        resolve();
-                    }
+                    if (!resolved) resolve();
                     return;
                 }
 
                 try {
                     const popupUrl = popup.location.href;
-                    if (popupUrl && (popupUrl.includes(redirectUri) || popupUrl.includes('access_token'))) {
-                        const hash = popup.location.hash || popupUrl.substring(popupUrl.indexOf('#'));
-                        const params = new URLSearchParams(hash.replace(/^#/, ''));
-                        const accessToken = params.get('access_token');
-                        const userId = params.get('user_id');
-                        const email = params.get('email');
-
-                        if (userId) {
-                            resolved = true;
-                            clearInterval(pollTimer);
-                            try { popup.close(); } catch(e) {}
-                            establishVKSession(userId, email, accessToken).then(resolve).catch(resolve);
-                        }
-                    } else if (popupUrl && popupUrl.includes('error=')) {
+                    if (popupUrl && popupUrl.startsWith(redirectUri)) {
                         resolved = true;
                         clearInterval(pollTimer);
+                        const urlObj = new URL(popupUrl);
+                        const code = urlObj.searchParams.get('code');
+                        const deviceId = urlObj.searchParams.get('device_id');
+                        const returnedState = urlObj.searchParams.get('state');
+                        const payload = urlObj.searchParams.get('payload');
+                        const err = urlObj.searchParams.get('error_description') || urlObj.searchParams.get('error');
+
                         try { popup.close(); } catch(e) {}
-                        const hash = popup.location.hash || popupUrl.substring(popupUrl.indexOf('#'));
-                        const params = new URLSearchParams(hash.replace(/^#/, ''));
-                        const errorReason = params.get('error_description') || params.get('error') || 'Авторизация отменена';
-                        showToast(errorReason, 'warning', 3000);
+
+                        if (err) {
+                            showToast('Ошибка входа VK: ' + err, 'warning', 3000);
+                            return resolve();
+                        }
+
+                        if (code) {
+                            try {
+                                const tokenData = await exchangeVKCodeForToken(code, deviceId, verifier, returnedState);
+                                await establishVKSession(tokenData.user_id, tokenData.email, tokenData.access_token);
+                            } catch (e) {
+                                console.error('[VK Auth] Code exchange failed:', e);
+                                showToast('Ошибка авторизации VK: ' + e.message, 'error', 3500);
+                            }
+                        } else if (payload) {
+                            try {
+                                const parsed = JSON.parse(payload);
+                                const uid = parsed.user?.id || parsed.user_id || parsed.uuid;
+                                await establishVKSession(uid, parsed.user?.email, parsed.token, parsed.user);
+                            } catch (e) {}
+                        }
                         resolve();
                     }
                 } catch (e) {
-                    // Cross-origin access while on oauth.vk.com domain
+                    // Cross-origin while on id.vk.com domain — expected until redirect back to origin
                 }
             }, 300);
 
-            // Timeout safety
             setTimeout(() => {
                 if (!resolved) {
                     resolved = true;
                     clearInterval(pollTimer);
                     resolve();
                 }
-            }, 120000);
+            }, 180000);
         });
     });
 };
 
-function initVKAuth() {
-    // 1. Check if redirected back with VK OAuth hash parameters
+async function initVKAuth() {
+    // 1. Check if redirected back with VK ID search params (?code=... or ?payload=... or ?error=...)
+    if (window.location.search && (window.location.search.includes('code=') || window.location.search.includes('payload=') || window.location.search.includes('error='))) {
+        const searchParams = new URLSearchParams(window.location.search);
+        const code = searchParams.get('code');
+        const deviceId = searchParams.get('device_id');
+        const state = searchParams.get('state');
+        const payload = searchParams.get('payload');
+        const error = searchParams.get('error_description') || searchParams.get('error');
+
+        // Clean query string immediately
+        try {
+            history.replaceState(null, '', window.location.pathname + window.location.hash);
+        } catch (e) {}
+
+        if (error) {
+            showToast('Ошибка VK ID: ' + error, 'warning', 3500);
+            return;
+        }
+
+        if (code) {
+            try {
+                const tokenData = await exchangeVKCodeForToken(code, deviceId, null, state);
+                if (tokenData && tokenData.user_id) {
+                    await establishVKSession(tokenData.user_id, tokenData.email, tokenData.access_token);
+                    return;
+                }
+            } catch (err) {
+                console.error('[VK Auth] Redirect code exchange error:', err);
+                showToast('Ошибка авторизации VK: ' + err.message, 'error', 3500);
+            }
+        } else if (payload) {
+            try {
+                const parsed = JSON.parse(payload);
+                const uid = parsed.user?.id || parsed.user_id || parsed.uuid;
+                if (uid) {
+                    await establishVKSession(uid, parsed.user?.email, parsed.token, parsed.user);
+                    return;
+                }
+            } catch (e) {}
+        }
+    }
+
+    // 2. Check if redirected back with VK OAuth hash parameters (#access_token=...&user_id=...)
     if (window.location.hash && window.location.hash.includes('access_token') && window.location.hash.includes('user_id')) {
         const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
         const accessToken = params.get('access_token');
@@ -1141,12 +1321,12 @@ function initVKAuth() {
             try {
                 history.replaceState(null, '', window.location.pathname + window.location.search);
             } catch (e) {}
-            establishVKSession(userId, email, accessToken);
+            await establishVKSession(userId, email, accessToken);
             return;
         }
     }
 
-    // 2. Check if VK session already saved in localStorage
+    // 3. Restore VK session from localStorage if not already authenticated
     const savedVK = localStorage.getItem('ssh_vk_user');
     if (savedVK && (!firebaseAuth || !firebaseAuth.currentUser)) {
         try {
@@ -1156,7 +1336,7 @@ function initVKAuth() {
                 window.currentUser = parsed;
                 updateAuthUI();
                 const gradeCalc = document.querySelector('grade-average-calculator');
-                if (gradeCalc) {
+                if (gradeCalc && typeof gradeCalc.loadFromDatabase === 'function') {
                     gradeCalc.loadFromDatabase();
                 }
             }
