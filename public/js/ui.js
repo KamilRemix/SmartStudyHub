@@ -133,6 +133,9 @@ function updateTranslations() {
         if (typeof updateAuthDialogTexts === 'function') {
             try { updateAuthDialogTexts(); } catch (e) {}
         }
+        if (typeof updateAuthUI === 'function') {
+            try { updateAuthUI(); } catch (e) {}
+        }
         if (typeof translations === 'undefined') return;
         const t = translations[currentLang] || translations['en'] || {};
         document.querySelectorAll('[data-i18n]').forEach(el => {

@@ -225,12 +225,14 @@ function getProviderLabel(providerId) {
     if (providerId === 'oidc.vk-id') return t('providerVk');
     if (providerId === 'github.com') return t('providerGithub');
     if (providerId === 'google.com') return t('providerGoogle');
+    if (providerId === 'password' || providerId === 'email') return t('providerEmail') || 'Email / Пароль';
     return providerId;
 }
 
 function getProviderCssClass(providerId) {
     if (providerId === 'oidc.vk-id') return 'vk';
     if (providerId === 'github.com') return 'github';
+    if (providerId === 'password' || providerId === 'email') return 'email';
     return 'google';
 }
 
@@ -303,6 +305,9 @@ function materialIcon(name, extraClasses = '') {
 }
 
 function getProviderIconSvg(providerId, iconClass = 'auth-flow-icon-svg') {
+    if (providerId === 'password' || providerId === 'email') {
+        return `<svg class="${iconClass}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`;
+    }
     if (providerId === 'oidc.vk-id') {
         return `<svg class="${iconClass}" viewBox="0 0 24 24" aria-hidden="true"><path fill="#0077FF" d="M15.684 0H8.316C2.692 0 0 2.692 0 8.316v7.368C0 21.308 2.692 24 8.316 24h7.368C21.308 24 24 21.308 24 15.684V8.316C24 2.692 21.308 0 15.684 0zm3.692 17.129h-1.644c-.624 0-.816-.496-1.936-1.616-1.024-1.008-1.472-1.136-1.728-1.136-.368 0-.48.104-.48.608v1.44c0 .4-.128.656-1.184.656-1.744 0-3.68-1.056-5.04-3.024-2.048-2.928-2.608-5.12-2.608-5.568 0-.24.096-.464.56-.464h1.644c.416 0 .576.192.736.64.8 2.32 2.144 4.352 2.688 4.352.208 0 .304-.096.304-.624V9.825c-.064-1.12-.656-1.216-.656-1.616 0-.192.16-.384.416-.384h2.576c.352 0 .48.176.48.592v3.184c0 .352.16.48.272.48.208 0 .384-.128.768-.512 1.184-1.328 2.032-3.376 2.032-3.376.112-.24.288-.384.704-.384h1.644c.496 0 .608.256.496.608-.208.976-2.256 3.872-2.256 3.872-.192.304-.272.448 0 .8.192.256.848.832 1.28 1.328.784.896 1.392 1.648 1.552 2.176.176.496-.08.752-.576.752z"/></svg>`;
     }
@@ -698,7 +703,347 @@ function buildLinkedProviderRow(providerId, canUnlink) {
         </div>`;
 }
 
+let currentAuthTab = 'signin';
+let lastTypedEmail = '';
+
+function getFirebaseErrorMessage(error) {
+    if (!error) return t('authErrorGeneric');
+    const code = error.code || '';
+    switch (code) {
+        case 'auth/invalid-email':
+            return t('authErrorInvalidEmail');
+        case 'auth/user-disabled':
+            return t('authErrorUserDisabled');
+        case 'auth/user-not-found':
+            return t('authErrorUserNotFound');
+        case 'auth/wrong-password':
+            return t('authErrorWrongPassword');
+        case 'auth/invalid-credential':
+        case 'auth/invalid-login-credentials':
+            return t('authErrorInvalidCredential');
+        case 'auth/email-already-in-use':
+            return t('authErrorEmailAlreadyInUse');
+        case 'auth/weak-password':
+            return t('authErrorWeakPassword');
+        case 'auth/operation-not-allowed':
+            return t('authErrorOperationNotAllowed');
+        case 'auth/too-many-requests':
+            return t('authErrorTooManyRequests');
+        case 'auth/network-request-failed':
+            return t('authErrorNetworkFailed');
+        case 'auth/missing-email':
+        case 'auth/missing-password':
+            return t('authErrorEmptyFields');
+        default:
+            return error.message || t('authErrorGeneric');
+    }
+}
+
+function showAuthFormFeedback(message, type = 'error') {
+    const settingsComponent = document.querySelector('settings-component');
+    if (!settingsComponent || !settingsComponent.shadowRoot) return;
+    const feedbackEl = settingsComponent.shadowRoot.querySelector('#auth-form-feedback');
+    if (!feedbackEl) return;
+    feedbackEl.textContent = message;
+    feedbackEl.className = `auth-form-feedback auth-form-feedback--${type}`;
+    feedbackEl.style.display = 'block';
+}
+
+function clearAuthFormFeedback() {
+    const settingsComponent = document.querySelector('settings-component');
+    if (!settingsComponent || !settingsComponent.shadowRoot) return;
+    const feedbackEl = settingsComponent.shadowRoot.querySelector('#auth-form-feedback');
+    if (!feedbackEl) return;
+    feedbackEl.textContent = '';
+    feedbackEl.style.display = 'none';
+}
+
+async function handleEmailSignIn(email, password, submitBtn) {
+    if (!email || !password) {
+        showToast(t('authErrorEmptyFields'), 'warning', 3000);
+        showAuthFormFeedback(t('authErrorEmptyFields'), 'error');
+        return;
+    }
+
+    return runAuthAction(submitBtn, async () => {
+        try {
+            clearAuthFormFeedback();
+            const authInstance = firebaseAuth || window.auth || (window.firebase && window.firebase.auth ? window.firebase.auth() : null);
+            const userCredential = await (window.signInWithEmailAndPassword
+                ? window.signInWithEmailAndPassword(authInstance, email.trim(), password)
+                : authInstance.signInWithEmailAndPassword(email.trim(), password));
+
+            const user = userCredential.user || authInstance.currentUser;
+            const userName = getUserDisplayLabel(user);
+            showToast(tpl('authWelcomeUser', { name: userName }), 'success', 3000);
+            await finalizeSignIn(userCredential);
+        } catch (error) {
+            console.error('[Auth] Email sign in error:', error);
+            const msg = getFirebaseErrorMessage(error);
+            showAuthFormFeedback(msg, 'error');
+            showToast(msg, 'error', 3500);
+        }
+    });
+}
+
+async function handleEmailSignUp(email, password, confirmPassword, submitBtn) {
+    if (!email || !password) {
+        showToast(t('authErrorEmptyFields'), 'warning', 3000);
+        showAuthFormFeedback(t('authErrorEmptyFields'), 'error');
+        return;
+    }
+
+    if (password.length < 6) {
+        showToast(t('authErrorWeakPassword'), 'warning', 3000);
+        showAuthFormFeedback(t('authErrorWeakPassword'), 'error');
+        return;
+    }
+
+    if (confirmPassword !== undefined && password !== confirmPassword) {
+        showToast(t('authErrorPasswordMismatch'), 'warning', 3000);
+        showAuthFormFeedback(t('authErrorPasswordMismatch'), 'error');
+        return;
+    }
+
+    return runAuthAction(submitBtn, async () => {
+        try {
+            clearAuthFormFeedback();
+            const authInstance = firebaseAuth || window.auth || (window.firebase && window.firebase.auth ? window.firebase.auth() : null);
+            const userCredential = await (window.createUserWithEmailAndPassword
+                ? window.createUserWithEmailAndPassword(authInstance, email.trim(), password)
+                : authInstance.createUserWithEmailAndPassword(email.trim(), password));
+
+            const user = userCredential.user || authInstance.currentUser;
+            if (user && !user.displayName) {
+                const defaultName = email.split('@')[0];
+                try {
+                    await user.updateProfile({ displayName: defaultName });
+                    await user.reload();
+                } catch (e) {
+                    console.warn('[Auth] Error setting default displayName:', e);
+                }
+            }
+
+            showToast(t('authSignUpSuccess'), 'success', 3000);
+            await finalizeSignIn(userCredential);
+        } catch (error) {
+            console.error('[Auth] Email sign up error:', error);
+            const msg = getFirebaseErrorMessage(error);
+            showAuthFormFeedback(msg, 'error');
+            showToast(msg, 'error', 3500);
+        }
+    });
+}
+
+async function handleForgotPassword(initialEmail = '') {
+    const promptText = t('authResetPasswordPrompt') || 'Введите ваш Email для сброса пароля:';
+    const email = await showAppPrompt(promptText, t('authResetPasswordTitle') || 'Сброс пароля', initialEmail || '');
+    if (!email) return;
+
+    try {
+        const authInstance = firebaseAuth || window.auth || (window.firebase && window.firebase.auth ? window.firebase.auth() : null);
+        if (window.sendPasswordResetEmail) {
+            await window.sendPasswordResetEmail(authInstance, email.trim());
+        } else if (authInstance && typeof authInstance.sendPasswordResetEmail === 'function') {
+            await authInstance.sendPasswordResetEmail(email.trim());
+        }
+        showToast(t('authResetEmailSent'), 'success', 4000);
+    } catch (error) {
+        console.error('[Auth] Password reset error:', error);
+        const msg = getFirebaseErrorMessage(error);
+        showToast(msg, 'error', 3500);
+    }
+}
+
+function renderAuthFormHtml(availableProviders, currentTab = 'signin') {
+    const isSignIn = currentTab === 'signin';
+    const emailLabel = escapeHtml(t('authEmailLabel') || 'Email');
+    const passwordLabel = escapeHtml(t('authPasswordLabel') || 'Пароль');
+    const confirmPasswordLabel = escapeHtml(t('authConfirmPasswordLabel') || 'Повторите пароль');
+    const emailPlaceholder = escapeHtml(t('authEmailPlaceholder') || 'name@example.com');
+    const passwordPlaceholder = escapeHtml(t('authPasswordPlaceholder') || 'Минимум 6 символов');
+    const confirmPasswordPlaceholder = escapeHtml(t('authConfirmPasswordPlaceholder') || 'Повторите ваш пароль');
+    const forgotPasswordText = escapeHtml(t('authForgotPasswordLink') || 'Забыли пароль?');
+    const submitText = escapeHtml(t(isSignIn ? 'authSignInBtn' : 'authSignUpBtn') || (isSignIn ? 'Войти' : 'Создать аккаунт'));
+    const orContinueWith = escapeHtml(t('authOrContinueWith') || 'или через соцсети');
+    const tabSignInText = escapeHtml(t('authTabsSignIn') || 'Вход');
+    const tabSignUpText = escapeHtml(t('authTabsSignUp') || 'Регистрация');
+
+    const socialButtonsHtml = availableProviders.map((id) => buildProviderActionButton(id, 'signin')).join('');
+
+    return `
+        <div class="auth-box">
+            <!-- Tabs Switcher -->
+            <div class="auth-tabs" role="tablist" aria-label="Authentication mode">
+                <button type="button" class="auth-tab-btn ${isSignIn ? 'active' : ''}" id="auth-tab-signin" data-auth-tab="signin" role="tab" aria-selected="${isSignIn}">
+                    <svg class="auth-tab-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                        <polyline points="10 17 15 12 10 7"></polyline>
+                        <line x1="15" y1="12" x2="3" y2="12"></line>
+                    </svg>
+                    <span>${tabSignInText}</span>
+                </button>
+                <button type="button" class="auth-tab-btn ${!isSignIn ? 'active' : ''}" id="auth-tab-signup" data-auth-tab="signup" role="tab" aria-selected="${!isSignIn}">
+                    <svg class="auth-tab-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="8.5" cy="7" r="4"></circle>
+                        <line x1="20" y1="8" x2="20" y2="14"></line>
+                        <line x1="23" y1="11" x2="17" y2="11"></line>
+                    </svg>
+                    <span>${tabSignUpText}</span>
+                </button>
+            </div>
+
+            <!-- Email & Password Form -->
+            <form id="auth-email-form" class="auth-email-form" novalidate autocomplete="on">
+                <div id="auth-form-feedback" class="auth-form-feedback" style="display: none;" role="alert"></div>
+
+                <!-- Email Input -->
+                <div class="auth-input-group">
+                    <label for="auth-email-input" class="auth-input-label">${emailLabel}</label>
+                    <div class="auth-input-wrapper">
+                        <span class="auth-input-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        </span>
+                        <input type="email" id="auth-email-input" name="email" class="auth-text-input" placeholder="${emailPlaceholder}" autocomplete="username" inputmode="email" required />
+                    </div>
+                </div>
+
+                <!-- Password Input -->
+                <div class="auth-input-group">
+                    <div class="auth-label-row">
+                        <label for="auth-password-input" class="auth-input-label">${passwordLabel}</label>
+                        ${isSignIn ? `<button type="button" class="auth-forgot-link" id="auth-forgot-btn">${forgotPasswordText}</button>` : ''}
+                    </div>
+                    <div class="auth-input-wrapper">
+                        <span class="auth-input-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        </span>
+                        <input type="password" id="auth-password-input" name="password" class="auth-text-input" placeholder="${passwordPlaceholder}" autocomplete="${isSignIn ? 'current-password' : 'new-password'}" required />
+                        <button type="button" class="auth-toggle-pwd-btn" id="auth-toggle-pwd" aria-label="Toggle password visibility" title="Показать/скрыть пароль">
+                            <svg class="pwd-eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <svg class="pwd-eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Confirm Password (Registration Only) -->
+                ${!isSignIn ? `
+                <div class="auth-input-group auth-confirm-password-group" id="auth-confirm-password-group">
+                    <label for="auth-confirm-password-input" class="auth-input-label">${confirmPasswordLabel}</label>
+                    <div class="auth-input-wrapper">
+                        <span class="auth-input-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        </span>
+                        <input type="password" id="auth-confirm-password-input" name="confirm-password" class="auth-text-input" placeholder="${confirmPasswordPlaceholder}" autocomplete="new-password" required />
+                        <button type="button" class="auth-toggle-pwd-btn" id="auth-toggle-confirm-pwd" aria-label="Toggle password visibility" title="Показать/скрыть пароль">
+                            <svg class="pwd-eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <svg class="pwd-eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                        </button>
+                    </div>
+                </div>` : ''}
+
+                <!-- Primary Submit Button -->
+                <button type="submit" class="auth-submit-btn" id="auth-submit-btn">
+                    <span class="auth-submit-text">${submitText}</span>
+                    <svg class="auth-submit-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                </button>
+            </form>
+
+            <!-- Social Providers Divider -->
+            ${socialButtonsHtml ? `
+            <div class="auth-divider">
+                <span class="auth-divider-line"></span>
+                <span class="auth-divider-text">${orContinueWith}</span>
+                <span class="auth-divider-line"></span>
+            </div>
+
+            <!-- Social Buttons Stack -->
+            <div class="auth-social-stack">
+                ${socialButtonsHtml}
+            </div>` : ''}
+        </div>
+    `;
+}
+
 function bindAuthContentActions(authContent) {
+    // 1. Auth tabs switcher
+    authContent.querySelectorAll('[data-auth-tab]').forEach((tabBtn) => {
+        tabBtn.addEventListener('click', () => {
+            const tab = tabBtn.getAttribute('data-auth-tab');
+            if (tab && tab !== currentAuthTab) {
+                const emailInput = authContent.querySelector('#auth-email-input');
+                if (emailInput && emailInput.value) {
+                    lastTypedEmail = emailInput.value;
+                }
+                currentAuthTab = tab;
+                updateAuthUI();
+                const newEmailInput = authContent.querySelector('#auth-email-input');
+                if (newEmailInput && lastTypedEmail) {
+                    newEmailInput.value = lastTypedEmail;
+                }
+            }
+        });
+    });
+
+    // 2. Password visibility toggles
+    const setupPwdToggle = (toggleBtnId, inputId) => {
+        const toggleBtn = authContent.querySelector('#' + toggleBtnId);
+        const input = authContent.querySelector('#' + inputId);
+        if (toggleBtn && input) {
+            toggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const isPwd = input.type === 'password';
+                input.type = isPwd ? 'text' : 'password';
+                const eyeOpen = toggleBtn.querySelector('.pwd-eye-open');
+                const eyeClosed = toggleBtn.querySelector('.pwd-eye-closed');
+                if (eyeOpen && eyeClosed) {
+                    eyeOpen.style.display = isPwd ? 'none' : 'block';
+                    eyeClosed.style.display = isPwd ? 'block' : 'none';
+                }
+            });
+        }
+    };
+    setupPwdToggle('auth-toggle-pwd', 'auth-password-input');
+    setupPwdToggle('auth-toggle-confirm-pwd', 'auth-confirm-password-input');
+
+    // 3. Forgot password button
+    const forgotBtn = authContent.querySelector('#auth-forgot-btn');
+    if (forgotBtn) {
+        forgotBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const emailInput = authContent.querySelector('#auth-email-input');
+            handleForgotPassword(emailInput ? emailInput.value : '');
+        });
+    }
+
+    // 4. Form submission
+    const form = authContent.querySelector('#auth-email-form');
+    if (form) {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (authActionInFlight) return;
+
+            const emailInput = authContent.querySelector('#auth-email-input');
+            const passwordInput = authContent.querySelector('#auth-password-input');
+            const confirmInput = authContent.querySelector('#auth-confirm-password-input');
+            const submitBtn = authContent.querySelector('#auth-submit-btn');
+
+            const email = emailInput ? emailInput.value.trim() : '';
+            const password = passwordInput ? passwordInput.value : '';
+            const confirmPassword = confirmInput ? confirmInput.value : undefined;
+
+            if (currentAuthTab === 'signup') {
+                handleEmailSignUp(email, password, confirmPassword, submitBtn);
+            } else {
+                handleEmailSignIn(email, password, submitBtn);
+            }
+        });
+    }
+
+    // 5. Social providers
     authContent.querySelectorAll('[data-provider]').forEach((btn) => {
         const providerId = btn.getAttribute('data-provider');
         if (!providerId) return;
@@ -712,6 +1057,7 @@ function bindAuthContentActions(authContent) {
         }
     });
 
+    // 6. Unlink buttons
     authContent.querySelectorAll('[data-unlink-provider]').forEach((btn) => {
         btn.addEventListener('click', () => {
             if (authActionInFlight) return;
@@ -719,11 +1065,16 @@ function bindAuthContentActions(authContent) {
         });
     });
 
+    // 7. Sign out button
     const signoutBtn = authContent.querySelector('#signout-btn');
     if (signoutBtn) {
         signoutBtn.addEventListener('click', window.signOutUser);
     }
 }
+
+window.handleEmailSignIn = handleEmailSignIn;
+window.handleEmailSignUp = handleEmailSignUp;
+window.handleForgotPassword = handleForgotPassword;
 
 window.requestAccountLink = (providerId) => {
     if (!currentUser || !firebaseAuth) return;
@@ -988,7 +1339,7 @@ async function updateAuthUI() {
         const userLabel = escapeHtml(getUserDisplayLabel(currentUser));
         const email = escapeHtml(currentUser.email || '');
         const photo = currentUser.photoURL;
-        const providerId = (currentUser.providerData && currentUser.providerData[0]?.providerId) || 'google.com';
+        const providerId = (currentUser.providerData && currentUser.providerData[0]?.providerId) || (currentUser.email ? 'password' : 'google.com');
         const providerName = getProviderLabel(providerId);
 
         const avatarHtml = photo
@@ -1013,10 +1364,7 @@ async function updateAuthUI() {
 
         bindAuthContentActions(authContent);
     } else {
-        authContent.innerHTML = `
-            <div class="auth-signin-stack" style="display: flex; flex-direction: column; gap: 12px;">
-                ${availableProviders.map((id) => buildProviderActionButton(id, 'signin')).join('')}
-            </div>`;
+        authContent.innerHTML = renderAuthFormHtml(availableProviders, currentAuthTab);
         bindAuthContentActions(authContent);
     }
 }
