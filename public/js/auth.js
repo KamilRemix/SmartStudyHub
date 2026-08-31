@@ -1236,6 +1236,16 @@ async function establishVKSession(userId, email, accessToken, initialProfile) {
     showToast(`Добро пожаловать, ${displayName}!`, 'success', 3000);
 }
 
+function formatAuthError(err) {
+    if (!err) return 'Неизвестная ошибка';
+    if (typeof err === 'string') return err;
+    if (err.error_description) return err.error_description;
+    if (err.error) return typeof err.error === 'string' ? err.error : JSON.stringify(err.error);
+    if (err.message) return err.message;
+    if (err.detail) return err.detail;
+    try { return JSON.stringify(err); } catch(e) { return String(err); }
+}
+
 // VK Sign-in Trigger — uses native VK ID FloatingOneTap (no popup windows)
 window.signInWithVk = function(button) {
     return runAuthAction(button, async () => {
@@ -1260,6 +1270,16 @@ window.signInWithVk = function(button) {
         })
         .on(VKIDSDK.WidgetEvents.SUCCESS, async (data) => {
             try {
+                // If payload was returned directly (FloatingOneTap default)
+                if (data.payload || data.token || data.user) {
+                    const payload = data.payload || data;
+                    const uid = payload.user?.id || payload.user_id || payload.uuid || payload.id;
+                    if (uid) {
+                        await establishVKSession(uid, payload.user?.email, payload.token, payload.user);
+                        return;
+                    }
+                }
+
                 if (data.code) {
                     const tokenData = await VKIDSDK.Auth.exchangeCode(data.code, data.device_id);
                     if (tokenData && tokenData.access_token) {
@@ -1275,27 +1295,25 @@ window.signInWithVk = function(button) {
                         return;
                     }
                 }
-                
-                // If payload was returned directly
-                if (data.payload || data.token) {
-                    const payload = data.payload || data;
-                    const uid = payload.user?.id || payload.user_id || payload.uuid || payload.id;
-                    await establishVKSession(uid, payload.user?.email, payload.token, payload.user);
-                    return;
-                }
 
                 throw new Error("Не удалось получить токен авторизации");
             } catch (err) {
                 console.error('[VK Auth] Widget success handling error:', err);
-                showToast('Ошибка авторизации VK: ' + (err?.message || err), 'error', 3500);
+                const savedVK = localStorage.getItem('ssh_vk_user');
+                if (!savedVK) {
+                    showToast('Ошибка авторизации VK: ' + formatAuthError(err), 'error', 3500);
+                }
             }
         })
         .on(VKIDSDK.WidgetEvents.ERROR, (error) => {
             console.warn('[VK Auth] Widget error:', error);
-            const errMsg = error?.detail || error?.message || '';
+            const errMsg = formatAuthError(error);
             // Ignore user cancellation errors
-            if (!errMsg.includes('User cancel')) {
-                showToast('Ошибка авторизации VK' + (errMsg ? ': ' + errMsg : ''), 'warning', 3000);
+            if (!errMsg.includes('User cancel') && !errMsg.includes('closed')) {
+                const savedVK = localStorage.getItem('ssh_vk_user');
+                if (!savedVK) {
+                    showToast('Ошибка авторизации VK: ' + errMsg, 'warning', 3000);
+                }
             }
         });
     });
@@ -1309,20 +1327,38 @@ async function initVKAuth() {
         window.location.search.includes('error=')
     )) {
         const searchParams = new URLSearchParams(window.location.search);
+        const payload = searchParams.get('payload');
         const code = searchParams.get('code');
         const deviceId = searchParams.get('device_id');
         const state = searchParams.get('state');
-        const payload = searchParams.get('payload');
         const error = searchParams.get('error_description') || searchParams.get('error');
 
         // Clean query string immediately
         try { history.replaceState(null, '', window.location.pathname + window.location.hash); } catch (e) {}
 
         if (error) {
-            showToast('Ошибка VK ID: ' + error, 'warning', 3500);
+            const savedVK = localStorage.getItem('ssh_vk_user');
+            if (!savedVK) {
+                showToast('Ошибка VK ID: ' + error, 'warning', 3500);
+            }
             return;
         }
 
+        // Priority 1: Handle payload directly (most common in VK ID 2.x)
+        if (payload) {
+            try {
+                const parsed = JSON.parse(payload);
+                const uid = parsed.user?.id || parsed.user_id || parsed.uuid || parsed.id;
+                if (uid) {
+                    await establishVKSession(uid, parsed.user?.email, parsed.token, parsed.user);
+                    return;
+                }
+            } catch (e) {
+                console.warn('[VK Auth] Payload parsing error:', e);
+            }
+        }
+
+        // Priority 2: Exchange authorization code if provided
         if (code && typeof VKIDSDK !== 'undefined') {
             try {
                 VKIDSDK.Config.init({
@@ -1346,17 +1382,11 @@ async function initVKAuth() {
                 }
             } catch (err) {
                 console.error('[VK Auth] Redirect code exchange error:', err);
-                showToast('Ошибка авторизации VK: ' + (err?.message || err), 'error', 3500);
-            }
-        } else if (payload) {
-            try {
-                const parsed = JSON.parse(payload);
-                const uid = parsed.user?.id || parsed.user_id || parsed.uuid || parsed.id;
-                if (uid) {
-                    await establishVKSession(uid, parsed.user?.email, parsed.token, parsed.user);
-                    return;
+                const savedVK = localStorage.getItem('ssh_vk_user');
+                if (!savedVK) {
+                    showToast('Ошибка авторизации VK: ' + formatAuthError(err), 'error', 3500);
                 }
-            } catch (e) {}
+            }
         }
     }
 
