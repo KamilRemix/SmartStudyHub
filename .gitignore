@@ -9,10 +9,14 @@ node_modules/
 # Firebase cache
 .firebase/
 
-# Build output (web & electron)
+# Build output (web & electron & android)
 dist/
 dist-exe/
 icon .png
+*.apk
+android/app/build/
+android/.gradle/
+android/build/
 
 # AI helper/debug scripts (not part of the product)
 find-missing.js
