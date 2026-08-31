@@ -1246,98 +1246,81 @@ function formatAuthError(err) {
     try { return JSON.stringify(err); } catch(e) { return String(err); }
 }
 
-// VK Sign-in Trigger — uses native VK ID FloatingOneTap (no popup windows)
+// VK Sign-in Trigger — popup OAuth with direct token flow (no code exchange, no Security Error)
 window.signInWithVk = function(button) {
     return runAuthAction(button, async () => {
-        if (typeof VKIDSDK === 'undefined') {
-            showToast('VK SDK не загружен. Проверьте интернет-соединение.', 'error', 3000);
+        const redirectUri = VK_AUTH_CONFIG.getRedirectUri();
+        const state = generateRandomString(32);
+
+        const authUrl = `https://oauth.vk.com/authorize?client_id=${VK_AUTH_CONFIG.appId}&display=popup&redirect_uri=${encodeURIComponent(redirectUri)}&scope=email&response_type=token&v=5.131&state=${state}`;
+
+        const width = 660;
+        const height = 500;
+        const left = (window.innerWidth / 2) - (width / 2) + window.screenX;
+        const top = (window.innerHeight / 2) - (height / 2) + window.screenY;
+
+        const popup = window.open(authUrl, 'vk_auth', `width=${width},height=${height},left=${left},top=${top},toolbar=0,scrollbars=1,status=1,resizable=1,location=1,menuBar=0`);
+
+        if (!popup) {
+            window.location.href = authUrl;
             return;
         }
 
-        const redirectUri = VK_AUTH_CONFIG.getRedirectUri();
-        const verifier = generateRandomString(64);
-        const codeChallenge = await generateCodeChallenge(verifier);
-        const state = generateRandomString(32);
+        let resolved = false;
 
-        localStorage.setItem('vk_code_verifier', verifier);
-        localStorage.setItem('vk_auth_state', state);
+        const pollTimer = setInterval(async () => {
+            if (resolved) {
+                clearInterval(pollTimer);
+                return;
+            }
 
-        try {
-            document.cookie = 'vkid_sdk:codeVerifier=' + encodeURIComponent(verifier) + '; path=/; max-age=3600; SameSite=Lax';
-            document.cookie = 'vkid_sdk:state=' + encodeURIComponent(state) + '; path=/; max-age=3600; SameSite=Lax';
-        } catch(e) {}
+            if (popup.closed) {
+                clearInterval(pollTimer);
+                return;
+            }
 
-        VKIDSDK.Config.init({
-            app: VK_AUTH_CONFIG.appId,
-            redirectUrl: redirectUri,
-            state: state,
-            codeVerifier: verifier,
-            codeChallenge: codeChallenge
-        });
-
-        // Use FloatingOneTap which renders a beautiful native VK modal in the SAME window
-        const floating = new VKIDSDK.FloatingOneTap();
-        
-        floating.render({
-            appName: 'SmartStudyHub',
-            showAlternativeLogin: 0
-        })
-        .on(VKIDSDK.WidgetEvents.SUCCESS, async (data) => {
             try {
-                // If payload was returned directly (FloatingOneTap default)
-                if (data.payload || data.token || data.user) {
-                    const payload = data.payload || data;
-                    const uid = payload.user?.id || payload.user_id || payload.uuid || payload.id;
-                    if (uid) {
-                        await establishVKSession(uid, payload.user?.email, payload.token, payload.user);
+                const popupUrl = popup.location.href;
+                if (popupUrl && (popupUrl.includes(redirectUri) || popupUrl.includes('access_token=') || popupUrl.includes('error='))) {
+                    resolved = true;
+                    clearInterval(pollTimer);
+
+                    const hash = popup.location.hash || (popupUrl.includes('#') ? popupUrl.substring(popupUrl.indexOf('#')) : '');
+                    const search = popup.location.search || (popupUrl.includes('?') ? popupUrl.substring(popupUrl.indexOf('?')) : '');
+
+                    // Try to close popup gracefully
+                    try { popup.close(); } catch(e) {}
+
+                    const hashParams = new URLSearchParams(hash.replace(/^#/, ''));
+                    const searchParams = new URLSearchParams(search.replace(/^\?/, ''));
+
+                    const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+                    const userId = hashParams.get('user_id') || searchParams.get('user_id');
+                    const email = hashParams.get('email') || searchParams.get('email');
+                    const error = hashParams.get('error_description') || searchParams.get('error_description') || hashParams.get('error') || searchParams.get('error');
+
+                    if (error) {
+                        showToast('Ошибка авторизации VK: ' + error, 'warning', 3000);
                         return;
                     }
-                }
 
-                if (data.code) {
-                    let tokenData = null;
-                    try {
-                        tokenData = await VKIDSDK.Auth.exchangeCode(data.code, data.device_id);
-                    } catch (e) {
-                        console.warn('[VK Auth] VKIDSDK.Auth.exchangeCode fallback:', e);
-                        tokenData = await exchangeVKCodeForToken(data.code, data.device_id, verifier, state);
-                    }
-
-                    if (tokenData && (tokenData.access_token || tokenData.token)) {
-                        const token = tokenData.access_token || tokenData.token;
-                        let userProfile = null;
-                        try {
-                            const info = await VKIDSDK.Auth.userInfo(token);
-                            userProfile = info?.user || info;
-                        } catch (e) {
-                            console.warn('[VK Auth] userInfo fetch warning:', e);
-                        }
-                        const uid = tokenData.user_id || userProfile?.id;
-                        await establishVKSession(uid, tokenData.email || userProfile?.email, token, userProfile);
-                        return;
+                    if (userId) {
+                        await establishVKSession(userId, email, accessToken);
                     }
                 }
+            } catch (e) {
+                // Ignore cross-origin DOMException while popup is on vk.com
+            }
+        }, 300);
 
-                throw new Error("Не удалось получить токен авторизации");
-            } catch (err) {
-                console.error('[VK Auth] Widget success handling error:', err);
-                const savedVK = localStorage.getItem('ssh_vk_user');
-                if (!savedVK && (!currentUser || !currentUser.uid)) {
-                    showToast('Ошибка авторизации VK: ' + formatAuthError(err), 'error', 3500);
-                }
+        // Timeout safety
+        setTimeout(() => {
+            if (!resolved) {
+                resolved = true;
+                clearInterval(pollTimer);
+                try { popup.close(); } catch(e) {}
             }
-        })
-        .on(VKIDSDK.WidgetEvents.ERROR, (error) => {
-            console.warn('[VK Auth] Widget error:', error);
-            const errMsg = formatAuthError(error);
-            // Ignore user cancellation errors
-            if (!errMsg.includes('User cancel') && !errMsg.includes('closed')) {
-                const savedVK = localStorage.getItem('ssh_vk_user');
-                if (!savedVK && (!currentUser || !currentUser.uid)) {
-                    showToast('Ошибка авторизации VK: ' + errMsg, 'warning', 3000);
-                }
-            }
-        });
+        }, 120000);
     });
 };
 
