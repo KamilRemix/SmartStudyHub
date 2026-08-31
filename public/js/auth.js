@@ -1024,11 +1024,6 @@ const VK_AUTH_CONFIG = {
     appId: 54715318,
     serviceToken: '11f86b0611f86b0611f86b066312ba88b0111f811f86b067b82724c736aafcecbd0b20b',
     getRedirectUri() {
-        // VK ID strictly requires a public HTTPS domain registered in the VK Dashboard.
-        // It rejects 'localhost' and 'http://'.
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol !== 'https:') {
-            return 'https://studio-9933447149-80d6a.web.app';
-        }
         return window.location.origin;
     }
 };
