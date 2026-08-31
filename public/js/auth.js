@@ -123,7 +123,59 @@ const CIS_COUNTRY_CODES = new Set(['RU', 'BY', 'KZ', 'AM', 'AZ', 'KG', 'MD', 'TJ
 let cachedUserRegionProviders = null;
 
 async function getAvailableAuthProviders() {
-    return ['google.com', 'github.com', 'oidc.vk-id'];
+    if (cachedUserRegionProviders) return cachedUserRegionProviders;
+
+    const baseProviders = ['google.com', 'github.com'];
+    let showVk = false;
+
+    let ipCountry = '';
+    try {
+        const res = await fetch('https://get.geojs.io/v1/ip/country.json');
+        const data = await res.json();
+        ipCountry = data.country;
+    } catch (e) {
+        console.warn('Failed to fetch IP country:', e);
+    }
+    const isCisIp = ipCountry ? CIS_COUNTRY_CODES.has(ipCountry.toUpperCase()) : false;
+
+    // 1. Android (APK)
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+        try {
+            const AppChannel = window.Capacitor.Plugins?.AppChannel;
+            if (AppChannel) {
+                const deviceInfo = await AppChannel.getDeviceInfo();
+                if (deviceInfo.installer === 'ru.vk.store') {
+                    showVk = true;
+                } else {
+                    const simCountry = (deviceInfo.simCountry || '').toUpperCase();
+                    const isCisSim = simCountry ? CIS_COUNTRY_CODES.has(simCountry) : false;
+                    const isSystemRu = (deviceInfo.systemLanguage || '').toLowerCase().startsWith('ru');
+                    if (isCisSim || isCisIp || isSystemRu) {
+                        showVk = true;
+                    }
+                }
+            } else {
+                if (isCisIp || (navigator.language || '').toLowerCase().startsWith('ru')) showVk = true;
+            }
+        } catch (e) {
+            console.warn('Capacitor AppChannel error:', e);
+            if (isCisIp || (navigator.language || '').toLowerCase().startsWith('ru')) showVk = true;
+        }
+    } 
+    // 2. Web & 3. Windows (EXE)
+    else {
+        const isLangRu = (navigator.language || '').toLowerCase().startsWith('ru');
+        if (isCisIp || isLangRu) {
+            showVk = true;
+        }
+    }
+
+    if (showVk) {
+        baseProviders.push('oidc.vk-id');
+    }
+
+    cachedUserRegionProviders = baseProviders;
+    return cachedUserRegionProviders;
 }
 
 function getLinkedProviders(user) {
@@ -972,10 +1024,11 @@ const VK_AUTH_CONFIG = {
     appId: 54715318,
     serviceToken: '11f86b0611f86b0611f86b066312ba88b0111f811f86b067b82724c736aafcecbd0b20b',
     getRedirectUri() {
-        // VK API strictly validates the redirect_uri. If localhost is not whitelisted
-        // in the VK App dashboard, VK throws "Ошибка загрузки".
-        // Using the production URL ensures the VK popup loads successfully.
-        return 'https://studio-9933447149-80d6a.web.app';
+        // Use current origin so VK redirects back to the same site.
+        // For production: https://studio-9933447149-80d6a.web.app
+        // For local dev: http://localhost:8080
+        // IMPORTANT: All redirect URIs must be whitelisted in VK App dashboard.
+        return window.location.origin;
     }
 };
 
@@ -1161,7 +1214,7 @@ async function establishVKSession(userId, email, accessToken, initialProfile) {
     showToast(`Добро пожаловать, ${displayName}!`, 'success', 3000);
 }
 
-// VK Sign-in Trigger
+// VK Sign-in Trigger — uses same-tab redirect (no popup)
 window.signInWithVk = function(button) {
     return runAuthAction(button, async () => {
         const redirectUri = VK_AUTH_CONFIG.getRedirectUri();
@@ -1172,99 +1225,11 @@ window.signInWithVk = function(button) {
         localStorage.setItem('vk_code_verifier', verifier);
         localStorage.setItem('vk_auth_state', state);
 
-        // 1. SDK-based login is temporarily bypassed because VKIDSDK throws 'Ошибка загрузки'
-        // on local environments due to strict redirect_uri domain matching.
-        // We will directly use the standard OAuth 2.1 PKCE authorization URL.
-        /*
-        if (typeof VKIDSDK !== 'undefined' && VKIDSDK.Config && VKIDSDK.Auth) {
-            // ... SDK Code ...
-        }
-        */
+        // Redirect in the same tab — VK will send the user back to our redirectUri with ?code=
+        // initVKAuth() picks up the code on page load and completes the session.
+        const authUrl = `https://id.vk.com/authorize?client_id=${VK_AUTH_CONFIG.appId}&response_type=code&code_challenge=${encodeURIComponent(challenge)}&code_challenge_method=s256&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&scope=vkid.personal_info%20email`;
 
-        // 2. Direct PKCE Popup Flow (Standard OAuth 2.1 VK ID)
-        return new Promise(async (resolve) => {
-
-
-            const authUrl = `https://id.vk.com/authorize?client_id=${VK_AUTH_CONFIG.appId}&response_type=code&code_challenge=${encodeURIComponent(challenge)}&code_challenge_method=s256&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&scope=vkid.personal_info%20email`;
-
-            const width = 600;
-            const height = 650;
-            const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
-            const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
-
-            let popup = window.open(
-                authUrl,
-                'vk_oauth_popup',
-                `width=${width},height=${height},left=${left},top=${top},toolbar=0,scrollbars=1,status=1,resizable=1,location=1,menuBar=0`
-            );
-
-            if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-                window.location.href = authUrl;
-                return resolve();
-            }
-
-            let resolved = false;
-            const pollTimer = setInterval(async () => {
-                if (resolved) {
-                    clearInterval(pollTimer);
-                    return;
-                }
-
-                if (popup.closed) {
-                    clearInterval(pollTimer);
-                    if (!resolved) resolve();
-                    return;
-                }
-
-                try {
-                    const popupUrl = popup.location.href;
-                    if (popupUrl && popupUrl.startsWith(redirectUri)) {
-                        resolved = true;
-                        clearInterval(pollTimer);
-                        const urlObj = new URL(popupUrl);
-                        const code = urlObj.searchParams.get('code');
-                        const deviceId = urlObj.searchParams.get('device_id');
-                        const returnedState = urlObj.searchParams.get('state');
-                        const payload = urlObj.searchParams.get('payload');
-                        const err = urlObj.searchParams.get('error_description') || urlObj.searchParams.get('error');
-
-                        try { popup.close(); } catch(e) {}
-
-                        if (err) {
-                            showToast('Ошибка входа VK: ' + err, 'warning', 3000);
-                            return resolve();
-                        }
-
-                        if (code) {
-                            try {
-                                const tokenData = await exchangeVKCodeForToken(code, deviceId, verifier, returnedState);
-                                await establishVKSession(tokenData.user_id, tokenData.email, tokenData.access_token);
-                            } catch (e) {
-                                console.error('[VK Auth] Code exchange failed:', e);
-                                showToast('Ошибка авторизации VK: ' + e.message, 'error', 3500);
-                            }
-                        } else if (payload) {
-                            try {
-                                const parsed = JSON.parse(payload);
-                                const uid = parsed.user?.id || parsed.user_id || parsed.uuid;
-                                await establishVKSession(uid, parsed.user?.email, parsed.token, parsed.user);
-                            } catch (e) {}
-                        }
-                        resolve();
-                    }
-                } catch (e) {
-                    // Cross-origin while on id.vk.com domain — expected until redirect back to origin
-                }
-            }, 300);
-
-            setTimeout(() => {
-                if (!resolved) {
-                    resolved = true;
-                    clearInterval(pollTimer);
-                    resolve();
-                }
-            }, 180000);
-        });
+        window.location.href = authUrl;
     });
 };
 

@@ -1,4 +1,4 @@
-# Agent Rules and Project Guidelines
+п»ї# Agent Rules and Project Guidelines
 
 ## Git & Version Control (РЎРўР РћР“РћР• РџР РђР’РР›Рћ)
 - РџРѕСЃР»Рµ СЂРµР°Р»РёР·Р°С†РёРё РљРђР–Р”РћР™ Р·Р°РґР°С‡Рё, С„РёС‡Рё РёР»Рё РёСЃРїСЂР°РІР»РµРЅРёСЏ Р°РіРµРЅС‚ РћР‘РЇР—РђРќ РґРµР»Р°С‚СЊ РєРѕРјРјРёС‚:
@@ -22,11 +22,25 @@
 - РќРµ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ Р±Р»РѕРєРёСЂСѓСЋС‰РёРµ Р·Р°РіР»СѓС€РєРё `if (false)` Рё РІСЃРїР»С‹РІР°СЋС‰РёРµ РѕРєРЅР° `alert()` РґР»СЏ РѕР±СЂР°Р±РѕС‚РєРё РѕС€РёР±РѕРє (С‚РѕР»СЊРєРѕ console.error / console.warn).
 
 ## Firebase Auth Scopes
-- При настройке Google Sign-In запрещено смешивать конфликтующие разрешения (например, YouTube и Google Drive) в одном запросе, это вызывает Error 400: invalid_request. Запрашивайте только базовые profile и email.
+- пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ Google Sign-In пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, YouTube пїЅ Google Drive) пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ Error 400: invalid_request. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ profile пїЅ email.
 
 ## Social Sign-In Buttons (Modern UI)
-- Запрещено использовать устаревший HTML/CSS стиль из 2010-х. Всегда используйте современные паттерны и цвета брендов:
-  - VK: Фон #0077FF, белый текст и логотип.
-  - GitHub: Фон #24292e или #000000, белый текст.
-  - Google: Белый фон, текст #3c4043, обводка #dadce0.
-  - Эффекты: Плавные анимации (cubic-bezier), тени (box-shadow) и transform (translateY(-2px)) при hover.
+- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ HTML/CSS пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ 2010-пїЅ. пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ:
+  - VK: пїЅпїЅпїЅ #0077FF, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+  - GitHub: пїЅпїЅпїЅ #24292e пїЅпїЅпїЅ #000000, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ.
+  - Google: пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ #3c4043, пїЅпїЅпїЅпїЅпїЅпїЅпїЅ #dadce0.
+  - пїЅпїЅпїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ (cubic-bezier), пїЅпїЅпїЅпїЅ (box-shadow) пїЅ transform (translateY(-2px)) пїЅпїЅпїЅ hover.
+
+## Russian Services Auth (VK, Yandex, etc.)
+- Russian services (VK ID, Yandex ID, etc.) MUST use their own native SDK for authentication, NOT Firebase OIDC providers.
+- VK login uses the VK ID SDK with PKCE OAuth 2.1 flow (window.signInWithVk). Do NOT route VK auth through firebase.auth().signInWithPopup() or signInWithRedirect().
+- The VK auth session is managed independently: user data is stored in localStorage (ssh_vk_user) and the app's currentUser object.
+- Only Google and GitHub use Firebase Auth (signInWithPopup/signInWithRedirect).
+- NEVER replace the VK SDK login flow with Firebase OIDC. The VK SDK flow is tested and working.
+
+## VK Button Visibility (Region-Based)
+- The VK sign-in button is shown/hidden dynamically based on user region and language.
+- Show VK button if: IP is from CIS countries (RU, BY, KZ, AM, AZ, KG, MD, TJ, TM, UZ) OR browser/system language is Russian.
+- Hide VK button for: Ukraine (UA) and all non-CIS countries with non-Russian language.
+- On Android: if installed from RuStore (ru.vk.store), always show VK button regardless of region.
+- The CIS country list is defined in CIS_COUNTRY_CODES constant. Ukraine is explicitly excluded.
