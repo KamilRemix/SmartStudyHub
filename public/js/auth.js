@@ -1262,7 +1262,8 @@ function initVKConfig() {
             app: VK_AUTH_CONFIG.appId,
             redirectUrl: redirectUri,
             codeVerifier: verifier,
-            scope: 'email'
+            scope: 'email',
+            mode: VKIDSDK.ConfigAuthMode ? VKIDSDK.ConfigAuthMode.Redirect : 'redirect'
         });
     } catch (e) {
         console.warn('[VK Auth] Config.init error:', e);
