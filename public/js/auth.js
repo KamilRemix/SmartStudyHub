@@ -1084,18 +1084,17 @@ async function exchangeVKCodeForToken(code, deviceId, codeVerifier, state) {
     const redirectUri = VK_AUTH_CONFIG.getRedirectUri();
     const verifier = codeVerifier || localStorage.getItem('vk_code_verifier') || getVKCookie('codeVerifier') || '';
     
-    const queryParams = new URLSearchParams({
+    const bodyParams = new URLSearchParams({
         grant_type: 'authorization_code',
+        client_id: String(VK_AUTH_CONFIG.appId),
         redirect_uri: redirectUri,
-        client_id: String(VK_AUTH_CONFIG.appId)
+        code: code
     });
-    if (deviceId) queryParams.set('device_id', deviceId);
-    if (verifier) queryParams.set('code_verifier', verifier);
-    if (state) queryParams.set('state', state);
+    if (deviceId) bodyParams.set('device_id', deviceId);
+    if (verifier) bodyParams.set('code_verifier', verifier);
+    if (state) bodyParams.set('state', state);
 
-    const bodyParams = new URLSearchParams({ code: code });
-
-    const response = await fetch(`https://id.vk.com/oauth2/auth?${queryParams.toString()}`, {
+    const response = await fetch('https://id.vk.com/oauth2/auth', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
