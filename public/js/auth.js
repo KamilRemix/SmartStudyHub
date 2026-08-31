@@ -1238,159 +1238,53 @@ async function establishVKSession(userId, email, accessToken, initialProfile) {
     showToast(`Добро пожаловать, ${displayName}!`, 'success', 3000);
 }
 
-// VK Sign-in Trigger — uses popup + postMessage to avoid page navigation
-// The popup handles the OAuth redirect and sends user data back via postMessage.
+// VK Sign-in Trigger — uses native VK ID FloatingOneTap (no popup windows)
 window.signInWithVk = function(button) {
     return runAuthAction(button, async () => {
-        const redirectUri = VK_AUTH_CONFIG.getRedirectUri();
-        const verifier = generateRandomString(64);
-        const challenge = await generateCodeChallenge(verifier);
-        const state = generateRandomString(32);
-
-        localStorage.setItem('vk_code_verifier', verifier);
-        localStorage.setItem('vk_auth_state', state);
-
-        const authUrl = `https://id.vk.com/authorize?client_id=${VK_AUTH_CONFIG.appId}&response_type=code&code_challenge=${encodeURIComponent(challenge)}&code_challenge_method=s256&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&scope=vkid.personal_info%20email`;
-
-        const width = 600;
-        const height = 650;
-        const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
-        const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
-
-        const popup = window.open(
-            authUrl,
-            'vk_oauth_popup',
-            `width=${width},height=${height},left=${left},top=${top},toolbar=0,scrollbars=1,status=1,resizable=1,location=1,menuBar=0`
-        );
-
-        // Fallback: if popup was blocked, use same-tab redirect
-        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-            window.location.href = authUrl;
+        if (typeof VKIDSDK === 'undefined') {
+            showToast('VK SDK не загружен. Проверьте интернет-соединение.', 'error', 3000);
             return;
         }
 
-        return new Promise((resolve) => {
-            // Listen for postMessage from the popup after it handles the VK callback
-            const onMessage = (event) => {
-                if (!event.data || event.data.type !== 'vk-auth-result') return;
-                window.removeEventListener('message', onMessage);
-                clearInterval(closedPoll);
+        VKIDSDK.Config.init({
+            app: VK_AUTH_CONFIG.appId,
+            redirectUrl: VK_AUTH_CONFIG.getRedirectUri()
+        });
 
-                const { vkUser, error } = event.data;
-                if (error) {
-                    showToast('Ошибка VK: ' + error, 'warning', 3000);
-                    return resolve();
+        // Use FloatingOneTap which renders a beautiful native VK modal in the SAME window
+        const floating = new VKIDSDK.FloatingOneTap();
+        
+        floating.render({
+            appName: 'SmartStudyHub',
+            showAlternativeLogin: 0,
+            displayMode: 'default'
+        })
+        .on(VKIDSDK.WidgetEvents.SUCCESS, async (payload) => {
+            try {
+                const uid = payload.user?.id || payload.user_id || payload.uuid || payload.id;
+                if (uid && payload.token) {
+                    await establishVKSession(uid, payload.user?.email, payload.token, payload.user);
+                } else {
+                    throw new Error("Неверный формат ответа от VK");
                 }
-                if (vkUser && vkUser.uid) {
-                    currentUser = vkUser;
-                    window.currentUser = vkUser;
-                    localStorage.setItem('ssh_vk_user', JSON.stringify(vkUser));
-                    updateAuthUI();
-                    updateTranslations();
-                    const gradeCalc = document.querySelector('grade-average-calculator');
-                    if (gradeCalc && typeof gradeCalc.loadFromDatabase === 'function') {
-                        gradeCalc.loadFromDatabase();
-                    }
-                    showToast(`Добро пожаловать, ${vkUser.displayName || 'пользователь VK'}!`, 'success', 3000);
-                }
-                resolve();
-            };
-            window.addEventListener('message', onMessage);
-
-            // Fallback if popup closes without sending a message
-            const closedPoll = setInterval(() => {
-                if (popup.closed) {
-                    clearInterval(closedPoll);
-                    window.removeEventListener('message', onMessage);
-                    resolve();
-                }
-            }, 500);
-
-            // Safety timeout
-            setTimeout(() => {
-                clearInterval(closedPoll);
-                window.removeEventListener('message', onMessage);
-                if (!popup.closed) { try { popup.close(); } catch(e) {} }
-                resolve();
-            }, 180000);
+            } catch (err) {
+                console.error('[VK Auth] Widget success handling error:', err);
+                showToast('Ошибка авторизации VK: ' + err.message, 'error', 3500);
+            }
+        })
+        .on(VKIDSDK.WidgetEvents.ERROR, (error) => {
+            console.warn('[VK Auth] Widget error:', error);
+            const errMsg = error?.detail || error?.message || '';
+            // Ignore user cancellation errors
+            if (!errMsg.includes('User cancel')) {
+                showToast('Ошибка авторизации VK' + (errMsg ? ': ' + errMsg : ''), 'warning', 3000);
+            }
         });
     });
 };
 
 async function initVKAuth() {
-    // If running inside a popup (window.opener exists), handle the VK callback here
-    // and send the result back to the parent via postMessage, then close.
-    const isInPopup = window.opener && !window.opener.closed;
-
-    // 1. Check for VK ID PKCE callback (?code=...) or error in URL
-    if (window.location.search && (
-        window.location.search.includes('code=') ||
-        window.location.search.includes('payload=') ||
-        window.location.search.includes('error=')
-    )) {
-        const searchParams = new URLSearchParams(window.location.search);
-        const code = searchParams.get('code');
-        const deviceId = searchParams.get('device_id');
-        const state = searchParams.get('state');
-        const payload = searchParams.get('payload');
-        const error = searchParams.get('error_description') || searchParams.get('error');
-
-        // Clean query string immediately
-        try { history.replaceState(null, '', window.location.pathname + window.location.hash); } catch (e) {}
-
-        if (error) {
-            if (isInPopup) {
-                window.opener.postMessage({ type: 'vk-auth-result', error }, '*');
-                window.close();
-            } else {
-                showToast('Ошибка VK ID: ' + error, 'warning', 3500);
-            }
-            return;
-        }
-
-        if (code) {
-            try {
-                const tokenData = await exchangeVKCodeForToken(code, deviceId, null, state);
-                if (tokenData && tokenData.user_id) {
-                    const vkUser = await buildVKUserObject(tokenData.user_id, tokenData.email, tokenData.access_token);
-                    if (isInPopup) {
-                        // Send result to parent window and close popup
-                        window.opener.postMessage({ type: 'vk-auth-result', vkUser }, '*');
-                        window.close();
-                    } else {
-                        // Direct page load (e.g. fallback redirect) — establish session normally
-                        await establishVKSession(tokenData.user_id, tokenData.email, tokenData.access_token);
-                    }
-                    return;
-                }
-            } catch (err) {
-                console.error('[VK Auth] Code exchange error:', err);
-                if (isInPopup) {
-                    window.opener.postMessage({ type: 'vk-auth-result', error: err.message }, '*');
-                    window.close();
-                } else {
-                    showToast('Ошибка авторизации VK: ' + err.message, 'error', 3500);
-                }
-            }
-        } else if (payload) {
-            try {
-                const parsed = JSON.parse(payload);
-                const uid = parsed.user?.id || parsed.user_id || parsed.uuid;
-                if (uid) {
-                    const vkUser = await buildVKUserObject(uid, parsed.user?.email, parsed.token, parsed.user);
-                    if (isInPopup) {
-                        window.opener.postMessage({ type: 'vk-auth-result', vkUser }, '*');
-                        window.close();
-                    } else {
-                        await establishVKSession(uid, parsed.user?.email, parsed.token, parsed.user);
-                    }
-                    return;
-                }
-            } catch (e) {}
-        }
-    }
-
-    // 2. Check for legacy VK OAuth hash (#access_token=...&user_id=...)
+    // Check for legacy VK OAuth hash (#access_token=...&user_id=...)
     if (window.location.hash && window.location.hash.includes('access_token') && window.location.hash.includes('user_id')) {
         const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
         const accessToken = params.get('access_token');
@@ -1398,21 +1292,12 @@ async function initVKAuth() {
         const email = params.get('email');
         if (userId) {
             try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) {}
-            if (isInPopup) {
-                const vkUser = await buildVKUserObject(userId, email, accessToken);
-                window.opener.postMessage({ type: 'vk-auth-result', vkUser }, '*');
-                window.close();
-            } else {
-                await establishVKSession(userId, email, accessToken);
-            }
+            await establishVKSession(userId, email, accessToken);
             return;
         }
     }
 
-    // 3. If in popup without a callback in URL — nothing to do (popup is navigating to VK)
-    if (isInPopup) return;
-
-    // 4. Restore VK session from localStorage if not already authenticated
+    // Restore VK session from localStorage if not already authenticated
     const savedVK = localStorage.getItem('ssh_vk_user');
     if (savedVK && (!firebaseAuth || !firebaseAuth.currentUser)) {
         try {
