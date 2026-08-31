@@ -6,7 +6,7 @@ const path = require('path');
 const { checkForUpdates, initCrashDetection, registerUpdateIPC } = require('./updater');
 
 // Auth page opened in system browser; after login it redirects to smartstudyhub://auth?token=...
-// Host electron-auth.html at this URL (e.g. Firebase Hosting: smartstudyhub-46d44.web.app/electron-auth.html)
+// Host electron-auth.html at this URL (e.g. Firebase Hosting: studio-9933447149-80d6a.web.app/electron-auth.html)
 const AUTH_PAGE_URL = 'https://studio-9933447149-80d6a.web.app/electron-auth.html';
 
 const PROTOCOL = 'smartstudyhub';

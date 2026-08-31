@@ -18,11 +18,11 @@ No CLIENT_ID or callback server is needed in the app.
 
 The app opens this URL when the user clicks “Sign in with Google”:
 
-- **Default:** `https://smartstudyhub-46d44.web.app/electron-auth.html`
+- **Default:** `https://studio-9933447149-80d6a.web.app/electron-auth.html`
 
 So you must **host the file `electron-auth.html`** (from this project) at that path.
 
-- **Firebase Hosting:** deploy `electron-auth.html` so it is served at `/electron-auth.html` on your project’s default hosting URL (e.g. `smartstudyhub-46d44.web.app`).
+- **Firebase Hosting:** deploy `electron-auth.html` so it is served at `/electron-auth.html` on your project’s default hosting URL (e.g. `studio-9933447149-80d6a.web.app`).
 - **Custom domain:** if you use another domain, change the URL in **main.js** (constant `AUTH_PAGE_URL`) to match, e.g. `https://yourdomain.com/electron-auth.html`, and host the same file there.
 
 ### Optional: change the auth URL

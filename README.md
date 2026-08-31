@@ -15,7 +15,7 @@
 
 <br>
 
-**[🌐 Open Web App](https://smartstudyhub-46d44.web.app)** · **[📥 Download for Windows](https://github.com/KamilRemix/SmartStudyHub/releases)** · **[🐛 Report Bug](https://github.com/KamilRemix/SmartStudyHub/issues)**
+**[🌐 Open Web App](https://studio-9933447149-80d6a.web.app)** · **[📥 Download for Windows](https://github.com/KamilRemix/SmartStudyHub/releases)** · **[🐛 Report Bug](https://github.com/KamilRemix/SmartStudyHub/issues)**
 
 <br>
 
@@ -111,7 +111,7 @@ Every screen, button, and placeholder is fully translated — including the AI a
 
 ### Option 1 — Use the Web App
 
-Simply open **[smartstudyhub-46d44.web.app](https://smartstudyhub-46d44.web.app)** in any modern browser. No installation required.
+Simply open **[studio-9933447149-80d6a.web.app](https://studio-9933447149-80d6a.web.app)** in any modern browser. No installation required.
 
 ### Option 2 — Download Desktop App (Windows)
 
