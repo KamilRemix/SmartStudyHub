@@ -464,17 +464,6 @@
             <h1 class="policy-title" id="policy-main-title">Политика конфиденциальности SmartStudyHub</h1>
             <p class="policy-meta" id="policy-meta-text">Дата вступления в силу: 31 августа 2026 г. | Версия: 1.0.0</p>
             
-            <div class="docs-links-bar">
-                <span style="font-size: 0.85rem; color: var(--text-muted);" id="gdocs-label">Документы Google Docs:</span>
-                <a href="https://docs.google.com/document/d/1rornyN6oievavIBGAbLWG-XJIAW9crFJbWVpMFpeS2s/edit?usp=sharing" target="_blank" rel="noopener noreferrer" class="gdocs-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                    <span>Русская версия (Google Docs)</span>
-                </a>
-                <a href="https://docs.google.com/document/d/1bcydNUsqagRmjIzQA9K_0I-XLIb7SEikLe1RVYtnc5I/edit?usp=sharing" target="_blank" rel="noopener noreferrer" class="gdocs-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                    <span>English Version (Google Docs)</span>
-                </a>
-            </div>
         </header>
 
         <!-- Russian Policy Content Container -->
@@ -843,7 +832,6 @@
             const badgeText = document.getElementById('policy-badge-text');
             const mainTitle = document.getElementById('policy-main-title');
             const metaText = document.getElementById('policy-meta-text');
-            const gdocsLabel = document.getElementById('gdocs-label');
             const backText = document.getElementById('nav-back-text');
 
             if (lang === 'en') {
@@ -857,7 +845,6 @@
                 badgeText.querySelector('span').textContent = 'Privacy & Data Security';
                 mainTitle.textContent = 'SmartStudyHub Privacy Policy';
                 metaText.textContent = 'Effective Date: August 31, 2026 | Version: 1.0.0';
-                gdocsLabel.textContent = 'Google Docs Documents:';
                 backText.textContent = 'Back to App';
             } else {
                 contentRu.style.display = 'block';
@@ -870,7 +857,6 @@
                 badgeText.querySelector('span').textContent = 'Конфиденциальность и безопасность данных';
                 mainTitle.textContent = 'Политика конфиденциальности SmartStudyHub';
                 metaText.textContent = 'Дата вступления в силу: 31 августа 2026 г. | Версия: 1.0.0';
-                gdocsLabel.textContent = 'Документы Google Docs:';
                 backText.textContent = 'В приложение';
             }
 

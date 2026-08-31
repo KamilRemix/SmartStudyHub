@@ -5,10 +5,9 @@
  * downloads the APK to the app cache, and opens the system PackageInstaller
  * via a Capacitor plugin (InAppUpdatePlugin) using FileProvider content:// URIs.
  * 
- * Security (Google Play Protect compliant):
- * - Uses REQUEST_INSTALL_PACKAGES permission declared in AndroidManifest
- * - All APK files opened via FileProvider content:// URIs (not file://)
- * - Standard Android PackageInstaller UI — user must manually confirm install
+ * Security (Store & Policy compliant):
+ * - Uses standard Android Intent & FileProvider content:// URIs
+ * - Standard Android PackageInstaller UI — user manually confirms install
  * - No silent/hidden code modifications or installations
  * - Files stored in app-private cache directory only
  */
