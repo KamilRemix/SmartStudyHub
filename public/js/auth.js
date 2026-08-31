@@ -118,6 +118,7 @@ async function finalizeSignIn(signInResult) {
     await handleSignedInUser(user, signInResult);
 }
 
+const VK_AUTH_ENABLED = false; // Temporarily disabled for everyone
 const CIS_COUNTRY_CODES = new Set(['RU', 'BY', 'KZ', 'AM', 'AZ', 'KG', 'MD', 'TJ', 'TM', 'UZ']);
 
 let cachedUserRegionProviders = null;
@@ -128,50 +129,52 @@ async function getAvailableAuthProviders() {
     const baseProviders = ['google.com', 'github.com'];
     let showVk = false;
 
-    let ipCountry = '';
-    try {
-        const res = await fetch('https://get.geojs.io/v1/ip/country.json');
-        const data = await res.json();
-        ipCountry = data.country;
-    } catch (e) {
-        console.warn('Failed to fetch IP country:', e);
-    }
-    const isCisIp = ipCountry ? CIS_COUNTRY_CODES.has(ipCountry.toUpperCase()) : false;
-
-    // 1. Android (APK)
-    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+    if (VK_AUTH_ENABLED) {
+        let ipCountry = '';
         try {
-            const AppChannel = window.Capacitor.Plugins?.AppChannel;
-            if (AppChannel) {
-                const deviceInfo = await AppChannel.getDeviceInfo();
-                if (deviceInfo.installer === 'ru.vk.store') {
-                    showVk = true;
-                } else {
-                    const simCountry = (deviceInfo.simCountry || '').toUpperCase();
-                    const isCisSim = simCountry ? CIS_COUNTRY_CODES.has(simCountry) : false;
-                    const isSystemRu = (deviceInfo.systemLanguage || '').toLowerCase().startsWith('ru');
-                    if (isCisSim || isCisIp || isSystemRu) {
+            const res = await fetch('https://get.geojs.io/v1/ip/country.json');
+            const data = await res.json();
+            ipCountry = data.country;
+        } catch (e) {
+            console.warn('Failed to fetch IP country:', e);
+        }
+        const isCisIp = ipCountry ? CIS_COUNTRY_CODES.has(ipCountry.toUpperCase()) : false;
+
+        // 1. Android (APK)
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            try {
+                const AppChannel = window.Capacitor.Plugins?.AppChannel;
+                if (AppChannel) {
+                    const deviceInfo = await AppChannel.getDeviceInfo();
+                    if (deviceInfo.installer === 'ru.vk.store') {
                         showVk = true;
+                    } else {
+                        const simCountry = (deviceInfo.simCountry || '').toUpperCase();
+                        const isCisSim = simCountry ? CIS_COUNTRY_CODES.has(simCountry) : false;
+                        const isSystemRu = (deviceInfo.systemLanguage || '').toLowerCase().startsWith('ru');
+                        if (isCisSim || isCisIp || isSystemRu) {
+                            showVk = true;
+                        }
                     }
+                } else {
+                    if (isCisIp || (navigator.language || '').toLowerCase().startsWith('ru')) showVk = true;
                 }
-            } else {
+            } catch (e) {
+                console.warn('Capacitor AppChannel error:', e);
                 if (isCisIp || (navigator.language || '').toLowerCase().startsWith('ru')) showVk = true;
             }
-        } catch (e) {
-            console.warn('Capacitor AppChannel error:', e);
-            if (isCisIp || (navigator.language || '').toLowerCase().startsWith('ru')) showVk = true;
+        } 
+        // 2. Web & 3. Windows (EXE)
+        else {
+            const isLangRu = (navigator.language || '').toLowerCase().startsWith('ru');
+            if (isCisIp || isLangRu) {
+                showVk = true;
+            }
         }
-    } 
-    // 2. Web & 3. Windows (EXE)
-    else {
-        const isLangRu = (navigator.language || '').toLowerCase().startsWith('ru');
-        if (isCisIp || isLangRu) {
-            showVk = true;
-        }
-    }
 
-    if (showVk) {
-        baseProviders.push('oidc.vk-id');
+        if (showVk) {
+            baseProviders.push('oidc.vk-id');
+        }
     }
 
     cachedUserRegionProviders = baseProviders;
