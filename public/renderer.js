@@ -834,6 +834,12 @@ class SettingsComponent extends HTMLElement {
                     <h3 style="font-size: 1.2rem; border: none; padding-bottom: 0.5rem;">Authentication</h3>
                     <div id="auth-content"></div>
                 </div>
+                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid color-mix(in srgb, var(--primary-accent) 15%, transparent); text-align: center;">
+                    <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style="color: var(--text-color-secondary); font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: color 0.2s ease;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        <span data-i18n="privacyPolicy">Политика конфиденциальности</span>
+                    </a>
+                </div>
             </div>
         `;
         this.setupTheme();

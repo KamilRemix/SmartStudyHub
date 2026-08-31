@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Политика конфиденциальности — SmartStudyHub</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(18, 24, 38, 0.85);
+            --card-border: rgba(99, 102, 241, 0.18);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-primary: #6366f1;
+            --accent-primary-hover: #4f46e5;
+            --accent-glow: rgba(99, 102, 241, 0.25);
+            --badge-bg: rgba(99, 102, 241, 0.12);
+            --badge-border: rgba(99, 102, 241, 0.28);
+            --success-color: #10b981;
+            --header-bg: rgba(11, 15, 25, 0.82);
+            --code-bg: rgba(0, 0, 0, 0.35);
+        }
+
+        body.light-theme {
+            --bg-color: #f8fafc;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --card-border: rgba(99, 102, 241, 0.2);
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --accent-primary: #4f46e5;
+            --accent-primary-hover: #4338ca;
+            --accent-glow: rgba(99, 102, 241, 0.15);
+            --badge-bg: rgba(99, 102, 241, 0.08);
+            --badge-border: rgba(99, 102, 241, 0.2);
+            --header-bg: rgba(248, 250, 252, 0.85);
+            --code-bg: rgba(241, 245, 249, 0.8);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.7;
+            font-size: 16px;
+            overflow-x: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .top-nav {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--header-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--card-border);
+            padding: 0.85rem 1.5rem;
+        }
+
+        .nav-container {
+            max-width: 960px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .brand-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--text-primary);
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 1.15rem;
+            transition: opacity 0.2s ease;
+        }
+
+        .brand-link:hover {
+            opacity: 0.85;
+        }
+
+        .brand-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .lang-switch {
+            display: flex;
+            background: var(--badge-bg);
+            border: 1px solid var(--badge-border);
+            border-radius: 20px;
+            padding: 3px;
+            gap: 2px;
+        }
+
+        .lang-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        .lang-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .lang-btn.active {
+            background: var(--accent-primary);
+            color: #ffffff;
+            box-shadow: 0 2px 8px var(--accent-glow);
+        }
+
+        .theme-toggle-btn {
+            background: var(--badge-bg);
+            border: 1px solid var(--badge-border);
+            color: var(--text-primary);
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .theme-toggle-btn:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-primary);
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--accent-primary);
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 0.88rem;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px var(--accent-glow);
+            transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        .back-btn:hover {
+            background: var(--accent-primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 14px var(--accent-glow);
+        }
+
+        .main-container {
+            max-width: 920px;
+            margin: 2.5rem auto 4rem;
+            padding: 0 1.5rem;
+        }
+
+        .policy-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            padding: 2.5rem 1.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .policy-header::before {
+            content: '';
+            position: absolute;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 240px;
+            height: 240px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .policy-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 14px;
+            background: var(--badge-bg);
+            border: 1px solid var(--badge-border);
+            border-radius: 20px;
+            color: var(--accent-primary);
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .policy-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.02em;
+        }
+
+        .policy-meta {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .docs-links-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid color-mix(in srgb, var(--card-border) 60%, transparent);
+        }
+
+        .gdocs-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 16px;
+            background: var(--code-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .gdocs-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            transform: translateY(-2px);
+        }
+
+        .policy-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            margin-bottom: 2rem;
+        }
+
+        .section-block {
+            margin-bottom: 2.5rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid color-mix(in srgb, var(--text-secondary) 15%, transparent);
+        }
+
+        .section-block:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .section-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            background: var(--accent-primary);
+            color: #ffffff;
+            font-size: 0.85rem;
+            font-weight: 700;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+
+        .sub-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--accent-primary);
+            margin: 1.25rem 0 0.5rem;
+        }
+
+        p {
+            margin-bottom: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        ul, ol {
+            margin: 0.5rem 0 1rem 1.4rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.45rem;
+        }
+
+        strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .highlight-box {
+            background: var(--badge-bg);
+            border-left: 4px solid var(--accent-primary);
+            padding: 1rem 1.25rem;
+            border-radius: 0 12px 12px 0;
+            margin: 1.25rem 0;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 1.25rem 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.92rem;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 10px 14px;
+            border: 1px solid var(--card-border);
+        }
+
+        th {
+            background: var(--badge-bg);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        td {
+            color: var(--text-secondary);
+        }
+
+        .page-footer {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.88rem;
+            padding: 2rem 1.5rem;
+            border-top: 1px solid var(--card-border);
+        }
+
+        .footer-links {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--accent-primary);
+        }
+
+        @media (max-width: 768px) {
+            .policy-card {
+                padding: 1.5rem;
+            }
+            .policy-title {
+                font-size: 1.65rem;
+            }
+            .nav-container {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav class="top-nav">
+        <div class="nav-container">
+            <a href="/" class="brand-link">
+                <img src="favicon.png" alt="SmartStudyHub Logo" class="brand-icon">
+                <span>SmartStudyHub</span>
+            </a>
+
+            <div class="nav-actions">
+                <!-- Language Switcher -->
+                <div class="lang-switch" role="group" aria-label="Select Language">
+                    <button type="button" class="lang-btn active" id="btn-lang-ru" onclick="switchLanguage('ru')">RU</button>
+                    <button type="button" class="lang-btn" id="btn-lang-en" onclick="switchLanguage('en')">EN</button>
+                </div>
+
+                <!-- Theme Toggle -->
+                <button type="button" class="theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle Theme" title="Сменить тему">
+                    <svg id="theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                    <svg id="theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                </button>
+
+                <!-- Return to App Button -->
+                <a href="/" class="back-btn" id="nav-back-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    <span id="nav-back-text">В приложение</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="main-container">
+        
+        <!-- Header Hero -->
+        <header class="policy-header">
+            <div class="policy-badge" id="policy-badge-text">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                <span>Конфиденциальность и безопасность данных</span>
+            </div>
+            <h1 class="policy-title" id="policy-main-title">Политика конфиденциальности SmartStudyHub</h1>
+            <p class="policy-meta" id="policy-meta-text">Дата вступления в силу: 31 августа 2026 г. | Версия: 1.0.0</p>
+            
+            <div class="docs-links-bar">
+                <span style="font-size: 0.85rem; color: var(--text-muted);" id="gdocs-label">Документы Google Docs:</span>
+                <a href="https://docs.google.com/document/d/1rornyN6oievavIBGAbLWG-XJIAW9crFJbWVpMFpeS2s/edit?usp=sharing" target="_blank" rel="noopener noreferrer" class="gdocs-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <span>Русская версия (Google Docs)</span>
+                </a>
+                <a href="https://docs.google.com/document/d/1bcydNUsqagRmjIzQA9K_0I-XLIb7SEikLe1RVYtnc5I/edit?usp=sharing" target="_blank" rel="noopener noreferrer" class="gdocs-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <span>English Version (Google Docs)</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- Russian Policy Content Container -->
+        <article class="policy-card" id="policy-content-ru">
+            
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">1</span>
+                    <span>Общие положения и область применения</span>
+                </h2>
+                <p>Настоящая Политика конфиденциальности определяет порядок сбора, обработки, хранения и защиты информации пользователей сервиса <strong>SmartStudyHub</strong> (далее — «Приложение», «Сервис», «мы»).</p>
+                <p>SmartStudyHub функционирует как мультиплатформенное решение: веб-версия (<a href="https://studio-9933447149-80d6a.web.app" style="color: var(--accent-primary);">https://studio-9933447149-80d6a.web.app</a>), мобильное приложение для Android и десктопное приложение для Windows.</p>
+                <div class="highlight-box">
+                    Мы придерживаемся принципа <strong>Local-First</strong> и минимализма при сборе данных: мы никогда не продаем, не передаем и не сдаем в аренду ваши персональные данные третьим лицам.
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">2</span>
+                    <span>Какие данные мы собираем и обрабатываем</span>
+                </h2>
+                <p>В зависимости от того, как вы используете SmartStudyHub, обрабатываются следующие категории данных:</p>
+                
+                <h3 class="sub-title">2.1. Данные учетной записи и авторизации</h3>
+                <ul>
+                    <li><strong>Регистрация по Email/Паролю:</strong> адрес электронной почты и зашифрованный пароль (пароли хешируются и хранятся исключительно в Firebase Authentication, разработчик не имеет к ним доступа).</li>
+                    <li><strong>Вход через Google и GitHub:</strong> общедоступные данные профиля — имя, адрес электронной почты, аватар и уникальный идентификатор пользователя (UID).</li>
+                    <li><strong>Вход через VK ID (для пользователей из РФ/СНГ):</strong> идентификатор VK, имя, фамилия и фото профиля через официальный VK ID SDK.</li>
+                    <li><strong>Использование без авторизации:</strong> вы можете пользоваться приложением анонимно — все данные будут сохраняться исключительно в памяти вашего браузера или устройства.</li>
+                </ul>
+
+                <h3 class="sub-title">2.2. Учебные и персональные данные</h3>
+                <ul>
+                    <li>Список предметов, оценки, даты получения оценок, коэффициенты/веса оценок, целевой балл и рассчитанный средний балл (GPA).</li>
+                    <li>Заметки, расписание занятий, списки учебных задач и история сессий таймера Pomodoro.</li>
+                    <li>Выбранные пользователем настройки: шкала оценивания (5-балльная, буквенная US), светлая/тёмная тема, язык интерфейса.</li>
+                </ul>
+
+                <h3 class="sub-title">2.3. ИИ-ассистент SmartStudyAI и Google Gemini</h3>
+                <ul>
+                    <li>Текстовые запросы и диалоги, отправляемые в ИИ-чат, передаются в защищенный API <strong>Google Gemini</strong> исключительно для генерации мгновенных ответов на учебные вопросы.</li>
+                    <li><strong>Интеграции Google Workspace (Gmail, Drive, Calendar, Tasks, YouTube):</strong> если вы явно подключаете эти сервисы в настройках, доступ к ним осуществляется строго в момент выполнения вашей команды в чате. Токены доступа сохраняются локально на вашем устройстве и не передаются третьим лицам.</li>
+                </ul>
+
+                <h3 class="sub-title">2.4. Технические и диагностические данные</h3>
+                <ul>
+                    <li>Обезличенные технические логи, сведения об операционной системе, типе устройства, разрешении экрана и кодах ошибок для устранения сбоев.</li>
+                    <li>Файлы cookie и локальное хранилище (LocalStorage, IndexedDB) — применяются для сохранения вашей сессии и работы приложения без интернета.</li>
+                </ul>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">3</span>
+                    <span>Цели сбора и обработки данных</span>
+                </h2>
+                <p>Мы используем данные исключительно для следующих законных целей:</p>
+                <ol>
+                    <li>Обеспечение корректной работы калькуляторов оценок, стратегий успеваемости и учебных инструментов.</li>
+                    <li>Синхронизация ваших учебных данных между браузером, телефоном и компьютером в реальном времени.</li>
+                    <li>Генерация полезных и точных академических ответов с помощью ИИ-ассистента.</li>
+                    <li>Обеспечение безопасности учетных записей, защита от несанкционированного доступа и спама.</li>
+                    <li>Сохранение пользовательских настроек (тема, язык, звуки уведомлений).</li>
+                </ol>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">4</span>
+                    <span>Хранение, синхронизация и безопасность</span>
+                </h2>
+                <p>Безопасность ваших данных обеспечивается многоуровневой защитой:</p>
+                <ul>
+                    <li><strong>Шифрование данных при передаче:</strong> весь обмен трафиком между вашим устройством, серверами хостинга и базой данных осуществляется по безопасному протоколу HTTPS / SSL / TLS с надежным шифрованием.</li>
+                    <li><strong>Правила безопасности базы данных (Security Rules):</strong> данные каждого пользователя изолированы в облаке Google Cloud / Firebase. Доступ к вашим оценкам имеет только авторизованный владелец аккаунта с соответствующим UID.</li>
+                    <li><strong>Локальное хранение:</strong> данные кэшируются на вашем устройстве, что обеспечивает мгновенную загрузку и конфиденциальность при оффлайн-работе.</li>
+                </ul>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">5</span>
+                    <span>Сторонние поставщики услуг (Third-Party Services)</span>
+                </h2>
+                <p>Для предоставления надежного функционала SmartStudyHub взаимодействует со следующими проверенными поставщиками:</p>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Сервис</th>
+                                <th>Компания</th>
+                                <th>Назначение</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Google Firebase</strong></td>
+                                <td>Google LLC</td>
+                                <td>Аутентификация, защищенный хостинг, облачные базы данных Realtime Database и Firestore.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Google Gemini AI</strong></td>
+                                <td>Google LLC / DeepMind</td>
+                                <td>Обработка запросов и генерация ответов умного учебного ассистента.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>GitHub Auth</strong></td>
+                                <td>GitHub Inc. (Microsoft)</td>
+                                <td>Опциональный вход через учетную запись разработчика.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>VK ID SDK</strong></td>
+                                <td>ООО «В Контакте»</td>
+                                <td>Опциональный вход для пользователей из РФ и стран СНГ.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">6</span>
+                    <span>Ваши права в отношении персональных данных (GDPR, 152-ФЗ, CCPA)</span>
+                </h2>
+                <p>Вы обладаете полным контролем над своими данными в SmartStudyHub:</p>
+                <ul>
+                    <li><strong>Право на доступ и экспорт:</strong> вы можете в любой момент просмотреть все свои данные в приложении или экспортировать их.</li>
+                    <li><strong>Право на исправление:</strong> вы можете редактировать любые оценки, профиль и настройки.</li>
+                    <li><strong>Право на удаление («Право на забвение»):</strong> вы можете очистить локальные данные в настройках браузера/приложения, либо отправить запрос на полное удаление учетной записи и всех связанных облачных записей.</li>
+                    <li><strong>Право на отзыв согласия:</strong> вы можете выйти из аккаунта или отключить привязанные провайдеры в Настройках.</li>
+                </ul>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">7</span>
+                    <span>Конфиденциальность несовершеннолетних</span>
+                </h2>
+                <p>Приложение SmartStudyHub разработано для помощи в учебе школьникам, студентам и преподавателям. Мы не осуществляем сбор конфиденциальной информации несовершеннолетних без согласия родителей или законных представителей и не используем данные детей в коммерческих или рекламных целях.</p>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">8</span>
+                    <span>Изменения в Политике конфиденциальности</span>
+                </h2>
+                <p>Мы можем периодически обновлять настоящую Политику конфиденциальности по мере расширения функций сервиса или изменения законодательства. Актуальная редакция всегда доступна по адресу: <a href="https://studio-9933447149-80d6a.web.app/privacy.html" style="color: var(--accent-primary);">https://studio-9933447149-80d6a.web.app/privacy.html</a>.</p>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">9</span>
+                    <span>Контакты и обратная связь</span>
+                </h2>
+                <p>Если у вас возникли вопросы, предложения или запросы касательно защиты ваших персональных данных, свяжитесь с нами:</p>
+                <ul>
+                    <li><strong>Разработчик:</strong> KamilRemix / SmartStudyHub Team</li>
+                    <li><strong>Репозиторий GitHub:</strong> <a href="https://github.com/KamilRemix/SmartStudyHub" target="_blank" rel="noopener noreferrer" style="color: var(--accent-primary);">github.com/KamilRemix/SmartStudyHub</a></li>
+                    <li><strong>Официальный сайт:</strong> <a href="https://studio-9933447149-80d6a.web.app" style="color: var(--accent-primary);">studio-9933447149-80d6a.web.app</a></li>
+                </ul>
+            </div>
+
+        </article>
+
+        <!-- English Policy Content Container -->
+        <article class="policy-card" id="policy-content-en" style="display: none;">
+            
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">1</span>
+                    <span>Overview and Scope</span>
+                </h2>
+                <p>This Privacy Policy outlines how <strong>SmartStudyHub</strong> ("Application", "Service", "we", "us", or "our") collects, uses, stores, and protects user information.</p>
+                <p>SmartStudyHub operates across multiple platforms: web (<a href="https://studio-9933447149-80d6a.web.app" style="color: var(--accent-primary);">https://studio-9933447149-80d6a.web.app</a>), Android mobile app, and Windows desktop application.</p>
+                <div class="highlight-box">
+                    We follow a strict <strong>Local-First</strong> and data minimization approach: we never sell, rent, or trade your personal data with third parties.
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">2</span>
+                    <span>Data We Collect and Process</span>
+                </h2>
+                <p>Depending on how you use SmartStudyHub, the following categories of data are processed:</p>
+                
+                <h3 class="sub-title">2.1. Account & Authentication Data</h3>
+                <ul>
+                    <li><strong>Email & Password Sign-In:</strong> Email address and hashed password (passwords are securely hashed and stored exclusively within Firebase Authentication; the developer has no access to raw passwords).</li>
+                    <li><strong>Google & GitHub Sign-In:</strong> Public profile information, including display name, email address, avatar URL, and a unique user identifier (UID).</li>
+                    <li><strong>VK ID Sign-In (for users in CIS regions):</strong> VK user ID, first and last name, and profile photo via the official VK ID SDK.</li>
+                    <li><strong>Guest / Unauthenticated Usage:</strong> You can use SmartStudyHub anonymously without signing in — all data is saved solely in your local browser or device storage.</li>
+                </ul>
+
+                <h3 class="sub-title">2.2. Academic & Personal Study Data</h3>
+                <ul>
+                    <li>Subject names, grades, dates, weight/coefficient values, target grades, and calculated Grade Point Average (GPA).</li>
+                    <li>Study notes, class schedules, to-do tasks, and Pomodoro focus timer history.</li>
+                    <li>User preferences: grading system (5-point RU, US Letter A-F), dark/light theme mode, and interface language.</li>
+                </ul>
+
+                <h3 class="sub-title">2.3. SmartStudyAI & Google Gemini Data</h3>
+                <ul>
+                    <li>Text queries and chat messages sent to the AI assistant are transmitted to the secure <strong>Google Gemini API</strong> solely to provide instant academic explanations and solutions.</li>
+                    <li><strong>Google Workspace Integrations (Gmail, Drive, Calendar, Tasks, YouTube):</strong> If you explicitly enable these features in settings, access is granted strictly in real time to carry out requested commands. Access tokens are stored locally on your device and are never shared with third parties.</li>
+                </ul>
+
+                <h3 class="sub-title">2.4. Technical & Diagnostic Data</h3>
+                <ul>
+                    <li>Anonymized technical logs, operating system information, device type, screen dimensions, and crash diagnostics to ensure service stability.</li>
+                    <li>Cookies and local browser storage (LocalStorage, IndexedDB) — used strictly to maintain your active session and enable offline functionality.</li>
+                </ul>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">3</span>
+                    <span>How We Use Your Data</span>
+                </h2>
+                <p>We process your data strictly for legitimate educational purposes:</p>
+                <ol>
+                    <li>Delivering accurate grade calculations, academic forecasting strategies, and productivity tools.</li>
+                    <li>Synchronizing your study records across browser, mobile, and desktop devices in real time.</li>
+                    <li>Providing responsive, high-quality AI tutoring and explanations via SmartStudyAI.</li>
+                    <li>Maintaining account security, preventing unauthorized access, and debugging application issues.</li>
+                    <li>Preserving customized preferences (themes, language settings, notification sounds).</li>
+                </ol>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">4</span>
+                    <span>Data Storage, Security, and Retention</span>
+                </h2>
+                <p>We implement robust industry-standard safeguards to protect your personal information:</p>
+                <ul>
+                    <li><strong>Encrypted Transmission:</strong> All data traffic between your client device, hosting servers, and cloud databases is encrypted via HTTPS / SSL / TLS.</li>
+                    <li><strong>Firebase Security Rules:</strong> User data is segregated in Google Cloud / Firebase databases. Access is enforced by strict server-side rules ensuring only the authenticated account owner (matching UID) can view or modify records.</li>
+                    <li><strong>Local-First Persistence:</strong> Data is cached locally on your device for instantaneous loading and offline privacy.</li>
+                </ul>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">5</span>
+                    <span>Third-Party Service Providers</span>
+                </h2>
+                <p>SmartStudyHub integrates with trusted third-party services to deliver reliable infrastructure:</p>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Service</th>
+                                <th>Provider</th>
+                                <th>Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Google Firebase</strong></td>
+                                <td>Google LLC</td>
+                                <td>Authentication, secure web hosting, Realtime Database, and Firestore cloud storage.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Google Gemini AI</strong></td>
+                                <td>Google LLC / DeepMind</td>
+                                <td>AI conversational reasoning and academic problem-solving.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>GitHub Auth</strong></td>
+                                <td>GitHub Inc. (Microsoft)</td>
+                                <td>Optional developer account authentication.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>VK ID SDK</strong></td>
+                                <td>VK LLC</td>
+                                <td>Optional social authentication for CIS users.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">6</span>
+                    <span>Your Privacy Rights (GDPR, CCPA, CPRA)</span>
+                </h2>
+                <p>You have full ownership and control over your personal data:</p>
+                <ul>
+                    <li><strong>Right to Access & Portability:</strong> You can view and export all your grades, notes, and study logs directly in the app.</li>
+                    <li><strong>Right to Rectification:</strong> You can modify or update any of your academic and profile data at any time.</li>
+                    <li><strong>Right to Erasure ("Right to be Forgotten"):</strong> You can reset all local storage from app settings or request complete deletion of your cloud account and stored records.</li>
+                    <li><strong>Right to Withdraw Consent:</strong> You can sign out, disconnect linked OAuth providers, or disable optional integrations at any time.</li>
+                </ul>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">7</span>
+                    <span>Children's Privacy</span>
+                </h2>
+                <p>SmartStudyHub is designed as a safe educational tool for students of all ages. We do not knowingly collect identifiable personal data from children without parental or guardian consent, nor do we engage in profiling or behavioral advertising.</p>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">8</span>
+                    <span>Updates to This Privacy Policy</span>
+                </h2>
+                <p>We may update this policy periodically to reflect new features or legal requirements. The most recent version will always be published at: <a href="https://studio-9933447149-80d6a.web.app/privacy.html" style="color: var(--accent-primary);">https://studio-9933447149-80d6a.web.app/privacy.html</a>.</p>
+            </div>
+
+            <div class="section-block">
+                <h2 class="section-title">
+                    <span class="section-title-num">9</span>
+                    <span>Contact Information</span>
+                </h2>
+                <p>If you have any questions, feedback, or privacy-related requests, please reach out to us:</p>
+                <ul>
+                    <li><strong>Developer:</strong> KamilRemix / SmartStudyHub Team</li>
+                    <li><strong>GitHub Repository:</strong> <a href="https://github.com/KamilRemix/SmartStudyHub" target="_blank" rel="noopener noreferrer" style="color: var(--accent-primary);">github.com/KamilRemix/SmartStudyHub</a></li>
+                    <li><strong>Official Web App:</strong> <a href="https://studio-9933447149-80d6a.web.app" style="color: var(--accent-primary);">studio-9933447149-80d6a.web.app</a></li>
+                </ul>
+            </div>
+
+        </article>
+
+    </main>
+
+    <!-- Page Footer -->
+    <footer class="page-footer">
+        <p>&copy; 2026 SmartStudyHub. Все права защищены. / All rights reserved.</p>
+        <div class="footer-links">
+            <a href="/">Главная / Home</a>
+            <span>&bull;</span>
+            <a href="https://github.com/KamilRemix/SmartStudyHub" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <span>&bull;</span>
+            <a href="https://studio-9933447149-80d6a.web.app/electron-auth.html">Auth Helper</a>
+        </div>
+    </footer>
+
+    <script>
+        function getInitialLanguage() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const paramLang = urlParams.get('lang');
+            if (paramLang && (paramLang === 'en' || paramLang === 'ru')) return paramLang;
+
+            const storedLang = localStorage.getItem('smartstudy_language') || localStorage.getItem('ssh_language');
+            if (storedLang && (storedLang === 'en' || storedLang === 'ru')) return storedLang;
+
+            const browserLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+            if (browserLang.startsWith('ru') || browserLang.startsWith('be') || browserLang.startsWith('kk') || browserLang.startsWith('uk')) {
+                return 'ru';
+            }
+            return 'en';
+        }
+
+        function switchLanguage(lang) {
+            const contentRu = document.getElementById('policy-content-ru');
+            const contentEn = document.getElementById('policy-content-en');
+            const btnRu = document.getElementById('btn-lang-ru');
+            const btnEn = document.getElementById('btn-lang-en');
+            const badgeText = document.getElementById('policy-badge-text');
+            const mainTitle = document.getElementById('policy-main-title');
+            const metaText = document.getElementById('policy-meta-text');
+            const gdocsLabel = document.getElementById('gdocs-label');
+            const backText = document.getElementById('nav-back-text');
+
+            if (lang === 'en') {
+                contentRu.style.display = 'none';
+                contentEn.style.display = 'block';
+                btnRu.classList.remove('active');
+                btnEn.classList.add('active');
+                document.documentElement.lang = 'en';
+                document.title = 'Privacy Policy — SmartStudyHub';
+                
+                badgeText.querySelector('span').textContent = 'Privacy & Data Security';
+                mainTitle.textContent = 'SmartStudyHub Privacy Policy';
+                metaText.textContent = 'Effective Date: August 31, 2026 | Version: 1.0.0';
+                gdocsLabel.textContent = 'Google Docs Documents:';
+                backText.textContent = 'Back to App';
+            } else {
+                contentRu.style.display = 'block';
+                contentEn.style.display = 'none';
+                btnRu.classList.add('active');
+                btnEn.classList.remove('active');
+                document.documentElement.lang = 'ru';
+                document.title = 'Политика конфиденциальности — SmartStudyHub';
+
+                badgeText.querySelector('span').textContent = 'Конфиденциальность и безопасность данных';
+                mainTitle.textContent = 'Политика конфиденциальности SmartStudyHub';
+                metaText.textContent = 'Дата вступления в силу: 31 августа 2026 г. | Версия: 1.0.0';
+                gdocsLabel.textContent = 'Документы Google Docs:';
+                backText.textContent = 'В приложение';
+            }
+
+            try {
+                localStorage.setItem('smartstudy_language', lang);
+            } catch (e) {}
+        }
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('smartstudy_theme');
+            const isLight = savedTheme === 'light';
+            if (isLight) {
+                document.body.classList.add('light-theme');
+                document.getElementById('theme-icon-sun').style.display = 'block';
+                document.getElementById('theme-icon-moon').style.display = 'none';
+            } else {
+                document.body.classList.remove('light-theme');
+                document.getElementById('theme-icon-sun').style.display = 'none';
+                document.getElementById('theme-icon-moon').style.display = 'block';
+            }
+        }
+
+        function toggleTheme() {
+            const isLight = document.body.classList.toggle('light-theme');
+            document.getElementById('theme-icon-sun').style.display = isLight ? 'block' : 'none';
+            document.getElementById('theme-icon-moon').style.display = isLight ? 'none' : 'block';
+            try {
+                localStorage.setItem('smartstudy_theme', isLight ? 'light' : 'dark');
+            } catch (e) {}
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            const initialLang = getInitialLanguage();
+            switchLanguage(initialLang);
+        });
+    </script>
+</body>
+</html>

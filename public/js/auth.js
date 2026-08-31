@@ -962,6 +962,12 @@ function renderAuthFormHtml(availableProviders, currentTab = 'signin') {
             <div class="auth-social-stack">
                 ${socialButtonsHtml}
             </div>` : ''}
+
+            <!-- Privacy Policy Notice -->
+            <div class="auth-privacy-notice" style="margin-top: 1.1rem; text-align: center; font-size: 0.78rem; color: var(--text-color-secondary); line-height: 1.45;">
+                <span>${escapeHtml(t('privacyNotice') || 'Входя или регистрируясь, вы соглашаетесь с')}</span>
+                <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style="color: var(--primary-accent); text-decoration: underline; font-weight: 500; margin-left: 3px;">${escapeHtml(t('privacyPolicy') || 'Политикой конфиденциальности')}</a>
+            </div>
         </div>
     `;
 }
