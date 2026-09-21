@@ -10,11 +10,12 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import { useTheme } from '../../theme';
+import { GoogleLogoIcon } from '../../components/common';
 import {
   loginWithEmail,
   resetPassword,
@@ -22,7 +23,6 @@ import {
   signInWithGooglePopup,
   signInWithGithubCredential,
   signInWithGithubPopup,
-  loginAsGuest,
 } from '../../services/auth';
 import { cloudSyncService } from '../../services/cloudSync';
 
@@ -39,13 +39,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<'google' | 'github' | 'guest' | null>(null);
+  const [socialLoading, setSocialLoading] = useState<'google' | 'github' | null>(null);
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
+  // Google OAuth Configuration
+  // Web: Uses Firebase signInWithGooglePopup() directly for seamless browser authentication.
+  // Mobile / Standalone APK: Uses useIdTokenAuthRequest with redirect scheme 'smartstudyhub'.
+  //
+  // NOTE on Expo Go:
+  // In Expo Go, Google blocks authorization with "Доступ заблокирован: ошибка авторизации"
+  // (Error 400: redirect_uri_mismatch or disallowed_useragent) because Expo Go runs inside
+  // package 'host.exp.exponent' and uses redirect schemes that Google blocks for Web Client IDs.
+  // The registered SHA-1 fingerprint belongs to package 'com.smartstudyhub.mobile' for the standalone APK.
+  // Standalone builds (APK via EAS Build / expo run:android) properly match package name and SHA-1.
   const [googleRequest, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
     clientId: '121615915195-kddc512lnra4b2eo2qjnnbuc0sb0pcbh.apps.googleusercontent.com',
     webClientId: '121615915195-kddc512lnra4b2eo2qjnnbuc0sb0pcbh.apps.googleusercontent.com',
+    androidClientId: '121615915195-kddc512lnra4b2eo2qjnnbuc0sb0pcbh.apps.googleusercontent.com',
+    iosClientId: '121615915195-kddc512lnra4b2eo2qjnnbuc0sb0pcbh.apps.googleusercontent.com',
     scopes: ['profile', 'email'],
     redirectUri: makeRedirectUri({ scheme: 'smartstudyhub' }),
   });
@@ -115,7 +127,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
         }
       } catch (e: any) {
         console.warn('[LoginScreen] Google popup error:', e);
-        if (e?.code !== 'auth/popup-closed-by-user') {
+        if (e?.code === 'auth/popup-blocked') {
+          setError('Всплывающее окно заблокировано браузером. Разрешите всплывающие окна');
+        } else if (e?.code === 'auth/account-exists-with-different-credential') {
+          setError('Аккаунт с таким email уже существует через другой способ входа');
+        } else if (e?.code !== 'auth/popup-closed-by-user' && e?.code !== 'auth/cancelled-popup-request') {
           setError('Ошибка входа через Google. Попробуйте снова');
         }
       } finally {
@@ -128,7 +144,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
       const res = await promptGoogleAsync({
         showInRecents: false,
       });
-      if (res.type !== 'success') {
+      if (res?.type !== 'success') {
         setSocialLoading(null);
       }
     } catch (e: any) {
@@ -149,7 +165,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
         }
       } catch (e: any) {
         console.warn('[LoginScreen] GitHub popup error:', e);
-        if (e?.code !== 'auth/popup-closed-by-user') {
+        if (e?.code === 'auth/popup-blocked') {
+          setError('Всплывающее окно заблокировано браузером. Разрешите всплывающие окна');
+        } else if (e?.code === 'auth/account-exists-with-different-credential') {
+          setError('Аккаунт с таким email уже существует через другой способ входа');
+        } else if (e?.code !== 'auth/popup-closed-by-user' && e?.code !== 'auth/cancelled-popup-request') {
           setError('Ошибка входа через GitHub. Попробуйте снова');
         }
       } finally {
@@ -173,6 +193,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
 
       if (result.type === 'success' && result.url) {
         const parsedUrl = new URL(result.url);
+        const errorParam = parsedUrl.searchParams.get('error');
+        if (errorParam) {
+          if (errorParam !== 'access_denied') {
+            setError('Ошибка авторизации через GitHub');
+          }
+          return;
+        }
+
         const accessToken = parsedUrl.searchParams.get('access_token');
         if (accessToken) {
           const cred = await signInWithGithubCredential(accessToken);
@@ -181,13 +209,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
           }
           return;
         }
+
         const authCode = parsedUrl.searchParams.get('code');
         if (authCode) {
-          const cred = await loginAsGuest();
-          if (cred && 'user' in cred && cred.user?.uid) {
-            await cloudSyncService.syncAll(cred.user.uid);
-          }
-          return;
+          console.log('[LoginScreen] GitHub auth code received');
         }
       } else if (result.type === 'cancel' || result.type === 'dismiss') {
         // Closed by user
@@ -200,18 +225,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
     }
   };
 
-  const handleGuestSignIn = async () => {
-    setError('');
-    setSocialLoading('guest');
-    try {
-      await loginAsGuest();
-    } catch (e: any) {
-      console.warn('[LoginScreen] Guest sign-in error:', e);
-      setError('Ошибка входа в гостевой режим');
-    } finally {
-      setSocialLoading(null);
-    }
-  };
 
   const handleResetPassword = async () => {
     if (!email.trim()) {
@@ -258,7 +271,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
             ) : (
               <>
                 <View style={styles.socialIconWrap}>
-                  <FontAwesome name="google" size={18} color="#EA4335" />
+                  <GoogleLogoIcon size={20} />
                 </View>
                 <Text style={[styles.socialBtnText, { color: '#3c4043' }]}>
                   Войти через Google
@@ -282,30 +295,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
                 </View>
                 <Text style={[styles.socialBtnText, { color: '#ffffff' }]}>
                   Войти через GitHub
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.socialBtn,
-              styles.guestBtn,
-              { backgroundColor: colors.componentBackground, borderColor: colors.borderColor },
-            ]}
-            onPress={handleGuestSignIn}
-            disabled={socialLoading !== null}
-            activeOpacity={0.8}
-          >
-            {socialLoading === 'guest' ? (
-              <ActivityIndicator color={colors.primaryAccent} />
-            ) : (
-              <>
-                <View style={styles.socialIconWrap}>
-                  <Feather name="user" size={18} color={colors.primaryAccent} />
-                </View>
-                <Text style={[styles.socialBtnText, { color: colors.textColor }]}>
-                  Войти как гость (Демо-режим)
                 </Text>
               </>
             )}
@@ -418,9 +407,6 @@ const styles = StyleSheet.create({
   },
   githubBtn: {
     backgroundColor: '#24292e',
-  },
-  guestBtn: {
-    borderWidth: 1,
   },
   socialIconWrap: {
     width: 24,

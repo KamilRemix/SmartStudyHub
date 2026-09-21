@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,16 +7,149 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
+  Animated,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../theme';
 import { AppHeader } from '../../components/common/AppHeader';
 import { useAuth } from '../../context/AuthContext';
 import { logout } from '../../services/auth';
 import { AuthNavigator } from '../auth/AuthNavigator';
 import { useI18n, SupportedLanguage } from '../../i18n';
-import { cloudSyncService, SyncStatus } from '../../services/cloudSync';
+
+// ─── Connectivity Hook ─────────────────────────────────────────────────────────
+function useIsOnline(): { isOnline: boolean; checking: boolean; recheck: () => void } {
+  const [isOnline, setIsOnline] = useState(true);
+  const [checking, setChecking] = useState(false);
+
+  const check = useCallback(async () => {
+    setChecking(true);
+    try {
+      const ctrl = new AbortController();
+      const id = setTimeout(() => ctrl.abort(), 4000);
+      await fetch('https://www.google.com/generate_204', { method: 'HEAD', signal: ctrl.signal });
+      clearTimeout(id);
+      setIsOnline(true);
+    } catch {
+      setIsOnline(false);
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    check();
+    const interval = setInterval(check, 30000);
+    return () => clearInterval(interval);
+  }, [check]);
+
+  return { isOnline, checking, recheck: check };
+}
+
+// ─── NetworkStatusCard ─────────────────────────────────────────────────────────
+const NetworkStatusCard: React.FC<{ colors: any; t: (key: string) => string }> = ({ colors, t }) => {
+  const { isOnline, checking, recheck } = useIsOnline();
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (checking) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 0.5, duration: 600, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.stopAnimation();
+      pulseAnim.setValue(1);
+    }
+  }, [checking, pulseAnim]);
+
+  const dotColor = checking ? colors.warning : isOnline ? colors.success : colors.error;
+  const iconName: 'wifi' | 'wifi-off' = isOnline ? 'wifi' : 'wifi-off';
+  const statusTitle = checking
+    ? (t('networkChecking') || 'Checking connection...')
+    : isOnline
+    ? (t('networkOnline') || 'Connected to Internet')
+    : (t('networkOffline') || 'No Internet connection');
+  const statusSub = isOnline
+    ? (t('networkOnlineDesc') || 'All features available')
+    : (t('networkOfflineDesc') || 'Cloud sync, online translation and currency rates require internet');
+
+  const featuresNeedingNet = [
+    t('networkFeatureSync') || 'Cloud data sync',
+    t('networkFeatureTranslate') || 'Online translation',
+    t('networkFeatureCurrency') || 'Currency rates',
+    t('networkFeatureAuth') || 'Social sign-in',
+  ];
+
+  return (
+    <>
+      <View style={networkStyles.sectionHeader}>
+        <Text style={[networkStyles.sectionTitle, { color: colors.textColorSecondary }]}>
+          {t('networkSection') || 'Connection'}
+        </Text>
+      </View>
+
+      <View style={[networkStyles.card, { backgroundColor: colors.componentBackground, borderColor: colors.borderColor }]}>
+        {/* Status Row */}
+        <View style={[networkStyles.row, networkStyles.borderBottom, { borderBottomColor: colors.borderColor }]}>
+          <View style={networkStyles.rowLeft}>
+            <View style={[networkStyles.iconWrap, { backgroundColor: dotColor + '18' }]}>
+              <Feather name={iconName} size={20} color={dotColor} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[networkStyles.itemTitle, { color: colors.textColor }]}>{statusTitle}</Text>
+              <Text style={[networkStyles.itemSubtitle, { color: colors.textColorSecondary }]} numberOfLines={2}>
+                {statusSub}
+              </Text>
+            </View>
+          </View>
+
+          {/* Animated status dot + recheck */}
+          <TouchableOpacity onPress={recheck} activeOpacity={0.7} style={networkStyles.dotWrap}>
+            <Animated.View style={[networkStyles.dot, { backgroundColor: dotColor, opacity: pulseAnim }]} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Internet-required features */}
+        {!isOnline && (
+          <View style={networkStyles.featuresRow}>
+            <Text style={[networkStyles.featuresLabel, { color: colors.textColorSecondary }]}>
+              {t('networkRequiresInternet') || 'Requires internet:'}
+            </Text>
+            {featuresNeedingNet.map((feat, i) => (
+              <View key={i} style={networkStyles.featItem}>
+                <Feather name="alert-circle" size={13} color={colors.warning} />
+                <Text style={[networkStyles.featText, { color: colors.textColorSecondary }]}>{feat}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </>
+  );
+};
+
+const networkStyles = StyleSheet.create({
+  sectionHeader: { paddingHorizontal: 4, paddingTop: 20, paddingBottom: 6 },
+  sectionTitle: { fontSize: 12, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.8, textTransform: 'uppercase' },
+  card: { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 4 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
+  borderBottom: { borderBottomWidth: StyleSheet.hairlineWidth },
+  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  iconWrap: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  itemTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  itemSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2, lineHeight: 16 },
+  dotWrap: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  dot: { width: 12, height: 12, borderRadius: 6 },
+  featuresRow: { paddingHorizontal: 16, paddingBottom: 14 },
+  featuresLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  featItem: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  featText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+});
+
+
 
 export const SettingsScreen: React.FC = () => {
   const { colors, theme, toggleTheme } = useTheme();
@@ -24,22 +157,6 @@ export const SettingsScreen: React.FC = () => {
   const { language, setLanguage, t, supportedLanguages } = useI18n();
   const [showAuth, setShowAuth] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
-    lastSyncedAt: null,
-    isSyncing: false,
-    error: null,
-  });
-
-  useEffect(() => {
-    const unsub = cloudSyncService.subscribe(setSyncStatus);
-    return unsub;
-  }, []);
-
-  const handleManualSync = async () => {
-    if (user?.uid) {
-      await cloudSyncService.syncAll(user.uid);
-    }
-  };
   const [langModalVisible, setLangModalVisible] = useState(false);
 
   const handleSelectLanguage = async (code: string) => {
@@ -232,103 +349,8 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Section: Cloud Sync Status */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.textColorSecondary }]}>
-            {t('cloudSyncSection')}
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: colors.componentBackground,
-              borderColor: colors.borderColor,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.row,
-              styles.borderBottom,
-              { borderBottomColor: colors.borderColor },
-            ]}
-          >
-            <View style={styles.rowLeft}>
-              <Feather name="cloud" size={20} color={colors.primaryAccent} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.itemTitle, { color: colors.textColor }]}>
-                  {t('syncStatus')}
-                </Text>
-                <Text style={[styles.itemSubtitle, { color: colors.textColorSecondary }]}>
-                  {syncStatus.isSyncing
-                    ? t('syncingProgress')
-                    : isAuthenticated && !isGuestUser
-                    ? syncStatus.lastSyncedAt
-                      ? t('syncedWithTime', { time: new Date(syncStatus.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })
-                      : t('connectedToCloud')
-                    : isGuestUser
-                    ? t('guestLocal')
-                    : t('loginRequired')}
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={handleManualSync}
-              disabled={syncStatus.isSyncing || !isAuthenticated || isGuestUser}
-              activeOpacity={0.7}
-              style={[
-                styles.badge,
-                {
-                  backgroundColor:
-                    syncStatus.isSyncing
-                      ? colors.warning + '20'
-                      : isAuthenticated && !isGuestUser
-                      ? colors.success + '20'
-                      : colors.textColorSecondary + '20',
-                },
-              ]}
-            >
-              {syncStatus.isSyncing ? (
-                <ActivityIndicator size="small" color={colors.warning} />
-              ) : (
-                <Text
-                  style={[
-                    styles.badgeText,
-                    {
-                      color:
-                        isAuthenticated && !isGuestUser
-                          ? colors.success
-                          : colors.textColorSecondary,
-                    },
-                  ]}
-                >
-                  {isAuthenticated && !isGuestUser ? t('syncNow') : t('localMode')}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <Feather name="database" size={18} color={colors.textColorSecondary} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.itemTitle, { color: colors.textColor }]}>
-                  {t('cloudProject')}
-                </Text>
-                <Text style={[styles.itemSubtitle, { color: colors.textColorSecondary }]}>
-                  studio-9933447149-80d6a
-                </Text>
-              </View>
-            </View>
-            <Feather
-              name={isAuthenticated && !isGuestUser ? 'check-circle' : 'circle'}
-              size={16}
-              color={isAuthenticated && !isGuestUser ? colors.success : colors.textColorSecondary}
-            />
-          </View>
-        </View>
+        {/* Section: Connection */}
+        <NetworkStatusCard colors={colors} t={t} />
 
         {/* Section: Application Info */}
         <View style={styles.sectionHeader}>

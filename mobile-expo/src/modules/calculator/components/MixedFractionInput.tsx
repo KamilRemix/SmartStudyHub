@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { MixedFraction } from '../types';
 
 export interface MixedFractionInputProps {
@@ -15,6 +16,7 @@ export const MixedFractionInput: React.FC<MixedFractionInputProps> = ({
   onChange,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   const handleWholeChange = (text: string) => {
     const clean = text.replace(/[^0-9-]/g, '');
@@ -58,7 +60,9 @@ export const MixedFractionInput: React.FC<MixedFractionInputProps> = ({
       <View style={styles.inputsRow}>
         {/* Whole Part */}
         <View style={styles.wholeContainer}>
-          <Text style={[styles.fieldLabel, { color: colors.textColorSecondary }]}>Целая</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textColorSecondary }]}>
+            {t('wholePart') || 'Целая'}
+          </Text>
           <TextInput
             style={[
               styles.input,
@@ -79,7 +83,9 @@ export const MixedFractionInput: React.FC<MixedFractionInputProps> = ({
 
         {/* Fraction Part: Numerator / Denominator */}
         <View style={styles.fractionColumn}>
-          <Text style={[styles.fieldLabel, { color: colors.textColorSecondary }]}>Числитель</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textColorSecondary }]}>
+            {t('numerator') || 'Числитель'}
+          </Text>
           <TextInput
             style={[
               styles.input,
@@ -99,7 +105,9 @@ export const MixedFractionInput: React.FC<MixedFractionInputProps> = ({
 
           <View style={[styles.fractionBar, { backgroundColor: colors.textColorSecondary }]} />
 
-          <Text style={[styles.fieldLabel, { color: colors.textColorSecondary }]}>Знаменатель</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textColorSecondary }]}>
+            {t('denominator') || 'Знаменатель'}
+          </Text>
           <TextInput
             style={[
               styles.input,
@@ -111,7 +119,7 @@ export const MixedFractionInput: React.FC<MixedFractionInputProps> = ({
               },
             ]}
             keyboardType="number-pad"
-            value={fraction.denominator === 1 && fraction.numerator === 0 ? '' : fraction.denominator.toString()}
+            value={fraction.denominator === 1 && fraction.numerator === 0 && fraction.whole === 0 ? '' : fraction.denominator.toString()}
             placeholder="1"
             placeholderTextColor={colors.textColorSecondary}
             onChangeText={handleDenChange}
@@ -153,23 +161,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 18,
+    fontSize: 20,
     textAlign: 'center',
+    textAlignVertical: 'center',
+    paddingVertical: 0,
+    paddingHorizontal: 4,
   },
   wholeInput: {
-    width: 68,
-    height: 54,
+    width: 84,
+    height: 62,
   },
   fractionColumn: {
     alignItems: 'center',
-    width: 90,
+    width: 104,
   },
   numDenInput: {
-    width: 80,
-    height: 40,
+    width: 96,
+    height: 46,
+    fontSize: 18,
   },
   fractionBar: {
-    width: 80,
+    width: 96,
     height: 2,
     marginVertical: 4,
     borderRadius: 1,

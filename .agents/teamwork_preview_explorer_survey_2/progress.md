@@ -1,16 +1,23 @@
-# Progress — Survey Explorer 2 (Localization & Cloud Sync)
+# Progress — Survey Explorer 2 (Auth, Logo, Settings & Network Requirement)
 
-Last visited: 2026-09-14T11:55:00Z
+Last visited: 2026-09-21T13:25:50Z
 
 ## Current Status
-Completed comprehensive investigation of:
-1. `public/translations.js` (analyzed 234 keys across all 11 languages, verified 0 emojis, found missing keys in non-RU/EN languages).
-2. `mobile-expo` i18n localization (currently absent, all hardcoded Russian, designed full porting plan to `mobile-expo/src/i18n/`).
-3. `GradeAverageScreen.tsx` & `ThresholdsModal.tsx` & `gradeMath.ts` (found GPA hardcoded bugs in `getFinalGrade`, inconsistency in `INITIAL_GRADES_DATA`, designed custom thresholds editor, AsyncStorage persistence, and cloud sync).
-4. Firebase Realtime Database setup in `mobile-expo` (analyzed `public/renderer.js`, `public/notes.js`, `public/genpass.js`, and `mobile-expo/src/services/firebase.ts`, designed 5-domain two-way sync schema, auto-sync triggers on login & reconnect, capped calculator history).
+Started investigation for 2026-09-21 mission:
+1. **R2 - Google Logo & Auth**:
+   - SVG support check (`react-native-svg` in `mobile-expo/package.json`)
+   - Authentic official Google 4-color 'G' SVG design (`#4285F4`, `#34A853`, `#FBBC05`, `#EA4335`)
+   - Removal of "Войти как гость (Демо-режим)" and audit of Guest Mode in `LoginScreen.tsx` and `AuthContext.tsx`
+   - Investigation of Google OAuth redirect configuration (`src/services/firebase.ts`, `src/context/AuthContext.tsx`, `app.json`, scheme) preventing "Доступ заблокирован: ошибка авторизации"
+   - Investigation of GitHub auth flow on mobile
+2. **R4 - Settings Cloud Sync & Internet Requirement UI**:
+   - Removal of technical "Cloud Sync / studio-9933447149-80d6a / sync status" card in `SettingsScreen.tsx`
+   - Network detection inspection (`src/services/network.ts` / NetInfo)
+   - Mapping features requiring internet connectivity
+   - Sleek native-styled Internet Requirement modal / toast with retry (STRICTLY NO EMOJIS, Feather icons only)
 
 Next steps:
-- Write `survey_i18n_sync.md` with complete architectural documentation.
-- Write `handoff.md` following 5-Component protocol.
-- Update `BRIEFING.md`.
-- Send report message to caller agent ("parent").
+- Inspect all relevant files in `mobile-expo`.
+- Synthesize findings into handoff report.
+- Update BRIEFING.md.
+- Send completion message to parent.

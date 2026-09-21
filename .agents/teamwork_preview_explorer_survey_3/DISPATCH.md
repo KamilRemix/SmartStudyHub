@@ -1,45 +1,29 @@
-# Survey Explorer 3 Dispatch: GenPass, Notes, Network & UI Polish Survey
+# Task Assignment: Survey Explorer 3 (Fraction Calculator Polish & Android Signing Verification)
 
-## Working Directory
-`c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_3`
+## Objective
+Investigate Requirements R3 and R5 by reading `c:\projects\SmartStudyHub\.agents\ORIGINAL_REQUEST.md` (header `## 2026-09-21T13:21:19Z`) and examining `c:\projects\SmartStudyHub\mobile-expo`:
+1. **R3 - Fraction Calculator**:
+   - Inspect `FractionCalculatorScreen.tsx` and `MixedFractionInput.tsx` (and any related components in `src/modules/calculator/`).
+   - Identify the hardcoded initial state / prefilled digits (`1 1/2` and `2 1/3`). Verify how it can start clean and empty with subtle placeholders.
+   - Inspect the dimensions, vertical padding, font sizes, text alignments, and layout of `MixedFractionInput` to understand why digits get cut off or clipped. Propose exact responsive styling adjustments.
+   - Audit labels in fraction calculator ("Целая", "Числитель", "Знаменатель", "Первая дробь", "Вторая дробь", "Вычислить", etc.) and determine how to fully localize them in `src/i18n/`.
+2. **R5 - Android Signing & Keystore Verification**:
+   - Verify Android package name is strictly `com.smartstudyhub.mobile` in `app.json`.
+   - Inspect `eas.json`, any credentials files, git history or local keystores/signing configs. Confirm that no keystores or release keys were deleted or compromised.
+   - Verify EAS cloud credentials configuration and readiness for release builds.
 
-## Identity
-Role: Features & UI Explorer
-Archetype: teamwork_preview_explorer
+Write your findings to `c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_3\handoff.md`.
 
-## Task & Scope
+## 2026-09-21T13:24:55Z
+You are Survey Explorer 3.
+Your working directory is: c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_3
+Read your instructions in: c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_3\DISPATCH.md
+Read the original user request at: c:\projects\SmartStudyHub\.agents\ORIGINAL_REQUEST.md (specifically header ## 2026-09-21T13:21:19Z).
+
+Your mission is to investigate R3 (Fraction Calculator Polish: remove prefilled 1 1/2 and 2 1/3 digits, start empty with subtle placeholders, redesign MixedFractionInput layout/dimensions/padding so digits are never cut off, localize labels) and R5 (Android Signing & Keystore Verification: verify com.smartstudyhub.mobile, eas.json, credentials, release keys safety).
 Inspect `c:\projects\SmartStudyHub\mobile-expo`:
-1. Check `GenPassModal.tsx` / GenPass screen:
-   - Current slider component: why it jumps or how to make it smoothly select any integer length from 4 to 64.
-   - Leak check: implementation of HaveIBeenPwned API (k-anonymity SHA-1 range query: prefix first 5 chars, hash remainder lookup).
-   - Password Vault ("Мои пароли"): data schema (service, login, password, bookmarks/favorite, timestamps), UI, local storage & sync hooks.
-2. Check `NotesScreen.tsx`:
-   - Photos attachment via `expo-image-picker` (permissions, storage URI/base64, UI preview, removal).
-   - Scheduled reminders via `expo-notifications` (date/time picker, trigger setup, notification display).
-3. Check Network detection:
-   - Check `@react-native-community/netinfo` or Expo Network APIs.
-   - Non-intrusive offline banner/toast ("Автономный режим • Данные сохранены локально") and reconnect toast with auto-sync trigger.
-4. Check Responsiveness & Russian text overflow across all screens (`flexShrink: 1`, text wrapping, button and badge padding).
-5. Output detailed findings, file paths, code locations, and recommendations into `survey_features_ui.md`.
-
-## 2026-09-14T10:48:37Z
-You are Survey Explorer 3 (Features & UI Explorer).
-Working directory: c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_3
-User request source: c:\projects\SmartStudyHub\.agents\ORIGINAL_REQUEST.md (read this first, specifically section ## 2026-09-14T10:46:33Z).
-Dispatch details: c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_3\DISPATCH.md
-
-Your task is to conduct an authoritative, read-only survey of c:\projects\SmartStudyHub\mobile-expo regarding:
-1. GenPassModal.tsx / password generator:
-   - Examine current slider component: why it's erratic or jumping, and how to implement a smooth continuous slider allowing any integer length 4 to 64.
-   - HaveIBeenPwned API leak check: design the k-anonymity SHA-1 range query integration (first 5 SHA-1 characters sent to https://api.pwnedpasswords.com/range/{prefix}, match suffix locally, return breach count). Check if expo-crypto or pure JS SHA-1 is available.
-   - Password Vault ("Мои пароли"): tab/modal structure, fields (service name, login/email, password, visible toggle, copy button, delete, bookmark/favorite toggle, cloud sync).
-2. NotesScreen.tsx:
-   - Photo attachments: examine integration with expo-image-picker (camera & gallery permissions, image preview, removal, storage).
-   - Scheduled reminders: examine expo-notifications setup (notification channel on Android, date/time picker, scheduling local notification).
-3. Network Detection:
-   - Check @react-native-community/netinfo or Expo network libraries.
-   - Non-intrusive offline indicator ("Автономный режим • Данные сохранены локально") and reconnect toast with auto-sync.
-4. Responsiveness & Russian text overflow:
-   - Identify all screens and components where Russian text gets clipped or overflows (buttons, badges, cards). Check flexShrink: 1, text wrapping, padding.
-5. Strict project rules: NO emojis in UI, Feather icons only, Firebase project studio-9933447149-80d6a.
-Write your complete findings to c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_3\survey_features_ui.md and handoff.md. Report back with send_message when done.
+- `src/modules/calculator/` (FractionCalculatorScreen, MixedFractionInput, etc.)
+- `app.json`
+- `eas.json` and any signing configurations / credentials
+Document your findings and recommendations in c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_3\handoff.md.
+When done, send a message to parent f52e8cef-ccf4-40d0-9082-def06fd36d95 with your summary and handoff path.

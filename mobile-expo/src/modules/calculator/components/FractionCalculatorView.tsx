@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { MixedFraction, FractionResult } from '../types';
 import { MixedFractionInput } from './MixedFractionInput';
 import { FractionStepRenderer } from './FractionStepRenderer';
@@ -14,10 +15,11 @@ export const FractionCalculatorView: React.FC<FractionCalculatorViewProps> = ({
   onSaveHistory,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
-  const [f1, setF1] = useState<MixedFraction>({ whole: 1, numerator: 1, denominator: 2 });
+  const [f1, setF1] = useState<MixedFraction>({ whole: 0, numerator: 0, denominator: 1 });
   const [operator, setOperator] = useState<FractionOperator>('+');
-  const [f2, setF2] = useState<MixedFraction>({ whole: 2, numerator: 1, denominator: 3 });
+  const [f2, setF2] = useState<MixedFraction>({ whole: 0, numerator: 0, denominator: 1 });
   const [result, setResult] = useState<FractionResult | null>(null);
 
   const operators: FractionOperator[] = ['+', '-', '×', '÷'];
@@ -49,7 +51,7 @@ export const FractionCalculatorView: React.FC<FractionCalculatorViewProps> = ({
       keyboardShouldPersistTaps="handled"
     >
       {/* First Fraction */}
-      <MixedFractionInput label="Первая дробь" fraction={f1} onChange={setF1} />
+      <MixedFractionInput label={t('firstFraction') || 'Первая дробь'} fraction={f1} onChange={setF1} />
 
       {/* Operator Selector */}
       <View style={styles.operatorRow}>
@@ -60,7 +62,7 @@ export const FractionCalculatorView: React.FC<FractionCalculatorViewProps> = ({
               key={op}
               onPress={() => setOperator(op)}
               accessibilityRole="button"
-              accessibilityLabel={`Операция ${op}`}
+              accessibilityLabel={op}
               style={[
                 styles.operatorButton,
                 {
@@ -84,17 +86,17 @@ export const FractionCalculatorView: React.FC<FractionCalculatorViewProps> = ({
       </View>
 
       {/* Second Fraction */}
-      <MixedFractionInput label="Вторая дробь" fraction={f2} onChange={setF2} />
+      <MixedFractionInput label={t('secondFraction') || 'Вторая дробь'} fraction={f2} onChange={setF2} />
 
       {/* Calculate Button */}
       <TouchableOpacity
         onPress={handleCalculate}
         accessibilityRole="button"
-        accessibilityLabel="Рассчитать дроби"
+        accessibilityLabel={t('calculateFractions') || 'Вычислить'}
         style={[styles.calcButton, { backgroundColor: colors.primaryAccent }]}
         activeOpacity={0.8}
       >
-        <Text style={styles.calcButtonText}>Вычислить</Text>
+        <Text style={styles.calcButtonText}>{t('calculateFractions') || 'Вычислить'}</Text>
       </TouchableOpacity>
 
       {/* Result Display */}
@@ -115,7 +117,7 @@ export const FractionCalculatorView: React.FC<FractionCalculatorViewProps> = ({
           ) : (
             <>
               <Text style={[styles.resultLabel, { color: colors.textColorSecondary }]}>
-                Результат:
+                {t('result') || 'Результат'}:
               </Text>
               <Text style={[styles.resultValue, { color: colors.textColor }]}>
                 {result.displayMixed}

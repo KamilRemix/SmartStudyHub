@@ -1,41 +1,34 @@
-# Survey Explorer 2 Dispatch: i18n Localization, Grade Thresholds & Cloud Sync Survey
+# Task Assignment: Survey Explorer 2 (Auth, Logo, Settings & Network Requirement)
 
-## Working Directory
-`c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_2`
+## Objective
+Investigate Requirements R2 and R4 by reading `c:\projects\SmartStudyHub\.agents\ORIGINAL_REQUEST.md` (header `## 2026-09-21T13:21:19Z`) and examining `c:\projects\SmartStudyHub\mobile-expo`:
+1. **R2 - Google Logo & Auth**:
+   - Inspect `LoginScreen.tsx` and auth components. Find where Google icon is currently rendered (is it feather/material icon, solid red?). Where can the authentic official Google 4-color 'G' SVG logo (`#4285F4`, `#34A853`, `#FBBC05`, `#EA4335`) be placed? Does `react-native-svg` exist in package.json?
+   - Find "Войти как гость (Демо-режим)" or guest login button and how it's wired into `AuthContext` and UI.
+   - Investigate Google OAuth redirect configuration (`src/services/firebase.ts`, `src/context/AuthContext.tsx`, `app.json`, scheme). Why does "Доступ заблокирован: ошибка авторизации" happen in Expo Go / native builds, and how to fix redirect URIs?
+   - Investigate GitHub auth flow in mobile: how is it currently implemented, what fails or is missing for registration/login?
+2. **R4 - Settings Cloud Sync & Internet Requirement UI**:
+   - Inspect `SettingsScreen.tsx`. Find the technical "Cloud Sync / studio-9933447149-80d6a / sync status" card.
+   - Check how network detection currently works (`src/services/network.ts` / NetInfo).
+   - Check where internet connectivity is required: cloud sync, online translator, currency rates, social sign-in.
+   - Design / plan the sleek native-styled Internet Requirement modal / toast with retry capability. Note strict rule: NO emojis anywhere in UI, modals, or toasts! Only Feather icons or native SVG.
 
-## Identity
-Role: Localization & Cloud Sync Explorer
-Archetype: teamwork_preview_explorer
+Write your findings to `c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_2\handoff.md`.
 
-## Task & Scope
-Inspect `c:\projects\SmartStudyHub`:
-1. Check `public/translations.js` in the project root: structure, keys, dictionaries for all 10 languages (`ru`, `en`, `uk`, `be`, `kk`, `es`, `de`, `fr`, `tr`, `zh`).
-2. Check existing localization implementation in `mobile-expo` (if any, e.g. in `src/i18n`, `SettingsScreen`, or components) and how to port the full 10-language dictionary into `mobile-expo/src/i18n/` with reactive language context/hook and AsyncStorage persistence.
-3. Check `GradeAverageScreen.tsx`: examine current grade calculation logic, scale definitions, thresholds (2, 3, 4, 5, percentages), and how custom user-defined thresholds can be edited, stored in AsyncStorage, and synced to Firebase.
-4. Check Firebase Realtime Database setup in `mobile-expo`: check `firebaseConfig`, current auth and database usage, and design two-way sync for:
-   - Calculator history (capped at 5-10 entries).
-   - Grades & subjects.
-   - Notes.
-   - Password vault entries.
-   - User settings.
-5. Output detailed findings, file paths, data models, and recommendations into `survey_i18n_sync.md`.
+## 2026-09-21T13:24:54Z
+You are Survey Explorer 2.
+Your working directory is: c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_2
+Read your instructions in: c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_2\DISPATCH.md
+Read the original user request at: c:\projects\SmartStudyHub\.agents\ORIGINAL_REQUEST.md (specifically header ## 2026-09-21T13:21:19Z).
 
-## 2026-09-14T10:48:36Z
-You are Survey Explorer 2 (Localization & Cloud Sync Explorer).
-Working directory: c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_2
-User request source: c:\projects\SmartStudyHub\.agents\ORIGINAL_REQUEST.md (read this first, specifically section ## 2026-09-14T10:46:33Z).
-Dispatch details: c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_2\DISPATCH.md
-
-Your task is to conduct an authoritative, read-only survey of c:\projects\SmartStudyHub regarding:
-1. Inspect c:\projects\SmartStudyHub\public\translations.js: analyze the complete dictionary structure, key names, and translations for all 10 required languages: ru, en, uk, be, kk, es, de, fr, tr, zh.
-2. Inspect current i18n / localization in mobile-expo (e.g. src/i18n/ or how text is handled in screens). Design the complete porting plan: placing the full 10-language dictionary in mobile-expo/src/i18n/, creating an i18n provider/hook with AsyncStorage persistence and reactive language switching across all screens and Settings.
-3. Inspect GradeAverageScreen.tsx: investigate existing calculation logic, grading scales (5-point, 12-point, percentages, etc.), and how custom thresholds (e.g. 2.70, 3.65, 60%, 75%) should be input, stored in AsyncStorage, and synced to Firebase.
-4. Inspect Firebase Realtime Database setup in mobile-expo: data schema design for two-way sync for authenticated users:
-   - Calculator history (limited to 5-10 recent entries).
-   - Grades & subjects.
-   - Notes.
-   - Password vault entries.
-   - User settings (language, theme, custom grade thresholds).
-   - Auto-sync triggers (on login and network reconnect).
-5. Strict project rules: NO emojis in UI, Feather icons only, Firebase project studio-9933447149-80d6a.
-Write your complete findings to c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_2\survey_i18n_sync.md and handoff.md. Report back with send_message when done.
+Your mission is to investigate R2 (Google SVG Logo, Guest Mode Removal, Google OAuth redirect, GitHub auth flow) and R4 (Removing technical Cloud Sync card from Settings, Implementing sleek native Internet Requirement modal/toast with retry).
+Inspect `c:\projects\SmartStudyHub\mobile-expo` files:
+- `src/modules/auth/LoginScreen.tsx`
+- `src/context/AuthContext.tsx`
+- `src/services/firebase.ts`
+- `app.json`
+- `src/modules/settings/SettingsScreen.tsx`
+- `src/services/network.ts` / NetInfo usage
+Check SVG support (`react-native-svg`), design the Google 4-color G logo SVG, investigate Google & GitHub OAuth redirect configuration, and design the Internet Requirement modal/toast (strictly NO emojis!).
+Document your findings and recommendations in c:\projects\SmartStudyHub\.agents\teamwork_preview_explorer_survey_2\handoff.md.
+When done, send a message to parent f52e8cef-ccf4-40d0-9082-def06fd36d95 with your summary and handoff path.
