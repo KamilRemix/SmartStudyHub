@@ -10,13 +10,37 @@ export interface SyncStatus {
 }
 
 const SYNC_KEYS = {
-  CALC_HISTORY: '@ssh_calc_history',
-  GRADES: '@ssh_grades_data',
-  NOTES: '@ssh_notes',
+  CALC_HISTORY: '@smartstudy_calc_history',
+  GRADES: '@smartstudy_grades_data',
+  NOTES: '@smartstudy_notes_data',
   VAULT: '@ssh_password_vault',
   SETTINGS: '@ssh_user_settings',
   LAST_SYNC: '@ssh_last_sync_timestamp',
 };
+
+// Legacy keys for backward compatibility
+const LEGACY_KEYS = {
+  CALC_HISTORY: '@ssh_calc_history',
+  GRADES: '@ssh_grades_data',
+  NOTES: '@ssh_notes',
+};
+
+async function getStoredItemWithFallback(primaryKey: string, legacyKey?: string): Promise<string | null> {
+  try {
+    const item = await AsyncStorage.getItem(primaryKey);
+    if (item) return item;
+    if (legacyKey) {
+      const legacyItem = await AsyncStorage.getItem(legacyKey);
+      if (legacyItem) {
+        await AsyncStorage.setItem(primaryKey, legacyItem);
+        return legacyItem;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 class CloudSyncService {
   private isSyncing = false;
@@ -96,13 +120,13 @@ class CloudSyncService {
       const snapshot = await get(userRootRef);
       const remoteData = snapshot.exists() ? snapshot.val() : {};
 
-      // 1. Calc History (limit to 10 most recent items to avoid memory bloat)
+      // 1. Calc History (limit to 50 most recent items)
       await this.syncCalcHistory(uid, remoteData.calcHistory);
 
-      // 2. Grades Data
+      // 2. Grades Data (two-way merge of subjects and grades)
       await this.syncGrades(uid, remoteData.grades);
 
-      // 3. Notes Data
+      // 3. Notes Data (two-way merge by ID and updatedAt)
       await this.syncNotes(uid, remoteData.notes);
 
       // 4. Password Vault Data
@@ -124,7 +148,7 @@ class CloudSyncService {
 
   private async syncCalcHistory(uid: string, remoteList: any[]) {
     try {
-      const localStr = await AsyncStorage.getItem(SYNC_KEYS.CALC_HISTORY);
+      const localStr = await getStoredItemWithFallback(SYNC_KEYS.CALC_HISTORY, LEGACY_KEYS.CALC_HISTORY);
       const localList: any[] = localStr ? JSON.parse(localStr) : [];
 
       // Combine by unique id or expression
@@ -137,9 +161,9 @@ class CloudSyncService {
         }
       }
 
-      // Sort descending by timestamp and cap to 10 items
+      // Sort descending by timestamp and cap to 50 items
       combined.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-      const capped = combined.slice(0, 10);
+      const capped = combined.slice(0, 50);
 
       await AsyncStorage.setItem(SYNC_KEYS.CALC_HISTORY, JSON.stringify(capped));
       await set(ref(database, `users/${uid}/calcHistory`), capped);
@@ -150,14 +174,49 @@ class CloudSyncService {
 
   private async syncGrades(uid: string, remoteGrades: any) {
     try {
-      const localStr = await AsyncStorage.getItem(SYNC_KEYS.GRADES);
+      const localStr = await getStoredItemWithFallback(SYNC_KEYS.GRADES, LEGACY_KEYS.GRADES);
       const localData = localStr ? JSON.parse(localStr) : null;
 
       if (!localData && remoteGrades) {
         await AsyncStorage.setItem(SYNC_KEYS.GRADES, JSON.stringify(remoteGrades));
-      } else if (localData) {
-        // Push local grades up
+      } else if (localData && !remoteGrades) {
         await set(ref(database, `users/${uid}/grades`), localData);
+      } else if (localData && remoteGrades) {
+        // Deep merge subjects: combine remote and local subjects and grades
+        const subjectMap = new Map<string, any>();
+        if (Array.isArray(remoteGrades.subjects)) {
+          remoteGrades.subjects.forEach((s: any) => s?.id && subjectMap.set(s.id, s));
+        }
+        if (Array.isArray(localData.subjects)) {
+          localData.subjects.forEach((s: any) => {
+            if (s?.id) {
+              const remoteSubj = subjectMap.get(s.id);
+              if (!remoteSubj) {
+                subjectMap.set(s.id, s);
+              } else {
+                const gradeMap = new Map<string, any>();
+                (remoteSubj.grades || []).forEach((g: any) => g?.id && gradeMap.set(g.id, g));
+                (s.grades || []).forEach((g: any) => g?.id && gradeMap.set(g.id, g));
+                subjectMap.set(s.id, {
+                  ...remoteSubj,
+                  ...s,
+                  grades: Array.from(gradeMap.values()),
+                });
+              }
+            }
+          });
+        }
+
+        const mergedGradesData = {
+          settings: {
+            ...(remoteGrades.settings || {}),
+            ...(localData.settings || {}),
+          },
+          subjects: Array.from(subjectMap.values()),
+        };
+
+        await AsyncStorage.setItem(SYNC_KEYS.GRADES, JSON.stringify(mergedGradesData));
+        await set(ref(database, `users/${uid}/grades`), mergedGradesData);
       }
     } catch (e) {
       console.warn('[CloudSync] syncGrades error:', e);
@@ -166,7 +225,7 @@ class CloudSyncService {
 
   private async syncNotes(uid: string, remoteNotes: any[]) {
     try {
-      const localStr = await AsyncStorage.getItem(SYNC_KEYS.NOTES);
+      const localStr = await getStoredItemWithFallback(SYNC_KEYS.NOTES, LEGACY_KEYS.NOTES);
       const localNotes: any[] = localStr ? JSON.parse(localStr) : [];
 
       const map = new Map<string, any>();

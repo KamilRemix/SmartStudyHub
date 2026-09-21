@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { subscribeToAuthChanges, loginAsGuest, logout } from '../services/auth';
 import type { User } from '../services/auth';
+import { cloudSyncService } from '../services/cloudSync';
 
 export interface AuthContextType {
   user: (User & { isOfflineDemo?: boolean }) | any | null;
@@ -34,6 +35,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const unsubscribe = subscribeToAuthChanges((currentUser) => {
       setUser(currentUser);
       setIsLoading(false);
+      if (currentUser?.uid && !currentUser?.isAnonymous && !currentUser?.isOfflineDemo) {
+        cloudSyncService.syncAll(currentUser.uid).catch((err) => {
+          console.warn('[AuthContext] background sync error:', err);
+        });
+      }
     });
     return unsubscribe;
   }, []);

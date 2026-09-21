@@ -10,7 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
@@ -24,6 +24,7 @@ import {
   signInWithGithubPopup,
   loginAsGuest,
 } from '../../services/auth';
+import { cloudSyncService } from '../../services/cloudSync';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -55,6 +56,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
       if (id_token) {
         setSocialLoading('google');
         signInWithGoogleCredential(id_token)
+          .then(async (cred) => {
+            if (cred?.user?.uid) {
+              await cloudSyncService.syncAll(cred.user.uid);
+            }
+          })
           .catch((err) => {
             console.warn('[LoginScreen] Firebase Google auth error:', err);
             setError('Ошибка авторизации через Google. Попробуйте снова');
@@ -79,7 +85,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
     setError('');
     setLoading(true);
     try {
-      await loginWithEmail(email.trim(), password);
+      const cred = await loginWithEmail(email.trim(), password);
+      if (cred?.user?.uid) {
+        await cloudSyncService.syncAll(cred.user.uid);
+      }
     } catch (e: any) {
       const code = e?.code || '';
       if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
@@ -100,7 +109,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
     setSocialLoading('google');
     if (Platform.OS === 'web') {
       try {
-        await signInWithGooglePopup();
+        const cred = await signInWithGooglePopup();
+        if (cred?.user?.uid) {
+          await cloudSyncService.syncAll(cred.user.uid);
+        }
       } catch (e: any) {
         console.warn('[LoginScreen] Google popup error:', e);
         if (e?.code !== 'auth/popup-closed-by-user') {
@@ -113,7 +125,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
     }
 
     try {
-      const res = await promptGoogleAsync();
+      const res = await promptGoogleAsync({
+        showInRecents: false,
+      });
       if (res.type !== 'success') {
         setSocialLoading(null);
       }
@@ -129,7 +143,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
     setSocialLoading('github');
     if (Platform.OS === 'web') {
       try {
-        await signInWithGithubPopup();
+        const cred = await signInWithGithubPopup();
+        if (cred?.user?.uid) {
+          await cloudSyncService.syncAll(cred.user.uid);
+        }
       } catch (e: any) {
         console.warn('[LoginScreen] GitHub popup error:', e);
         if (e?.code !== 'auth/popup-closed-by-user') {
@@ -150,27 +167,34 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&scope=read:user%20user:email`;
 
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri, {
+        showInRecents: false,
+      });
 
       if (result.type === 'success' && result.url) {
         const parsedUrl = new URL(result.url);
         const accessToken = parsedUrl.searchParams.get('access_token');
         if (accessToken) {
-          await signInWithGithubCredential(accessToken);
+          const cred = await signInWithGithubCredential(accessToken);
+          if (cred?.user?.uid) {
+            await cloudSyncService.syncAll(cred.user.uid);
+          }
           return;
         }
-        // Fallback to guest / demo session if direct code exchange not available
-        await loginAsGuest();
+        const authCode = parsedUrl.searchParams.get('code');
+        if (authCode) {
+          const cred = await loginAsGuest();
+          if (cred && 'user' in cred && cred.user?.uid) {
+            await cloudSyncService.syncAll(cred.user.uid);
+          }
+          return;
+        }
       } else if (result.type === 'cancel' || result.type === 'dismiss') {
         // Closed by user
       }
     } catch (e: any) {
-      console.warn('[LoginScreen] GitHub sign-in error, falling back to guest mode:', e);
-      try {
-        await loginAsGuest();
-      } catch {
-        setError('Не удалось войти через GitHub. Проверьте подключение');
-      }
+      console.warn('[LoginScreen] GitHub sign-in error:', e);
+      setError('Не удалось завершить вход через GitHub. Проверьте подключение');
     } finally {
       setSocialLoading(null);
     }
@@ -234,7 +258,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
             ) : (
               <>
                 <View style={styles.socialIconWrap}>
-                  <Feather name="globe" size={18} color="#4285F4" />
+                  <FontAwesome name="google" size={18} color="#EA4335" />
                 </View>
                 <Text style={[styles.socialBtnText, { color: '#3c4043' }]}>
                   Войти через Google
