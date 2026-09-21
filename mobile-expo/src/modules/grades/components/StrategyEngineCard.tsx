@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { SubjectItem, GradingSystem, PeriodType, ThresholdSettings } from '../types';
 import { solveTargetStrategy } from '../utils/gradeMath';
 
@@ -19,6 +20,7 @@ export const StrategyEngineCard: React.FC<StrategyEngineCardProps> = ({
   thresholds,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   const defaultTarget = system === '5-point' ? 5 : 'A';
   const [selectedTarget, setSelectedTarget] = useState<number | string>(
@@ -42,20 +44,20 @@ export const StrategyEngineCard: React.FC<StrategyEngineCardProps> = ({
         <View style={styles.titleWithIcon}>
           <Feather name="trending-up" size={18} color={colors.primaryAccent} />
           <Text style={[styles.cardTitle, { color: colors.textColor }]}>
-            Стратегия достижения цели
+            {t('strategyTitle')}
           </Text>
         </View>
 
         {/* Target Buttons */}
         <View style={styles.targetRow}>
-          {targets.map((t) => {
-            const isSelected = selectedTarget === t;
+          {targets.map((tgt) => {
+            const isSelected = selectedTarget === tgt;
             return (
               <TouchableOpacity
-                key={String(t)}
-                onPress={() => setSelectedTarget(t)}
+                key={String(tgt)}
+                onPress={() => setSelectedTarget(tgt)}
                 accessibilityRole="button"
-                accessibilityLabel={`Выбрать целевую оценку ${t}`}
+                accessibilityLabel={t('selectTargetGradeA11y', { target: tgt })}
                 style={[
                   styles.targetButton,
                   {
@@ -71,7 +73,7 @@ export const StrategyEngineCard: React.FC<StrategyEngineCardProps> = ({
                     { color: isSelected ? '#ffffff' : colors.textColorSecondary },
                   ]}
                 >
-                  {t}
+                  {tgt}
                 </Text>
               </TouchableOpacity>
             );
@@ -93,11 +95,13 @@ export const StrategyEngineCard: React.FC<StrategyEngineCardProps> = ({
           <Feather name="check-circle" size={20} color={colors.success} />
           <View style={styles.verdictTextContainer}>
             <Text style={[styles.verdictTitle, { color: colors.success }]}>
-              Цель уже достигнута!
+              {t('strategyAchievedTitle')}
             </Text>
             <Text style={[styles.verdictDescription, { color: colors.textColor }]}>
-              Текущий балл {strategy.currentAverage.toFixed(2)} соответствует или превышает порог{' '}
-              {strategy.targetThreshold.toFixed(2)}. Главное — удерживать планку!
+              {t('strategyAchievedDesc', {
+                avg: strategy.currentAverage.toFixed(2),
+                threshold: strategy.targetThreshold.toFixed(2),
+              })}
             </Text>
           </View>
         </View>
@@ -114,12 +118,17 @@ export const StrategyEngineCard: React.FC<StrategyEngineCardProps> = ({
           <Feather name="award" size={20} color={colors.primaryAccent} />
           <View style={styles.verdictTextContainer}>
             <Text style={[styles.verdictTitle, { color: colors.primaryAccent }]}>
-              Прямой путь: нужно {strategy.neededTopGrades} оценок «{strategy.topGradeValue}»
+              {t('strategyDirectTitle', {
+                count: strategy.neededTopGrades,
+                grade: strategy.topGradeValue,
+              })}
             </Text>
             <Text style={[styles.verdictDescription, { color: colors.textColor }]}>
-              Получив еще {strategy.neededTopGrades} высших оценок (весом 1.0), ваш средний балл
-              поднимется до {strategy.projectedAverageWithTopGrades.toFixed(2)} (порог:{' '}
-              {strategy.targetThreshold.toFixed(2)}).
+              {t('strategyDirectDesc', {
+                count: strategy.neededTopGrades,
+                projected: strategy.projectedAverageWithTopGrades.toFixed(2),
+                threshold: strategy.targetThreshold.toFixed(2),
+              })}
             </Text>
           </View>
         </View>
@@ -139,11 +148,14 @@ export const StrategyEngineCard: React.FC<StrategyEngineCardProps> = ({
           <Feather name="git-merge" size={16} color={colors.textColorSecondary} />
           <View style={styles.altTextContainer}>
             <Text style={[styles.altTitle, { color: colors.textColor }]}>
-              Смешанный вариант:
+              {t('strategyMixedTitle')}
             </Text>
             <Text style={[styles.altDescription, { color: colors.textColorSecondary }]}>
-              {strategy.mixedStrategy.fivesCount} пятерок и {strategy.mixedStrategy.foursCount}{' '}
-              четверок → средний балл: {strategy.mixedStrategy.projectedAverage.toFixed(2)}
+              {t('strategyMixedDesc', {
+                fives: strategy.mixedStrategy.fivesCount,
+                fours: strategy.mixedStrategy.foursCount,
+                projected: strategy.mixedStrategy.projectedAverage.toFixed(2),
+              })}
             </Text>
           </View>
         </View>
@@ -163,12 +175,17 @@ export const StrategyEngineCard: React.FC<StrategyEngineCardProps> = ({
           <Feather name="refresh-cw" size={16} color={colors.textColorSecondary} />
           <View style={styles.altTextContainer}>
             <Text style={[styles.altTitle, { color: colors.textColor }]}>
-              Исправление оценки:
+              {t('strategyRemediationTitle')}
             </Text>
             <Text style={[styles.altDescription, { color: colors.textColorSecondary }]}>
-              Пересдайте оценку «{strategy.remediation.lowestGrade}» на «{strategy.topGradeValue}» →
-              прогноз балла: {strategy.remediation.projectedAverage.toFixed(2)}{' '}
-              {strategy.remediation.achievesTarget ? '(цель будет достигнута!)' : ''}
+              {t('strategyRemediationDesc', {
+                low: strategy.remediation.lowestGrade,
+                top: strategy.topGradeValue,
+                projected: strategy.remediation.projectedAverage.toFixed(2),
+                achieved: strategy.remediation.achievesTarget
+                  ? t('strategyRemediationAchieved')
+                  : '',
+              })}
             </Text>
           </View>
         </View>

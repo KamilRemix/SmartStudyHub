@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { AppHeader } from '../../../components/common/AppHeader';
 
 // --- Currency definitions ---
@@ -25,17 +26,17 @@ interface CurrencyDef {
   flag: string; // Two-letter text label (not emoji)
 }
 
-const CURRENCIES: CurrencyDef[] = [
-  { code: 'USD', name: 'Доллар США', flag: 'US' },
-  { code: 'EUR', name: 'Евро', flag: 'EU' },
-  { code: 'RUB', name: 'Российский рубль', flag: 'RU' },
-  { code: 'CNY', name: 'Китайский юань', flag: 'CN' },
-  { code: 'KZT', name: 'Казахстанский тенге', flag: 'KZ' },
-  { code: 'BYN', name: 'Белорусский рубль', flag: 'BY' },
-  { code: 'GBP', name: 'Британский фунт', flag: 'GB' },
-  { code: 'JPY', name: 'Японская иена', flag: 'JP' },
-  { code: 'TRY', name: 'Турецкая лира', flag: 'TR' },
-  { code: 'AED', name: 'Дирхам ОАЭ', flag: 'AE' },
+const getCurrencies = (t: (k: any) => string): CurrencyDef[] => [
+  { code: 'USD', name: t('currUSD'), flag: 'US' },
+  { code: 'EUR', name: t('currEUR'), flag: 'EU' },
+  { code: 'RUB', name: t('currRUB'), flag: 'RU' },
+  { code: 'CNY', name: t('currCNY'), flag: 'CN' },
+  { code: 'KZT', name: t('currKZT'), flag: 'KZ' },
+  { code: 'BYN', name: t('currBYN'), flag: 'BY' },
+  { code: 'GBP', name: t('currGBP'), flag: 'GB' },
+  { code: 'JPY', name: t('currJPY'), flag: 'JP' },
+  { code: 'TRY', name: t('currTRY'), flag: 'TR' },
+  { code: 'AED', name: t('currAED'), flag: 'AE' },
 ];
 
 const RATES_STORAGE_KEY = '@smartstudy_currency_rates';
@@ -72,6 +73,7 @@ interface CachedRates {
 
 interface CurrencyPickerProps {
   visible: boolean;
+  currencies: CurrencyDef[];
   selectedCode: string;
   onSelect: (code: string) => void;
   onClose: () => void;
@@ -79,14 +81,16 @@ interface CurrencyPickerProps {
 
 const CurrencyPickerModal: React.FC<CurrencyPickerProps> = ({
   visible,
+  currencies,
   selectedCode,
   onSelect,
   onClose,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
 
-  const filtered = CURRENCIES.filter(
+  const filtered = currencies.filter(
     (c) =>
       c.code.toLowerCase().includes(search.toLowerCase()) ||
       c.name.toLowerCase().includes(search.toLowerCase())
@@ -100,7 +104,7 @@ const CurrencyPickerModal: React.FC<CurrencyPickerProps> = ({
           style={[styles.modalSheet, { backgroundColor: colors.componentBackground }]}
         >
           <View style={[styles.modalHandle, { backgroundColor: colors.borderColor }]} />
-          <Text style={[styles.modalTitle, { color: colors.textColor }]}>Выберите валюту</Text>
+          <Text style={[styles.modalTitle, { color: colors.textColor }]}>{t('selectCurrency')}</Text>
           <View
             style={[
               styles.searchRow,
@@ -110,7 +114,7 @@ const CurrencyPickerModal: React.FC<CurrencyPickerProps> = ({
             <Feather name="search" size={16} color={colors.textColorSecondary} />
             <TextInput
               style={[styles.searchInput, { color: colors.textColor }]}
-              placeholder="Поиск валюты..."
+              placeholder={t('searchCurrencyPlaceholder')}
               placeholderTextColor={colors.textColorSecondary}
               value={search}
               onChangeText={setSearch}
@@ -161,11 +165,16 @@ const CurrencyPickerModal: React.FC<CurrencyPickerProps> = ({
   );
 };
 
+const CURRENCY_CODES = ['USD', 'EUR', 'RUB', 'CNY', 'KZT', 'BYN', 'GBP', 'JPY', 'TRY', 'AED'];
+
 // --- Main Screen ---
 
 export const CurrencyConverterScreen: React.FC = () => {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const navigation = useNavigation();
+
+  const currencies = useMemo(() => getCurrencies(t), [t]);
 
   const [rates, setRates] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -206,7 +215,7 @@ export const CurrencyConverterScreen: React.FC = () => {
     const cached = await loadCachedRates();
     if (cached && Date.now() - cached.timestamp < RATES_CACHE_TTL) {
       setRates(cached.rates);
-      setLastUpdate(new Date(cached.timestamp).toLocaleTimeString('ru-RU'));
+      setLastUpdate(new Date(cached.timestamp).toLocaleTimeString());
       setLoading(false);
       return;
     }
@@ -217,14 +226,14 @@ export const CurrencyConverterScreen: React.FC = () => {
       const data = await response.json();
       if (data && data.rates) {
         const filteredRates: Record<string, number> = {};
-        CURRENCIES.forEach((c) => {
-          if (data.rates[c.code] !== undefined) {
-            filteredRates[c.code] = data.rates[c.code];
+        CURRENCY_CODES.forEach((code) => {
+          if (data.rates[code] !== undefined) {
+            filteredRates[code] = data.rates[code];
           }
         });
         const now = Date.now();
         setRates(filteredRates);
-        setLastUpdate(new Date(now).toLocaleTimeString('ru-RU'));
+        setLastUpdate(new Date(now).toLocaleTimeString());
         await saveCachedRates({ rates: filteredRates, timestamp: now });
       }
     } catch (error) {
@@ -232,15 +241,15 @@ export const CurrencyConverterScreen: React.FC = () => {
       // Fallback to cache even if expired, or default offline rates
       if (cached) {
         setRates(cached.rates);
-        setLastUpdate(new Date(cached.timestamp).toLocaleTimeString('ru-RU') + ' (кэш)');
+        setLastUpdate(new Date(cached.timestamp).toLocaleTimeString() + t('cacheSuffix'));
       } else {
         setRates(DEFAULT_FALLBACK_RATES);
-        setLastUpdate('Офлайн (базовые курсы)');
+        setLastUpdate(t('offlineBaseRates'));
       }
     } finally {
       setLoading(false);
     }
-  }, [loadCachedRates, saveCachedRates]);
+  }, [loadCachedRates, saveCachedRates, t]);
 
   useEffect(() => {
     fetchRates();
@@ -280,21 +289,21 @@ export const CurrencyConverterScreen: React.FC = () => {
     setFromValue(formatCurrency(convertedValue));
   };
 
-  const getCurrencyInfo = (code: string) => CURRENCIES.find((c) => c.code === code);
+  const getCurrencyInfo = (code: string) => currencies.find((c) => c.code === code);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader
-        title="Курсы валют"
-        subtitle="Конвертация в реальном времени"
+        title={t('currencyConverterTitle')}
+        subtitle={t('realTimeConversion')}
         leftAction={{
           icon: 'arrow-left',
-          accessibilityLabel: 'Назад',
+          accessibilityLabel: t('back'),
           onPress: () => navigation.goBack(),
         }}
         rightAction={{
           icon: 'refresh-cw',
-          accessibilityLabel: 'Обновить курсы',
+          accessibilityLabel: t('refreshRates'),
           onPress: () => fetchRates(),
         }}
       />
@@ -303,7 +312,7 @@ export const CurrencyConverterScreen: React.FC = () => {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primaryAccent} />
           <Text style={[styles.loadingText, { color: colors.textColorSecondary }]}>
-            Загрузка курсов...
+            {t('loadingRates')}
           </Text>
         </View>
       ) : (
@@ -385,7 +394,7 @@ export const CurrencyConverterScreen: React.FC = () => {
                 ]}
                 onPress={handleCopyResult}
                 activeOpacity={0.7}
-                accessibilityLabel={copied ? 'Скопировано в буфер обмена' : 'Скопировать результат'}
+                accessibilityLabel={copied ? t('copiedToClipboard') : t('copyResult')}
               >
                 <Feather
                   name={copied ? 'check' : 'copy'}
@@ -420,7 +429,7 @@ export const CurrencyConverterScreen: React.FC = () => {
             <View style={styles.infoRow}>
               <Feather name="clock" size={14} color={colors.textColorSecondary} />
               <Text style={[styles.infoText, { color: colors.textColorSecondary }]}>
-                Обновлено: {lastUpdate}
+                {t('updatedAt', { time: lastUpdate })}
               </Text>
             </View>
           </View>
@@ -428,7 +437,7 @@ export const CurrencyConverterScreen: React.FC = () => {
           {/* Popular pairs */}
           <View style={styles.popularSection}>
             <Text style={[styles.popularTitle, { color: colors.textColorSecondary }]}>
-              Популярные пары
+              {t('popularPairs')}
             </Text>
             <View style={styles.popularGrid}>
               {POPULAR_PAIRS.map((pair) => {
@@ -462,6 +471,7 @@ export const CurrencyConverterScreen: React.FC = () => {
 
       <CurrencyPickerModal
         visible={pickerTarget !== null}
+        currencies={currencies}
         selectedCode={pickerTarget === 'from' ? fromCurrency : toCurrency}
         onSelect={(code) => {
           if (pickerTarget === 'from') setFromCurrency(code);

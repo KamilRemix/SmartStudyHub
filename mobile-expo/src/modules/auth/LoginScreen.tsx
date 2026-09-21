@@ -15,6 +15,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import { useTheme } from '../../theme';
+import { useI18n } from '../../i18n';
 import { GoogleLogoIcon } from '../../components/common';
 import {
   loginWithEmail,
@@ -34,6 +35,7 @@ interface LoginScreenProps {
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -75,7 +77,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
           })
           .catch((err) => {
             console.warn('[LoginScreen] Firebase Google auth error:', err);
-            setError('Ошибка авторизации через Google. Попробуйте снова');
+            setError(t('authErrorGoogleFailed'));
           })
           .finally(() => {
             setSocialLoading(null);
@@ -83,15 +85,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
       }
     } else if (googleResponse?.type === 'error') {
       setSocialLoading(null);
-      setError('Ошибка входа через Google');
+      setError(t('authErrorGoogleFailed'));
     } else if (googleResponse?.type === 'cancel' || googleResponse?.type === 'dismiss') {
       setSocialLoading(null);
     }
-  }, [googleResponse]);
+  }, [googleResponse, t]);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      setError('Введите email и пароль');
+      setError(t('authErrorEnterEmailPassword'));
       return;
     }
     setError('');
@@ -104,11 +106,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
     } catch (e: any) {
       const code = e?.code || '';
       if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
-        setError('Неверный email или пароль');
+        setError(t('authErrorInvalidCredentials'));
       } else if (code === 'auth/too-many-requests') {
-        setError('Слишком много попыток. Попробуйте позже');
+        setError(t('authErrorLoginConnection'));
       } else {
-        setError('Ошибка входа. Проверьте подключение');
+        setError(t('authErrorLoginConnection'));
         console.warn('[LoginScreen] login error:', e);
       }
     } finally {
@@ -128,11 +130,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
       } catch (e: any) {
         console.warn('[LoginScreen] Google popup error:', e);
         if (e?.code === 'auth/popup-blocked') {
-          setError('Всплывающее окно заблокировано браузером. Разрешите всплывающие окна');
+          setError(t('authErrorPopupBlocked'));
         } else if (e?.code === 'auth/account-exists-with-different-credential') {
-          setError('Аккаунт с таким email уже существует через другой способ входа');
+          setError(t('authErrorAccountExistsDiff'));
         } else if (e?.code !== 'auth/popup-closed-by-user' && e?.code !== 'auth/cancelled-popup-request') {
-          setError('Ошибка входа через Google. Попробуйте снова');
+          setError(t('authErrorGoogleFailed'));
         }
       } finally {
         setSocialLoading(null);
@@ -150,7 +152,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
     } catch (e: any) {
       setSocialLoading(null);
       console.warn('[LoginScreen] Google sign-in prompt error:', e);
-      setError('Не удалось открыть окно входа Google. Проверьте подключение');
+      setError(t('authErrorGoogleSignInPrompt'));
     }
   };
 
@@ -166,11 +168,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
       } catch (e: any) {
         console.warn('[LoginScreen] GitHub popup error:', e);
         if (e?.code === 'auth/popup-blocked') {
-          setError('Всплывающее окно заблокировано браузером. Разрешите всплывающие окна');
+          setError(t('authErrorPopupBlocked'));
         } else if (e?.code === 'auth/account-exists-with-different-credential') {
-          setError('Аккаунт с таким email уже существует через другой способ входа');
+          setError(t('authErrorAccountExistsDiff'));
         } else if (e?.code !== 'auth/popup-closed-by-user' && e?.code !== 'auth/cancelled-popup-request') {
-          setError('Ошибка входа через GitHub. Попробуйте снова');
+          setError(t('authErrorGithubFailed'));
         }
       } finally {
         setSocialLoading(null);
@@ -196,7 +198,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
         const errorParam = parsedUrl.searchParams.get('error');
         if (errorParam) {
           if (errorParam !== 'access_denied') {
-            setError('Ошибка авторизации через GitHub');
+            setError(t('authErrorGithubFailed'));
           }
           return;
         }
@@ -219,7 +221,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
       }
     } catch (e: any) {
       console.warn('[LoginScreen] GitHub sign-in error:', e);
-      setError('Не удалось завершить вход через GitHub. Проверьте подключение');
+      setError(t('authErrorGithubPrompt'));
     } finally {
       setSocialLoading(null);
     }
@@ -228,7 +230,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
 
   const handleResetPassword = async () => {
     if (!email.trim()) {
-      setError('Введите email для сброса пароля');
+      setError(t('authErrorEnterEmailReset'));
       return;
     }
     setError('');
@@ -237,7 +239,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
       await resetPassword(email.trim());
       setResetSent(true);
     } catch (e: any) {
-      setError('Не удалось отправить письмо');
+      setError(t('authErrorSendMailFailed'));
       console.warn('[LoginScreen] reset error:', e);
     } finally {
       setLoading(false);
@@ -255,7 +257,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
           <Text style={[styles.appName, { color: colors.textColor }]}>SmartStudyHub</Text>
         </View>
         <Text style={[styles.subtitle, { color: colors.textColorSecondary }]}>
-          Войдите, чтобы синхронизировать данные
+          {t('authSubtitleSync')}
         </Text>
 
         <View style={styles.form}>
@@ -274,7 +276,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
                   <GoogleLogoIcon size={20} />
                 </View>
                 <Text style={[styles.socialBtnText, { color: '#3c4043' }]}>
-                  Войти через Google
+                  {t('signInWithGoogle')}
                 </Text>
               </>
             )}
@@ -294,7 +296,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
                   <Feather name="github" size={18} color="#ffffff" />
                 </View>
                 <Text style={[styles.socialBtnText, { color: '#ffffff' }]}>
-                  Войти через GitHub
+                  {t('signInWithGithub')}
                 </Text>
               </>
             )}
@@ -304,7 +306,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
           <View style={styles.dividerRow}>
             <View style={[styles.divider, { backgroundColor: colors.borderColor }]} />
             <Text style={[styles.dividerText, { color: colors.textColorSecondary }]}>
-              или через Email
+              {t('authOrWithEmail')}
             </Text>
             <View style={[styles.divider, { backgroundColor: colors.borderColor }]} />
           </View>
@@ -314,7 +316,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
             <Feather name="mail" size={18} color={colors.textColorSecondary} />
             <TextInput
               style={[styles.input, { color: colors.textColor }]}
-              placeholder="Email"
+              placeholder={t('authEmailLabel')}
               placeholderTextColor={colors.textColorSecondary}
               value={email}
               onChangeText={setEmail}
@@ -329,7 +331,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
             <Feather name="lock" size={18} color={colors.textColorSecondary} />
             <TextInput
               style={[styles.input, { color: colors.textColor }]}
-              placeholder="Пароль"
+              placeholder={t('genpassAddPwdPlaceholder')}
               placeholderTextColor={colors.textColorSecondary}
               value={password}
               onChangeText={setPassword}
@@ -347,7 +349,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
           )}
           {resetSent && (
             <Text style={[styles.successText, { color: colors.success }]}>
-              Письмо для сброса пароля отправлено
+              {t('authPasswordSent')}
             </Text>
           )}
 
@@ -361,21 +363,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
             {loading ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={styles.primaryBtnText}>Войти</Text>
+              <Text style={styles.primaryBtnText}>{t('authTabsSignIn')}</Text>
             )}
           </TouchableOpacity>
 
           {/* Reset password */}
           <TouchableOpacity onPress={handleResetPassword} disabled={loading} activeOpacity={0.7}>
             <Text style={[styles.linkText, { color: colors.primaryAccent }]}>
-              Забыли пароль?
+              {t('forgotPassword')}
             </Text>
           </TouchableOpacity>
 
           {/* Register */}
           <TouchableOpacity onPress={onNavigateToRegister} activeOpacity={0.7}>
             <Text style={[styles.linkText, { color: colors.primaryAccent }]}>
-              Нет аккаунта? Зарегистрироваться
+              {t('authNoAccountSignUp')}
             </Text>
           </TouchableOpacity>
         </View>

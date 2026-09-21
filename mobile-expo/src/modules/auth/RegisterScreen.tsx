@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../theme';
+import { useI18n } from '../../i18n';
 import { registerWithEmail, updateUserProfile } from '../../services/auth';
 
 interface RegisterScreenProps {
@@ -20,6 +21,7 @@ interface RegisterScreenProps {
 
 export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogin }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -30,11 +32,11 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) {
-      setError('Заполните все поля');
+      setError(t('authErrorFillFields'));
       return;
     }
     if (password.length < 6) {
-      setError('Пароль должен содержать не менее 6 символов');
+      setError(t('authErrorPasswordMin6'));
       return;
     }
     setError('');
@@ -45,13 +47,13 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
     } catch (e: any) {
       const code = e?.code || '';
       if (code === 'auth/email-already-in-use') {
-        setError('Этот email уже зарегистрирован');
+        setError(t('authErrorEmailInUse'));
       } else if (code === 'auth/invalid-email') {
-        setError('Неверный формат email');
+        setError(t('authErrorLoginConnection'));
       } else if (code === 'auth/weak-password') {
-        setError('Пароль слишком простой');
+        setError(t('authErrorPasswordMin6'));
       } else {
-        setError('Ошибка регистрации. Проверьте подключение');
+        setError(t('authErrorLoginConnection'));
         console.warn('[RegisterScreen] register error:', e);
       }
     } finally {
@@ -68,9 +70,9 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
         <View style={styles.logoRow}>
           <Feather name="user-plus" size={36} color={colors.primaryAccent} />
         </View>
-        <Text style={[styles.title, { color: colors.textColor }]}>Создать аккаунт</Text>
+        <Text style={[styles.title, { color: colors.textColor }]}>{t('createAccount')}</Text>
         <Text style={[styles.subtitle, { color: colors.textColorSecondary }]}>
-          Для синхронизации данных между устройствами
+          {t('authSyncDevicesDesc')}
         </Text>
 
         <View style={styles.form}>
@@ -79,7 +81,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
             <Feather name="user" size={18} color={colors.textColorSecondary} />
             <TextInput
               style={[styles.input, { color: colors.textColor }]}
-              placeholder="Имя"
+              placeholder={t('namePlaceholder')}
               placeholderTextColor={colors.textColorSecondary}
               value={name}
               onChangeText={setName}
@@ -92,7 +94,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
             <Feather name="mail" size={18} color={colors.textColorSecondary} />
             <TextInput
               style={[styles.input, { color: colors.textColor }]}
-              placeholder="Email"
+              placeholder={t('authEmailLabel')}
               placeholderTextColor={colors.textColorSecondary}
               value={email}
               onChangeText={setEmail}
@@ -107,7 +109,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
             <Feather name="lock" size={18} color={colors.textColorSecondary} />
             <TextInput
               style={[styles.input, { color: colors.textColor }]}
-              placeholder="Пароль (минимум 6 символов)"
+              placeholder={t('passwordPlaceholderMin6')}
               placeholderTextColor={colors.textColorSecondary}
               value={password}
               onChangeText={setPassword}
@@ -132,13 +134,13 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
             {loading ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={styles.primaryBtnText}>Зарегистрироваться</Text>
+              <Text style={styles.primaryBtnText}>{t('registerButton')}</Text>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity onPress={onNavigateToLogin} activeOpacity={0.7}>
             <Text style={[styles.linkText, { color: colors.primaryAccent }]}>
-              Уже есть аккаунт? Войти
+              {t('authHaveAccountSignIn')}
             </Text>
           </TouchableOpacity>
         </View>

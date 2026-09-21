@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { CalculatorKeypadButton } from './CalculatorKeypadButton';
 import { evaluateExpression } from '../utils/expressionParser';
 
@@ -16,6 +17,7 @@ export const StandardCalculatorView: React.FC<StandardCalculatorViewProps> = ({
   onSaveHistory,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   // Compute live preview
   const livePreview = useMemo(() => {
@@ -118,25 +120,25 @@ export const StandardCalculatorView: React.FC<StandardCalculatorViewProps> = ({
             label="C"
             type="action"
             onPress={handleClear}
-            accessibilityLabel="Очистить всё"
+            accessibilityLabel={t('calcClearAll')}
           />
           <CalculatorKeypadButton
             label="("
             type="operator"
             onPress={() => handleAppend('(')}
-            accessibilityLabel="Открывающая скобка"
+            accessibilityLabel={t('calcOpenParen')}
           />
           <CalculatorKeypadButton
             label=")"
             type="operator"
             onPress={() => handleAppend(')')}
-            accessibilityLabel="Закрывающая скобка"
+            accessibilityLabel={t('calcCloseParen')}
           />
           <CalculatorKeypadButton
             label="÷"
             type="operator"
             onPress={() => handleAppend('÷')}
-            accessibilityLabel="Деление"
+            accessibilityLabel={t('calcDivide')}
           />
         </View>
 
@@ -149,7 +151,7 @@ export const StandardCalculatorView: React.FC<StandardCalculatorViewProps> = ({
             label="×"
             type="operator"
             onPress={() => handleAppend('×')}
-            accessibilityLabel="Умножение"
+            accessibilityLabel={t('calcMultiply')}
           />
         </View>
 
@@ -162,7 +164,7 @@ export const StandardCalculatorView: React.FC<StandardCalculatorViewProps> = ({
             label="-"
             type="operator"
             onPress={() => handleAppend('-')}
-            accessibilityLabel="Вычитание"
+            accessibilityLabel={t('calcSubtract')}
           />
         </View>
 
@@ -175,7 +177,7 @@ export const StandardCalculatorView: React.FC<StandardCalculatorViewProps> = ({
             label="+"
             type="operator"
             onPress={() => handleAppend('+')}
-            accessibilityLabel="Сложение"
+            accessibilityLabel={t('calcAdd')}
           />
         </View>
 
@@ -185,19 +187,19 @@ export const StandardCalculatorView: React.FC<StandardCalculatorViewProps> = ({
             iconName="delete"
             type="action"
             onPress={handleBackspace}
-            accessibilityLabel="Стереть символ"
+            accessibilityLabel={t('calcBackspace')}
           />
           <CalculatorKeypadButton label="0" onPress={() => handleAppend('0')} />
           <CalculatorKeypadButton
             label="."
             onPress={() => handleAppend('.')}
-            accessibilityLabel="Точка"
+            accessibilityLabel={t('calcDecimalPoint')}
           />
           <CalculatorKeypadButton
             label="%"
             type="operator"
             onPress={() => handleAppend('%')}
-            accessibilityLabel="Процент"
+            accessibilityLabel={t('calcPercent')}
           />
         </View>
 
@@ -208,7 +210,7 @@ export const StandardCalculatorView: React.FC<StandardCalculatorViewProps> = ({
             type="accent"
             flexSpan={4}
             onPress={handleEquals}
-            accessibilityLabel="Вычислить результат"
+            accessibilityLabel={t('calcEquals')}
           />
         </View>
       </View>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { FractionStep } from '../types';
 
 export interface FractionStepRendererProps {
@@ -9,13 +10,14 @@ export interface FractionStepRendererProps {
 
 export const FractionStepRenderer: React.FC<FractionStepRendererProps> = ({ steps }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   if (!steps || steps.length === 0) return null;
 
   return (
     <View style={styles.container}>
       <Text style={[styles.mainHeader, { color: colors.textColor }]}>
-        Пошаговое решение:
+        {t('fractionStepSolution')}
       </Text>
       {steps.map((step, idx) => (
         <View

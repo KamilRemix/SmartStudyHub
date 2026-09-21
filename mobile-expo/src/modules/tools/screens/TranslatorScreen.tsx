@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import * as Speech from 'expo-speech';
 import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { AppHeader } from '../../../components/common/AppHeader';
 import { TranslationService } from '../../../services/TranslationService';
 
@@ -29,13 +30,13 @@ interface LangDef {
   speechLang: string;
 }
 
-const LANGUAGES: LangDef[] = [
-  { code: 'ru', name: 'Русский', nativeName: 'Русский', speechLang: 'ru-RU' },
-  { code: 'en', name: 'Английский', nativeName: 'English', speechLang: 'en-US' },
-  { code: 'de', name: 'Немецкий', nativeName: 'Deutsch', speechLang: 'de-DE' },
-  { code: 'fr', name: 'Французский', nativeName: 'Francais', speechLang: 'fr-FR' },
-  { code: 'es', name: 'Испанский', nativeName: 'Espanol', speechLang: 'es-ES' },
-  { code: 'zh', name: 'Китайский', nativeName: 'Zhongwen', speechLang: 'zh-CN' },
+const getLanguages = (t: (k: any) => string): LangDef[] => [
+  { code: 'ru', name: t('langRussian'), nativeName: 'Русский', speechLang: 'ru-RU' },
+  { code: 'en', name: t('langEnglish'), nativeName: 'English', speechLang: 'en-US' },
+  { code: 'de', name: t('langGerman'), nativeName: 'Deutsch', speechLang: 'de-DE' },
+  { code: 'fr', name: t('langFrench'), nativeName: 'Français', speechLang: 'fr-FR' },
+  { code: 'es', name: t('langSpanish'), nativeName: 'Español', speechLang: 'es-ES' },
+  { code: 'zh', name: t('langChinese'), nativeName: '中文', speechLang: 'zh-CN' },
 ];
 
 const FAVORITES_KEY = '@smartstudy_translator_favorites';
@@ -53,6 +54,7 @@ interface FavoriteTranslation {
 
 interface LangPickerProps {
   visible: boolean;
+  languages: LangDef[];
   selectedCode: string;
   onSelect: (code: string) => void;
   onClose: () => void;
@@ -60,14 +62,16 @@ interface LangPickerProps {
 
 const LangPickerModal: React.FC<LangPickerProps> = ({
   visible,
+  languages,
   selectedCode,
   onSelect,
   onClose,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
 
-  const filtered = LANGUAGES.filter(
+  const filtered = languages.filter(
     (l) =>
       l.name.toLowerCase().includes(search.toLowerCase()) ||
       l.nativeName.toLowerCase().includes(search.toLowerCase()) ||
@@ -82,14 +86,14 @@ const LangPickerModal: React.FC<LangPickerProps> = ({
           style={[styles.modalSheet, { backgroundColor: colors.componentBackground }]}
         >
           <View style={[styles.modalHandle, { backgroundColor: colors.borderColor }]} />
-          <Text style={[styles.modalTitle, { color: colors.textColor }]}>Выберите язык</Text>
+          <Text style={[styles.modalTitle, { color: colors.textColor }]}>{t('selectLanguage')}</Text>
           <View
             style={[styles.searchRow, { backgroundColor: colors.background, borderColor: colors.borderColor }]}
           >
             <Feather name="search" size={16} color={colors.textColorSecondary} />
             <TextInput
               style={[styles.searchInput, { color: colors.textColor }]}
-              placeholder="Поиск языка..."
+              placeholder={t('searchLanguagePlaceholder')}
               placeholderTextColor={colors.textColorSecondary}
               value={search}
               onChangeText={setSearch}
@@ -139,13 +143,17 @@ const LangPickerModal: React.FC<LangPickerProps> = ({
 
 export const TranslatorScreen: React.FC = () => {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const navigation = useNavigation();
+
+  const languages = useMemo(() => getLanguages(t), [t]);
 
   const [fromLang, setFromLang] = useState('ru');
   const [toLang, setToLang] = useState('en');
   const [sourceText, setSourceText] = useState('');
   const [targetText, setTargetText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isError, setIsError] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<'from' | 'to' | null>(null);
   const [favorites, setFavorites] = useState<FavoriteTranslation[]>([]);
   const [showFavorites, setShowFavorites] = useState(false);
@@ -177,24 +185,19 @@ export const TranslatorScreen: React.FC = () => {
   }, []);
 
   const handleCopyTarget = useCallback(async () => {
-    if (
-      !targetText.trim() ||
-      targetText.includes('Ошибка') ||
-      targetText === 'Перевод появится здесь' ||
-      targetText === 'Перевод...' ||
-      loading
-    ) {
+    if (!targetText.trim() || isError || loading) {
       return;
     }
     await Clipboard.setStringAsync(targetText);
     setCopiedTarget(true);
     setTimeout(() => setCopiedTarget(false), 2000);
-  }, [targetText, loading]);
+  }, [targetText, isError, loading]);
 
   // Auto-translate with debounce
   useEffect(() => {
     if (!sourceText.trim()) {
       setTargetText('');
+      setIsError(false);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -210,12 +213,14 @@ export const TranslatorScreen: React.FC = () => {
   const translateText = async (text: string, from: string, to: string) => {
     if (!text.trim()) return;
     setLoading(true);
+    setIsError(false);
     try {
       const result = await TranslationService.translate(text, from, to);
       setTargetText(result);
     } catch (error) {
       console.warn('[Translator] Translation error:', error);
-      setTargetText('Ошибка перевода');
+      setIsError(true);
+      setTargetText(t('translationError'));
     } finally {
       setLoading(false);
     }
@@ -228,11 +233,12 @@ export const TranslatorScreen: React.FC = () => {
     const tmpText = sourceText;
     setSourceText(targetText);
     setTargetText(tmpText);
+    setIsError(false);
   };
 
   const handleSpeak = async (text: string, langCode: string) => {
-    if (!text.trim() || text.includes('Ошибка') || text === 'Перевод появится здесь') return;
-    const lang = LANGUAGES.find((l) => l.code === langCode);
+    if (!text.trim() || isError) return;
+    const lang = languages.find((l) => l.code === langCode);
     if (!lang) return;
 
     const speaking = await Speech.isSpeakingAsync();
@@ -253,14 +259,7 @@ export const TranslatorScreen: React.FC = () => {
   };
 
   const handleToggleFavorite = async () => {
-    if (
-      !sourceText.trim() ||
-      !targetText.trim() ||
-      targetText.includes('Ошибка') ||
-      targetText === 'Перевод...' ||
-      targetText === 'Перевод появится здесь' ||
-      loading
-    ) {
+    if (!sourceText.trim() || !targetText.trim() || isError || loading) {
       return;
     }
 
@@ -301,21 +300,21 @@ export const TranslatorScreen: React.FC = () => {
     setShowFavorites(false);
   };
 
-  const getLangName = (code: string) => LANGUAGES.find((l) => l.code === code)?.nativeName || code;
+  const getLangName = (code: string) => languages.find((l) => l.code === code)?.nativeName || code;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader
-        title="Переводчик"
+        title={t('translator')}
         subtitle={`${getLangName(fromLang)} - ${getLangName(toLang)}`}
         leftAction={{
           icon: 'arrow-left',
-          accessibilityLabel: 'Назад',
+          accessibilityLabel: t('back'),
           onPress: () => navigation.goBack(),
         }}
         rightAction={{
           icon: 'bookmark',
-          accessibilityLabel: 'Избранные переводы',
+          accessibilityLabel: t('favoriteTranslations'),
           onPress: () => setShowFavorites(!showFavorites),
         }}
       />
@@ -323,13 +322,13 @@ export const TranslatorScreen: React.FC = () => {
       {showFavorites ? (
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={[styles.sectionTitle, { color: colors.textColor }]}>
-            Избранные переводы ({favorites.length})
+            {t('favoriteTranslationsCount', { count: favorites.length })}
           </Text>
           {favorites.length === 0 ? (
             <View style={[styles.emptyCard, { backgroundColor: colors.componentBackground, borderColor: colors.borderColor }]}>
               <Feather name="bookmark" size={32} color={colors.textColorSecondary} />
               <Text style={[styles.emptyText, { color: colors.textColorSecondary }]}>
-                Нет сохраненных переводов
+                {t('noSavedTranslations')}
               </Text>
             </View>
           ) : (
@@ -420,7 +419,7 @@ export const TranslatorScreen: React.FC = () => {
               style={[styles.textArea, { color: colors.textColor }]}
               multiline
               numberOfLines={4}
-              placeholder="Введите текст для перевода..."
+              placeholder={t('enterTextToTranslate')}
               placeholderTextColor={colors.textColorSecondary}
               value={sourceText}
               onChangeText={setSourceText}
@@ -438,14 +437,14 @@ export const TranslatorScreen: React.FC = () => {
                 <TouchableOpacity
                   onPress={() => handleSpeak(targetText, toLang)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  accessibilityLabel="Озвучить перевод"
+                  accessibilityLabel={t('speakTranslation')}
                 >
                   <Feather name="volume-2" size={18} color={colors.primaryAccent} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleCopyTarget}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  accessibilityLabel={copiedTarget ? 'Скопировано в буфер обмена' : 'Скопировать перевод'}
+                  accessibilityLabel={copiedTarget ? t('copiedToClipboard') : t('copyTranslation')}
                 >
                   <Feather
                     name={copiedTarget ? 'check' : 'copy'}
@@ -456,7 +455,7 @@ export const TranslatorScreen: React.FC = () => {
                 <TouchableOpacity
                   onPress={handleToggleFavorite}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  accessibilityLabel="В избранное"
+                  accessibilityLabel={t('addToFavorites')}
                 >
                   <Feather
                     name={isFavorited ? 'heart' : 'heart'}
@@ -470,12 +469,12 @@ export const TranslatorScreen: React.FC = () => {
               <View style={styles.translatingBox}>
                 <ActivityIndicator size="small" color={colors.primaryAccent} />
                 <Text style={[styles.translatingText, { color: colors.textColorSecondary }]}>
-                  Перевод...
+                  {t('translating')}
                 </Text>
               </View>
             ) : (
               <Text style={[styles.targetTextDisplay, { color: colors.textColor }]}>
-                {targetText || 'Перевод появится здесь'}
+                {targetText || t('translationPlaceholder')}
               </Text>
             )}
           </View>
@@ -484,6 +483,7 @@ export const TranslatorScreen: React.FC = () => {
 
       <LangPickerModal
         visible={pickerTarget !== null}
+        languages={languages}
         selectedCode={pickerTarget === 'from' ? fromLang : toLang}
         onSelect={(code) => {
           if (pickerTarget === 'from') setFromLang(code);

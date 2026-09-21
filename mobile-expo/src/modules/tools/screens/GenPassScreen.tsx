@@ -90,7 +90,7 @@ function calculateEntropy(password: string): number {
   return password.length * Math.log2(poolSize);
 }
 
-function estimateCrackTime(password: string): string {
+function estimateCrackTime(password: string, t?: (k: any, p?: any) => string): string {
   if (!password) return '—';
   let poolSize = 0;
   if (/[a-z]/.test(password)) poolSize += 26;
@@ -103,13 +103,18 @@ function estimateCrackTime(password: string): string {
   const combinations = Math.pow(poolSize, password.length);
   const seconds = combinations / 100000000000;
 
-  if (seconds < 1) return 'менее секунды';
-  if (seconds < 60) return `${Math.round(seconds)} сек`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)} мин`;
-  if (seconds < 86400) return `${Math.round(seconds / 3600)} ч`;
-  if (seconds < 31536000) return `${Math.round(seconds / 86400)} дн`;
-  if (seconds < 31536000000) return `${Math.round(seconds / 31536000)} лет`;
-  return 'тысячи лет';
+  if (!t) {
+    if (seconds < 1) return '< 1s';
+    return `${Math.round(seconds)}s`;
+  }
+
+  if (seconds < 1) return t('crackLessSec');
+  if (seconds < 60) return t('crackSec', { s: Math.round(seconds) });
+  if (seconds < 3600) return t('crackMin', { m: Math.round(seconds / 60) });
+  if (seconds < 86400) return t('crackHours', { h: Math.round(seconds / 3600) });
+  if (seconds < 31536000) return t('crackDays', { d: Math.round(seconds / 86400) });
+  if (seconds < 31536000000) return t('crackYears', { y: Math.round(seconds / 31536000) });
+  return t('crackMillennia');
 }
 
 function calculateScore(password: string, isPwned: boolean): number {
@@ -134,15 +139,16 @@ function calculateScore(password: string, isPwned: boolean): number {
   return score;
 }
 
-function getStrength(score: number): StrengthInfo {
-  if (score < 25) return { label: 'Опасно', color: '#ff4c4c', level: 0, score };
-  if (score < 45) return { label: 'Слабый', color: '#ff9500', level: 1, score };
-  if (score < 70) return { label: 'Средний', color: '#eab308', level: 2, score };
-  if (score < 90) return { label: 'Отличный', color: '#34c759', level: 3, score };
-  return { label: 'Несокрушимый', color: '#00c853', level: 4, score };
+function getStrength(score: number, t?: (k: any) => string): StrengthInfo {
+  const tr = t ?? ((k: string) => k);
+  if (score < 25) return { label: tr('strengthDangerous'), color: '#ff4c4c', level: 0, score };
+  if (score < 45) return { label: tr('strengthWeak'), color: '#ff9500', level: 1, score };
+  if (score < 70) return { label: tr('strengthMedium'), color: '#eab308', level: 2, score };
+  if (score < 90) return { label: tr('strengthStrong'), color: '#34c759', level: 3, score };
+  return { label: tr('strengthUnbreakable'), color: '#00c853', level: 4, score };
 }
 
-function evaluateChecklist(password: string, isPwned: boolean, leakCount: number): ChecklistRule[] {
+function evaluateChecklist(password: string, isPwned: boolean, leakCount: number, t?: (k: any, p?: any) => string): ChecklistRule[] {
   const len = password.length;
   const hasUpper = /[A-Z]/.test(password);
   const hasLower = /[a-z]/.test(password);
@@ -150,16 +156,18 @@ function evaluateChecklist(password: string, isPwned: boolean, leakCount: number
   const hasSym = /[^A-Za-z0-9]/.test(password);
   const hasPattern = /(qwerty|12345|asdfgh|password|111|aaa|abc)/i.test(password);
 
+  const tr = t ?? ((k: string, _p?: any) => k);
+
   return [
-    { id: 'length', label: 'Длина минимум 12 символов', passed: len >= 12 },
-    { id: 'upperlower', label: 'Заглавные и строчные буквы', passed: hasUpper && hasLower },
-    { id: 'numsym', label: 'Цифры и спецсимволы', passed: hasNum && hasSym },
-    { id: 'patterns', label: 'Нет простых паттернов', passed: len > 0 && !hasPattern },
+    { id: 'length', label: tr('ruleLength12'), passed: len >= 12 },
+    { id: 'upperlower', label: tr('ruleUpperLower'), passed: hasUpper && hasLower },
+    { id: 'numsym', label: tr('ruleNumSym'), passed: hasNum && hasSym },
+    { id: 'patterns', label: tr('ruleNoPatterns'), passed: len > 0 && !hasPattern },
     {
       id: 'pwned',
       label: isPwned
-        ? `Скомпрометирован (в утечках: ${leakCount})`
-        : 'Не скомпрометирован (база утечек)',
+        ? tr('rulePwnedLeaked', { count: leakCount })
+        : tr('rulePwnedSafe'),
       passed: !isPwned,
     },
   ];

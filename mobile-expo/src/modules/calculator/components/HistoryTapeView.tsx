@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { CalcHistoryEntry } from '../types';
 
 export interface HistoryTapeViewProps {
@@ -18,6 +19,7 @@ export const HistoryTapeView: React.FC<HistoryTapeViewProps> = ({
   onClearHistory,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   const formatTime = (ts: number): string => {
     const d = new Date(ts);
@@ -30,11 +32,11 @@ export const HistoryTapeView: React.FC<HistoryTapeViewProps> = ({
 
   const handleClearPress = () => {
     Alert.alert(
-      'Очистить историю',
-      'Вы уверены, что хотите удалить все сохраненные вычисления?',
+      t('calcClearHistoryTitle'),
+      t('calcClearHistoryConfirm'),
       [
-        { text: 'Отмена', style: 'cancel' },
-        { text: 'Удалить', style: 'destructive', onPress: onClearHistory },
+        { text: t('cancel'), style: 'cancel' },
+        { text: t('delete'), style: 'destructive', onPress: onClearHistory },
       ]
     );
   };
@@ -44,19 +46,19 @@ export const HistoryTapeView: React.FC<HistoryTapeViewProps> = ({
       {/* Header Bar */}
       <View style={styles.headerBar}>
         <Text style={[styles.headerCount, { color: colors.textColorSecondary }]}>
-          Записей: {history.length}
+          {t('calcRecordsCount', { count: history.length })}
         </Text>
         {history.length > 0 && (
           <TouchableOpacity
             onPress={handleClearPress}
             style={styles.clearButton}
             accessibilityRole="button"
-            accessibilityLabel="Очистить историю вычислений"
+            accessibilityLabel={t('calcClearHistoryA11y')}
             activeOpacity={0.7}
           >
             <Feather name="trash-2" size={16} color={colors.secondaryAccent} />
             <Text style={[styles.clearButtonText, { color: colors.secondaryAccent }]}>
-              Очистить
+              {t('clear')}
             </Text>
           </TouchableOpacity>
         )}
@@ -66,10 +68,10 @@ export const HistoryTapeView: React.FC<HistoryTapeViewProps> = ({
         <View style={styles.emptyContainer}>
           <Feather name="clock" size={48} color={colors.textColorSecondary} />
           <Text style={[styles.emptyTitle, { color: colors.textColor }]}>
-            История вычислений пуста
+            {t('calcHistoryEmptyTitle')}
           </Text>
           <Text style={[styles.emptySubtitle, { color: colors.textColorSecondary }]}>
-            Результаты вычислений будут сохраняться здесь автоматически.
+            {t('calcHistoryEmptyDesc')}
           </Text>
         </View>
       ) : (
@@ -112,7 +114,7 @@ export const HistoryTapeView: React.FC<HistoryTapeViewProps> = ({
                       },
                     ]}
                   >
-                    {item.type === 'fraction' ? 'Дроби' : 'Стандартный'}
+                    {item.type === 'fraction' ? t('calcTabFraction') : t('calcTabStandard')}
                   </Text>
                 </View>
                 <Text style={[styles.timestampText, { color: colors.textColorSecondary }]}>
@@ -126,7 +128,7 @@ export const HistoryTapeView: React.FC<HistoryTapeViewProps> = ({
                 style={styles.clickableRow}
                 activeOpacity={0.7}
                 accessibilityRole="button"
-                accessibilityLabel={`Вставить выражение: ${item.expression}`}
+                accessibilityLabel={t('calcInsertExpression', { expr: item.expression })}
               >
                 <Text style={[styles.expressionText, { color: colors.textColorSecondary }]}>
                   {item.expression}
@@ -140,7 +142,7 @@ export const HistoryTapeView: React.FC<HistoryTapeViewProps> = ({
                 style={styles.clickableRow}
                 activeOpacity={0.7}
                 accessibilityRole="button"
-                accessibilityLabel={`Вставить результат: ${item.result}`}
+                accessibilityLabel={t('calcInsertResult', { res: item.result })}
               >
                 <Text style={[styles.resultText, { color: colors.textColor }]}>
                   = {item.result}

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { AppHeader } from '../../../components/common/AppHeader';
 
 // --- Unit definitions ---
@@ -33,15 +34,15 @@ interface CategoryDef {
   convert: (value: number, from: string, to: string) => number;
 }
 
-const lengthUnits: UnitDef[] = [
-  { id: 'mm', label: 'Миллиметры', short: 'мм' },
-  { id: 'cm', label: 'Сантиметры', short: 'см' },
-  { id: 'm', label: 'Метры', short: 'м' },
-  { id: 'km', label: 'Километры', short: 'км' },
-  { id: 'in', label: 'Дюймы', short: 'in' },
-  { id: 'ft', label: 'Футы', short: 'ft' },
-  { id: 'yd', label: 'Ярды', short: 'yd' },
-  { id: 'mi', label: 'Мили', short: 'mi' },
+const getLengthUnits = (t: (k: any) => string): UnitDef[] => [
+  { id: 'mm', label: t('unitMm'), short: t('unitShortMm') },
+  { id: 'cm', label: t('unitCm'), short: t('unitShortCm') },
+  { id: 'm', label: t('unitM'), short: t('unitShortM') },
+  { id: 'km', label: t('unitKm'), short: t('unitShortKm') },
+  { id: 'in', label: t('unitIn'), short: t('unitShortIn') },
+  { id: 'ft', label: t('unitFt'), short: t('unitShortFt') },
+  { id: 'yd', label: t('unitYd'), short: t('unitShortYd') },
+  { id: 'mi', label: t('unitMi'), short: t('unitShortMi') },
 ];
 
 const lengthToMeters: Record<string, number> = {
@@ -55,13 +56,13 @@ const lengthToMeters: Record<string, number> = {
   mi: 1609.344,
 };
 
-const massUnits: UnitDef[] = [
-  { id: 'mg', label: 'Миллиграммы', short: 'мг' },
-  { id: 'g', label: 'Граммы', short: 'г' },
-  { id: 'kg', label: 'Килограммы', short: 'кг' },
-  { id: 'lb', label: 'Фунты', short: 'lb' },
-  { id: 'oz', label: 'Унции', short: 'oz' },
-  { id: 't', label: 'Тонны', short: 'т' },
+const getMassUnits = (t: (k: any) => string): UnitDef[] => [
+  { id: 'mg', label: t('unitMg'), short: t('unitShortMg') },
+  { id: 'g', label: t('unitG'), short: t('unitShortG') },
+  { id: 'kg', label: t('unitKg'), short: t('unitShortKg') },
+  { id: 'lb', label: t('unitLb'), short: t('unitShortLb') },
+  { id: 'oz', label: t('unitOz'), short: t('unitShortOz') },
+  { id: 't', label: t('unitT'), short: t('unitShortT') },
 ];
 
 const massToGrams: Record<string, number> = {
@@ -73,10 +74,10 @@ const massToGrams: Record<string, number> = {
   t: 1_000_000,
 };
 
-const tempUnits: UnitDef[] = [
-  { id: 'C', label: 'Цельсий', short: 'C' },
-  { id: 'F', label: 'Фаренгейт', short: 'F' },
-  { id: 'K', label: 'Кельвин', short: 'K' },
+const getTempUnits = (t: (k: any) => string): UnitDef[] => [
+  { id: 'C', label: t('unitCelsius'), short: 'C' },
+  { id: 'F', label: t('unitFahrenheit'), short: 'F' },
+  { id: 'K', label: t('unitKelvin'), short: 'K' },
 ];
 
 function convertTemperature(value: number, from: string, to: string): number {
@@ -96,12 +97,12 @@ function convertTemperature(value: number, from: string, to: string): number {
   }
 }
 
-const CATEGORIES: CategoryDef[] = [
+const getCategories = (t: (k: any) => string): CategoryDef[] => [
   {
     id: 'length',
-    label: 'Длина',
+    label: t('length'),
     icon: 'maximize-2',
-    units: lengthUnits,
+    units: getLengthUnits(t),
     convert: (value, from, to) => {
       if (from === to) return value;
       const meters = value * lengthToMeters[from];
@@ -110,9 +111,9 @@ const CATEGORIES: CategoryDef[] = [
   },
   {
     id: 'mass',
-    label: 'Масса',
+    label: t('mass'),
     icon: 'package',
-    units: massUnits,
+    units: getMassUnits(t),
     convert: (value, from, to) => {
       if (from === to) return value;
       const grams = value * massToGrams[from];
@@ -121,9 +122,9 @@ const CATEGORIES: CategoryDef[] = [
   },
   {
     id: 'temp',
-    label: 'Температура',
+    label: t('temperature'),
     icon: 'thermometer',
-    units: tempUnits,
+    units: getTempUnits(t),
     convert: convertTemperature,
   },
 ];
@@ -148,6 +149,7 @@ const PickerModal: React.FC<PickerModalProps> = ({
   title,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
 
   const filtered = units.filter(
@@ -169,7 +171,7 @@ const PickerModal: React.FC<PickerModalProps> = ({
             <Feather name="search" size={16} color={colors.textColorSecondary} />
             <TextInput
               style={[styles.searchInput, { color: colors.textColor }]}
-              placeholder="Поиск..."
+              placeholder={t('searchPlaceholder')}
               placeholderTextColor={colors.textColorSecondary}
               value={search}
               onChangeText={setSearch}
@@ -218,16 +220,19 @@ const PickerModal: React.FC<PickerModalProps> = ({
 
 export const UnitConverterScreen: React.FC = () => {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const navigation = useNavigation();
 
+  const categories = useMemo(() => getCategories(t), [t]);
+
   const [categoryIdx, setCategoryIdx] = useState(0);
-  const [fromUnit, setFromUnit] = useState(CATEGORIES[0].units[0].id);
-  const [toUnit, setToUnit] = useState(CATEGORIES[0].units[2].id);
+  const [fromUnit, setFromUnit] = useState(categories[0].units[0].id);
+  const [toUnit, setToUnit] = useState(categories[0].units[2].id);
   const [fromValue, setFromValue] = useState('1');
   const [pickerTarget, setPickerTarget] = useState<'from' | 'to' | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const category = CATEGORIES[categoryIdx];
+  const category = categories[categoryIdx];
 
   const numericFrom = parseFloat(fromValue.replace(',', '.')) || 0;
   const convertedValue = category.convert(numericFrom, fromUnit, toUnit);
@@ -255,11 +260,11 @@ export const UnitConverterScreen: React.FC = () => {
   const handleCategoryChange = useCallback(
     (idx: number) => {
       setCategoryIdx(idx);
-      setFromUnit(CATEGORIES[idx].units[0].id);
-      setToUnit(CATEGORIES[idx].units[Math.min(2, CATEGORIES[idx].units.length - 1)].id);
+      setFromUnit(categories[idx].units[0].id);
+      setToUnit(categories[idx].units[Math.min(2, categories[idx].units.length - 1)].id);
       setFromValue('1');
     },
-    []
+    [categories]
   );
 
   const handleSwap = useCallback(() => {
@@ -274,18 +279,18 @@ export const UnitConverterScreen: React.FC = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader
-        title="Конвертер единиц"
+        title={t('unitConverter')}
         subtitle={category.label}
         leftAction={{
           icon: 'arrow-left',
-          accessibilityLabel: 'Назад',
+          accessibilityLabel: t('back'),
           onPress: () => navigation.goBack(),
         }}
       />
 
       {/* Category tabs */}
       <View style={styles.categoryRow}>
-        {CATEGORIES.map((cat, idx) => (
+        {categories.map((cat, idx) => (
           <TouchableOpacity
             key={cat.id}
             onPress={() => handleCategoryChange(idx)}
@@ -373,7 +378,7 @@ export const UnitConverterScreen: React.FC = () => {
               ]}
               onPress={handleCopyResult}
               activeOpacity={0.7}
-              accessibilityLabel={copied ? 'Скопировано в буфер обмена' : 'Скопировать результат'}
+              accessibilityLabel={copied ? t('copiedToClipboard') : t('copyResult')}
             >
               <Feather
                 name={copied ? 'check' : 'copy'}
@@ -410,7 +415,7 @@ export const UnitConverterScreen: React.FC = () => {
           else setToUnit(id);
         }}
         onClose={() => setPickerTarget(null)}
-        title={`Выберите единицу (${category.label})`}
+        title={t('selectUnitCategory', { category: category.label })}
       />
     </View>
   );

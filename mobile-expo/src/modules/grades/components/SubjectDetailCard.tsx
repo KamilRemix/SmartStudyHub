@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { SubjectItem, GradingSystem, PeriodType, ThresholdSettings } from '../types';
 import { calculateSubjectAverage, getFinalGrade } from '../utils/gradeMath';
 
@@ -25,6 +26,7 @@ export const SubjectDetailCard: React.FC<SubjectDetailCardProps> = ({
   onDeleteSubject,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   const { average, totalWeight, gradeCount } = calculateSubjectAverage(
     subject.grades,
@@ -52,14 +54,14 @@ export const SubjectDetailCard: React.FC<SubjectDetailCardProps> = ({
             {subject.name}
           </Text>
           <Text style={[styles.targetInfo, { color: colors.textColorSecondary }]}>
-            Цель: {subject.targetGrade}
+            {t('targetLabel', { target: subject.targetGrade })}
           </Text>
         </View>
 
         <TouchableOpacity
           onPress={onDeleteSubject}
           accessibilityRole="button"
-          accessibilityLabel={`Удалить предмет ${subject.name}`}
+          accessibilityLabel={t('deleteSubjectA11y', { name: subject.name })}
           style={styles.deleteSubjectBtn}
           activeOpacity={0.7}
         >
@@ -75,8 +77,8 @@ export const SubjectDetailCard: React.FC<SubjectDetailCardProps> = ({
           </Text>
           <Text style={[styles.statsSubtitle, { color: colors.textColorSecondary }]}>
             {gradeCount > 0
-              ? `${gradeCount} оценок • вес: ${totalWeight.toFixed(1)}`
-              : 'Нет оценок за этот период'}
+              ? t('gradesCountAndWeight', { count: gradeCount, weight: totalWeight.toFixed(1) })
+              : t('noGradesInPeriod')}
           </Text>
         </View>
 
@@ -93,7 +95,7 @@ export const SubjectDetailCard: React.FC<SubjectDetailCardProps> = ({
       <View style={styles.chipsSection}>
         {periodGrades.length === 0 ? (
           <Text style={[styles.noGradesNotice, { color: colors.textColorSecondary }]}>
-            Нажмите на кнопки оценок ниже, чтобы добавить первую оценку.
+            {t('addFirstGradeHint')}
           </Text>
         ) : (
           <ScrollView
@@ -125,7 +127,7 @@ export const SubjectDetailCard: React.FC<SubjectDetailCardProps> = ({
                   <TouchableOpacity
                     onPress={() => onDeleteGrade(g.id)}
                     accessibilityRole="button"
-                    accessibilityLabel="Удалить оценку"
+                    accessibilityLabel={t('deleteGradeA11y')}
                     style={styles.chipDeleteBtn}
                     activeOpacity={0.7}
                   >
@@ -142,7 +144,7 @@ export const SubjectDetailCard: React.FC<SubjectDetailCardProps> = ({
       <TouchableOpacity
         onPress={onOpenWhatIf}
         accessibilityRole="button"
-        accessibilityLabel="Калькулятор Что если"
+        accessibilityLabel={t('whatIfA11y')}
         style={[
           styles.whatIfButton,
           {
@@ -154,7 +156,7 @@ export const SubjectDetailCard: React.FC<SubjectDetailCardProps> = ({
       >
         <Feather name="help-circle" size={16} color={colors.primaryAccent} />
         <Text style={[styles.whatIfText, { color: colors.primaryAccent }]}>
-          Симулятор «Что если?»
+          {t('whatIfSimulator')}
         </Text>
       </TouchableOpacity>
     </View>

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { NoteItem, NoteViewMode } from '../types';
 
 export interface NoteCardProps {
@@ -23,6 +24,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
   onToggleChecklistItem,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
 
   const isCustomColor = Boolean(note.color);
@@ -58,7 +60,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
     <TouchableOpacity
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Заметка ${note.title || 'Без названия'}`}
+      accessibilityLabel={t('noteA11y', { title: note.title || t('untitledNote') })}
       activeOpacity={0.8}
       style={[
         styles.card,
@@ -72,13 +74,13 @@ export const NoteCard: React.FC<NoteCardProps> = ({
       {/* Header with Title & Pin */}
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: titleColor }]} numberOfLines={2}>
-          {note.title || 'Без названия'}
+          {note.title || t('untitledNote')}
         </Text>
         <View style={styles.actionsRow}>
           <TouchableOpacity
             onPress={handleCopy}
             accessibilityRole="button"
-            accessibilityLabel={copied ? 'Скопировано в буфер обмена' : 'Скопировать текст заметки'}
+            accessibilityLabel={copied ? t('copiedToClipboard') : t('copyNoteText')}
             style={styles.iconBtn}
             activeOpacity={0.7}
           >
@@ -91,7 +93,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
           <TouchableOpacity
             onPress={onTogglePin}
             accessibilityRole="button"
-            accessibilityLabel={note.pinned ? 'Открепить заметку' : 'Закрепить заметку'}
+            accessibilityLabel={note.pinned ? t('unpinNote') : t('pinNote')}
             style={styles.iconBtn}
             activeOpacity={0.7}
           >
@@ -104,7 +106,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
           <TouchableOpacity
             onPress={onDelete}
             accessibilityRole="button"
-            accessibilityLabel="Удалить заметку"
+            accessibilityLabel={t('deleteNote')}
             style={styles.iconBtn}
             activeOpacity={0.7}
           >
@@ -131,7 +133,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
               activeOpacity={0.7}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: item.done }}
-              accessibilityLabel={`Пункт: ${item.text}`}
+              accessibilityLabel={t('checklistItemA11y', { text: item.text })}
             >
               <Feather
                 name={item.done ? 'check-square' : 'square'}
@@ -155,7 +157,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
           ))}
           {remainingCount > 0 && (
             <Text style={[styles.moreText, { color: iconColor }]}>
-              +{remainingCount} еще
+              {t('andMoreItems', { count: remainingCount })}
             </Text>
           )}
         </View>

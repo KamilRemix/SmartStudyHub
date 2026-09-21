@@ -61,7 +61,7 @@ export const MixedFractionInput: React.FC<MixedFractionInputProps> = ({
         {/* Whole Part */}
         <View style={styles.wholeContainer}>
           <Text style={[styles.fieldLabel, { color: colors.textColorSecondary }]}>
-            {t('wholePart') || 'Целая'}
+            {t('wholePart')}
           </Text>
           <TextInput
             style={[
@@ -84,7 +84,7 @@ export const MixedFractionInput: React.FC<MixedFractionInputProps> = ({
         {/* Fraction Part: Numerator / Denominator */}
         <View style={styles.fractionColumn}>
           <Text style={[styles.fieldLabel, { color: colors.textColorSecondary }]}>
-            {t('numerator') || 'Числитель'}
+            {t('numerator')}
           </Text>
           <TextInput
             style={[
@@ -106,7 +106,7 @@ export const MixedFractionInput: React.FC<MixedFractionInputProps> = ({
           <View style={[styles.fractionBar, { backgroundColor: colors.textColorSecondary }]} />
 
           <Text style={[styles.fieldLabel, { color: colors.textColorSecondary }]}>
-            {t('denominator') || 'Знаменатель'}
+            {t('denominator')}
           </Text>
           <TextInput
             style={[

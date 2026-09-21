@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { GradingSystem } from '../types';
 import { LETTER_TO_GPA } from '../utils/gradeMath';
 
@@ -19,13 +20,14 @@ export const GradeInputKeypad: React.FC<GradeInputKeypadProps> = ({
   onClearGrades,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const [selectedWeight, setSelectedWeight] = useState<number>(1.0);
 
   const weights: { value: number; label: string }[] = [
-    { value: 1.0, label: '1.0x Ответ' },
-    { value: 1.5, label: '1.5x Тест' },
-    { value: 2.0, label: '2.0x Контр.' },
-    { value: 3.0, label: '3.0x Экзамен' },
+    { value: 1.0, label: t('weightOral') },
+    { value: 1.5, label: t('weightTest') },
+    { value: 2.0, label: t('weightExam') },
+    { value: 3.0, label: t('weightFinal') },
   ];
 
   const handleGradePress = (item: number | string) => {
@@ -40,9 +42,9 @@ export const GradeInputKeypad: React.FC<GradeInputKeypadProps> = ({
   };
 
   const handleClear = () => {
-    Alert.alert('Очистить оценки', 'Удалить все оценки по этому предмету за текущий период?', [
-      { text: 'Отмена', style: 'cancel' },
-      { text: 'Удалить', style: 'destructive', onPress: onClearGrades },
+    Alert.alert(t('clearGradesTitle'), t('clearGradesConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('delete'), style: 'destructive', onPress: onClearGrades },
     ]);
   };
 
@@ -69,7 +71,7 @@ export const GradeInputKeypad: React.FC<GradeInputKeypadProps> = ({
               key={w.value}
               onPress={() => setSelectedWeight(w.value)}
               accessibilityRole="button"
-              accessibilityLabel={`Коэффициент веса ${w.label}`}
+              accessibilityLabel={t('weightCoefficientA11y', { label: w.label })}
               style={[
                 styles.weightPill,
                 {
@@ -99,7 +101,7 @@ export const GradeInputKeypad: React.FC<GradeInputKeypadProps> = ({
             key={String(val)}
             onPress={() => handleGradePress(val)}
             accessibilityRole="button"
-            accessibilityLabel={`Добавить оценку ${val}`}
+            accessibilityLabel={t('addGradeA11y', { val })}
             style={[
               styles.gradeButton,
               {
@@ -117,7 +119,7 @@ export const GradeInputKeypad: React.FC<GradeInputKeypadProps> = ({
         <TouchableOpacity
           onPress={onDeleteLastGrade}
           accessibilityRole="button"
-          accessibilityLabel="Удалить последнюю оценку"
+          accessibilityLabel={t('deleteLastGradeA11y')}
           style={[
             styles.actionButton,
             {
@@ -134,7 +136,7 @@ export const GradeInputKeypad: React.FC<GradeInputKeypadProps> = ({
         <TouchableOpacity
           onPress={handleClear}
           accessibilityRole="button"
-          accessibilityLabel="Очистить оценки за период"
+          accessibilityLabel={t('clearGradesA11y')}
           style={[
             styles.actionButton,
             {

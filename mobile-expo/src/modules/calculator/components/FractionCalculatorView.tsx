@@ -51,7 +51,7 @@ export const FractionCalculatorView: React.FC<FractionCalculatorViewProps> = ({
       keyboardShouldPersistTaps="handled"
     >
       {/* First Fraction */}
-      <MixedFractionInput label={t('firstFraction') || 'Первая дробь'} fraction={f1} onChange={setF1} />
+      <MixedFractionInput label={t('firstFraction')} fraction={f1} onChange={setF1} />
 
       {/* Operator Selector */}
       <View style={styles.operatorRow}>
@@ -86,17 +86,17 @@ export const FractionCalculatorView: React.FC<FractionCalculatorViewProps> = ({
       </View>
 
       {/* Second Fraction */}
-      <MixedFractionInput label={t('secondFraction') || 'Вторая дробь'} fraction={f2} onChange={setF2} />
+      <MixedFractionInput label={t('secondFraction')} fraction={f2} onChange={setF2} />
 
       {/* Calculate Button */}
       <TouchableOpacity
         onPress={handleCalculate}
         accessibilityRole="button"
-        accessibilityLabel={t('calculateFractions') || 'Вычислить'}
+        accessibilityLabel={t('calculateFractions')}
         style={[styles.calcButton, { backgroundColor: colors.primaryAccent }]}
         activeOpacity={0.8}
       >
-        <Text style={styles.calcButtonText}>{t('calculateFractions') || 'Вычислить'}</Text>
+        <Text style={styles.calcButtonText}>{t('calculateFractions')}</Text>
       </TouchableOpacity>
 
       {/* Result Display */}
@@ -117,7 +117,7 @@ export const FractionCalculatorView: React.FC<FractionCalculatorViewProps> = ({
           ) : (
             <>
               <Text style={[styles.resultLabel, { color: colors.textColorSecondary }]}>
-                {t('result') || 'Результат'}:
+                {t('result')}:
               </Text>
               <Text style={[styles.resultValue, { color: colors.textColor }]}>
                 {result.displayMixed}

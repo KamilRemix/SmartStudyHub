@@ -14,6 +14,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { NoteItem, NoteChecklistItem } from '../types';
 import { ColorPicker } from './ColorPicker';
 
@@ -35,7 +36,12 @@ export interface NoteEditorModalProps {
   onDelete?: (id: string) => void;
 }
 
-const PRESET_TAGS = ['Учеба', 'Важное', 'Планы', 'Идеи'];
+const PRESET_TAG_KEYS: { key: string; defaultText: string }[] = [
+  { key: 'tagStudies', defaultText: 'Учеба' },
+  { key: 'tagImportant', defaultText: 'Важное' },
+  { key: 'tagPlans', defaultText: 'Планы' },
+  { key: 'tagIdeas', defaultText: 'Идеи' },
+];
 
 export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   visible,
@@ -45,6 +51,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   onDelete,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -176,21 +183,21 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           <TouchableOpacity
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Отменить редактирование"
+            accessibilityLabel={t('cancelEdit')}
             style={styles.headerBtn}
           >
             <Feather name="x" size={22} color={colors.textColor} />
           </TouchableOpacity>
 
           <Text style={[styles.headerTitle, { color: colors.textColor }]}>
-            {note ? 'Редактировать' : 'Новая заметка'}
+            {note ? t('editNote') : t('newNote')}
           </Text>
 
           <View style={styles.headerActions}>
             <TouchableOpacity
               onPress={() => setPinned(!pinned)}
               accessibilityRole="button"
-              accessibilityLabel={pinned ? 'Открепить заметку' : 'Закрепить заметку'}
+              accessibilityLabel={pinned ? t('unpinNote') : t('pinNote')}
               style={styles.headerBtn}
             >
               <Feather
@@ -207,7 +214,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                   onClose();
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="Удалить заметку"
+                accessibilityLabel={t('deleteNote')}
                 style={styles.headerBtn}
               >
                 <Feather name="trash-2" size={20} color={colors.secondaryAccent} />
@@ -217,7 +224,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             <TouchableOpacity
               onPress={handleSave}
               accessibilityRole="button"
-              accessibilityLabel="Сохранить заметку"
+              accessibilityLabel={t('saveNote')}
               style={[styles.saveHeaderBtn, { backgroundColor: colors.primaryAccent }]}
             >
               <Feather name="check" size={18} color="#ffffff" />
@@ -234,7 +241,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           {/* Color Picker Row */}
           <View style={styles.colorSection}>
             <Text style={[styles.sectionLabel, { color: colors.textColorSecondary }]}>
-              Цвет фона:
+              {t('noteBackgroundColor')}
             </Text>
             <ColorPicker selectedColor={color} onSelectColor={setColor} />
           </View>
@@ -242,7 +249,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           {/* Title Input */}
           <TextInput
             style={[styles.titleInput, { color: colors.textColor }]}
-            placeholder="Заголовок"
+            placeholder={t('noteTitlePlaceholder')}
             placeholderTextColor={colors.textColorSecondary}
             value={title}
             onChangeText={setTitle}
@@ -252,7 +259,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           {/* Content Body Input */}
           <TextInput
             style={[styles.contentInput, { color: colors.textColor }]}
-            placeholder="Текст заметки..."
+            placeholder={t('noteContentPlaceholder')}
             placeholderTextColor={colors.textColorSecondary}
             value={content}
             onChangeText={setContent}
@@ -269,7 +276,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             >
               <Feather name="image" size={16} color={colors.primaryAccent} />
               <Text style={[styles.attachBtnText, { color: colors.textColor }]}>
-                Добавить фото
+                {t('addPhoto')}
               </Text>
             </TouchableOpacity>
 
@@ -297,7 +304,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                     { color: reminderTimestamp ? colors.primaryAccent : colors.textColorSecondary },
                   ]}
                 >
-                  {reminderTimestamp ? 'Напоминание активно' : '+1 ч'}
+                  {reminderTimestamp ? t('reminderActive') : t('reminderPlus1h')}
                 </Text>
                 {reminderTimestamp ? (
                   <TouchableOpacity onPress={handleClearReminder} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -330,7 +337,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           <View style={styles.sectionDivider}>
             <View style={styles.checklistHeader}>
               <Text style={[styles.sectionTitle, { color: colors.textColor }]}>
-                Чек-лист
+                {t('checklist')}
               </Text>
               <TouchableOpacity
                 onPress={handleAddChecklistItem}
@@ -339,7 +346,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
               >
                 <Feather name="plus" size={14} color={colors.primaryAccent} />
                 <Text style={[styles.addCheckItemText, { color: colors.primaryAccent }]}>
-                  Пункт
+                  {t('addChecklistItem')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -366,7 +373,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                       opacity: item.done ? 0.6 : 1,
                     },
                   ]}
-                  placeholder="Элемент списка..."
+                  placeholder={t('checklistItemPlaceholder')}
                   placeholderTextColor={colors.textColorSecondary}
                   value={item.text}
                   onChangeText={(text) => handleUpdateChecklistItem(item.id, text)}
@@ -385,7 +392,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           {/* Tags Section */}
           <View style={styles.sectionDivider}>
             <Text style={[styles.sectionTitle, { color: colors.textColor }]}>
-              Теги
+              {t('tags')}
             </Text>
 
             {/* Current Tags */}
@@ -407,12 +414,13 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
 
             {/* Quick Presets */}
             <View style={styles.presetsRow}>
-              {PRESET_TAGS.map((pt) => {
-                const isAdded = tags.includes(pt);
+              {PRESET_TAG_KEYS.map((pt) => {
+                const tagLabel = t(pt.key) || pt.defaultText;
+                const isAdded = tags.includes(tagLabel);
                 return (
                   <TouchableOpacity
-                    key={pt}
-                    onPress={() => (isAdded ? handleRemoveTag(pt) : handleAddTag(pt))}
+                    key={pt.key}
+                    onPress={() => (isAdded ? handleRemoveTag(tagLabel) : handleAddTag(tagLabel))}
                     style={[
                       styles.presetChip,
                       {
@@ -434,7 +442,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                         { color: isAdded ? colors.primaryAccent : colors.textColorSecondary },
                       ]}
                     >
-                      {pt}
+                      {tagLabel}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -452,7 +460,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                     borderColor: colors.borderColor,
                   },
                 ]}
-                placeholder="Свой тег..."
+                placeholder={t('customTagPlaceholder')}
                 placeholderTextColor={colors.textColorSecondary}
                 value={newTagInput}
                 onChangeText={setNewTagInput}

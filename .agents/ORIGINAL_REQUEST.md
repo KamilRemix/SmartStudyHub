@@ -228,3 +228,27 @@ Audit every component and screen (`modules/calculator`, `modules/grades`, `modul
 - [ ] Technical cloud sync card is removed from Settings and replaced by a graceful network requirement alert
 - [ ] `npm run typecheck` passes with 0 errors
 - [ ] Android signing credentials safety verified in EAS/project
+
+## 2026-09-21T14:12:33Z
+
+STOP — do not duplicate work. The following tasks have already been completed by the main agent in this session:
+
+**COMPLETED (commit 6f995cc):**
+- R3 Fraction calculator: initial state now `{whole:0, numerator:0, denominator:1}`, all labels use `t()` keys (`firstFraction`, `secondFraction`, `calculateFractions`, `result`)
+- R4 Settings: Cloud Sync card REMOVED, replaced with `NetworkStatusCard` component (wifi/wifi-off Feather icon, pulse animation, auto-recheck every 30s, offline features list)
+- socialLoading type fixed: `'google' | 'github' | null` (no `'guest'`)
+
+**COMPLETED (commit 1515b35, previous session):**
+- R2 Google logo: `GoogleLogoIcon.tsx` created with official 4-color SVG, imported in `LoginScreen.tsx`
+- R5 Keystore: verified no keystore in git history, EAS manages signing
+
+**New i18n keys added (RU + EN):** `firstFraction`, `secondFraction`, `calculateFractions`, `networkSection`, `networkChecking`, `networkOnline`, `networkOffline`, `networkOnlineDesc`, `networkOfflineDesc`, `networkRequiresInternet`, `networkFeatureSync`, `networkFeatureTranslate`, `networkFeatureCurrency`, `networkFeatureAuth`
+
+**TypeScript: 0 errors confirmed.**
+
+**Still outstanding (not done yet):**
+- R1 Localization audit: many hardcoded Russian strings remain across other screens
+- R2 partial: Google OAuth "Доступ заблокирован" in Expo Go (needs redirect URI fix in Google Cloud Console — can't be done via code alone, requires user action)
+- GitHub Sign-In code flow bug (gets `code` not `access_token`, needs server-side exchange)
+
+Please focus ONLY on R1 localization audit of remaining hardcoded strings if you proceed. Do NOT re-implement anything listed as completed above.

@@ -42,3 +42,22 @@ Strict Project Rules & Constraints (from AGENTS.md):
 - Android Package: Strictly `com.smartstudyhub.mobile` in `app.json`. Do not change package name.
 - File Safety: Save all files strictly in UTF-8 without BOM. No alert() popups, no blocking `if (false)` stubs.
 - Quality gate: `npm run typecheck` in `c:\projects\SmartStudyHub\mobile-expo` must pass with 0 errors.
+
+## 2026-09-21T14:12:47Z (Urgent Directive from Parent)
+The following tasks have ALREADY been completed and committed by the main agent:
+1. R3 Fraction calculator: initial state now {whole:0, numerator:0, denominator:1}, labels use t() keys (firstFraction, secondFraction, calculateFractions, result) — commit 6f995cc.
+2. R4 Settings: Cloud Sync card REMOVED, replaced with NetworkStatusCard component — commit 6f995cc.
+3. socialLoading type fixed: 'google' | 'github' | null (no 'guest') — commit 6f995cc.
+4. R2 Google logo: GoogleLogoIcon.tsx created with official 4-color SVG, imported in LoginScreen.tsx — commit 1515b35.
+5. R5 Keystore: verified no keystore in git history, EAS manages signing — commit 1515b35.
+
+New i18n keys already added in RU + EN:
+firstFraction, secondFraction, calculateFractions, networkSection, networkChecking, networkOnline, networkOffline, networkOnlineDesc, networkOfflineDesc, networkRequiresInternet, networkFeatureSync, networkFeatureTranslate, networkFeatureCurrency, networkFeatureAuth.
+
+TypeScript currently passes with 0 errors.
+
+YOUR PRIMARY REMAINING TASK:
+Focus ONLY on R1 Localization Audit of remaining hardcoded Russian strings across other screens (modules/calculator, modules/grades, modules/notes, modules/tools, modules/settings, modules/auth, components).
+Ensure 100% of user-facing strings are localized through i18n (en, ru, and other supported languages) without raw hardcoded text.
+Do NOT re-implement or overwrite R2 logo, R3, R4, or R5.
+Ensure git commit rule and npm run typecheck passing with 0 errors.

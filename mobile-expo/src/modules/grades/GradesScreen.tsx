@@ -266,12 +266,20 @@ export const GradesScreen: React.FC = () => {
   };
 
   const getPeriodTitle = () => {
-    if (settings.activePeriod === 'annual') return 'Годовая';
+    if (settings.activePeriod === 'annual') return t('gradesAnnual');
     if (settings.periodMode === 'quarters') {
-      const map: Record<string, string> = { q1: '1 Четверть', q2: '2 Четверть', q3: '3 Четверть', q4: '4 Четверть' };
+      const map: Record<string, string> = {
+        q1: t('quarter1'),
+        q2: t('quarter2'),
+        q3: t('quarter3'),
+        q4: t('quarter4'),
+      };
       return map[settings.activePeriod] || settings.activePeriod;
     } else {
-      const map: Record<string, string> = { s1: '1 Семестр', s2: '2 Семестр' };
+      const map: Record<string, string> = {
+        s1: t('semester1'),
+        s2: t('semester2'),
+      };
       return map[settings.activePeriod] || settings.activePeriod;
     }
   };
@@ -377,7 +385,7 @@ export const GradesScreen: React.FC = () => {
                 ]}
                 numberOfLines={1}
               >
-                Быстрый расчет
+                {t('gradesQuickCalc')}
               </Text>
             </TouchableOpacity>
 
@@ -388,7 +396,7 @@ export const GradesScreen: React.FC = () => {
                   key={s.id}
                   onPress={() => setSelectedSubjectId(s.id)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Выбрать предмет ${s.name}`}
+                  accessibilityLabel={t('gradesSelectSubject', { name: s.name })}
                   style={[
                     styles.subjectChip,
                     {
@@ -421,7 +429,7 @@ export const GradesScreen: React.FC = () => {
             <TouchableOpacity
               onPress={() => setShowAddModal(true)}
               accessibilityRole="button"
-              accessibilityLabel="Добавить предмет"
+              accessibilityLabel={t('addSubject')}
               style={[
                 styles.addSubjectChip,
                 {
@@ -433,7 +441,7 @@ export const GradesScreen: React.FC = () => {
             >
               <Feather name="plus" size={14} color={colors.primaryAccent} />
               <Text style={[styles.addSubjectChipText, { color: colors.primaryAccent }]}>
-                Предмет
+                {t('addSubjectShort')}
               </Text>
             </TouchableOpacity>
           </ScrollView>

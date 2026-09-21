@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { GradingSystem } from '../types';
 
 export interface AddSubjectModalProps {
@@ -26,6 +27,7 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
   onAdd,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const [name, setName] = useState('');
   const [target, setTarget] = useState<number | string>(system === '5-point' ? 5 : 'A');
   const [error, setError] = useState('');
@@ -35,7 +37,7 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
   const handleSubmit = () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      setError('Введите название предмета');
+      setError(t('subjectNameRequired'));
       return;
     }
     onAdd(trimmed, target);
@@ -60,7 +62,7 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
             >
               <View style={styles.header}>
                 <Text style={[styles.title, { color: colors.textColor }]}>
-                  Добавить предмет
+                  {t('addSubject')}
                 </Text>
                 <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
                   <Feather name="x" size={20} color={colors.textColorSecondary} />
@@ -68,7 +70,7 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
               </View>
 
               <Text style={[styles.label, { color: colors.textColorSecondary }]}>
-                Название предмета:
+                {t('subjectNameLabel')}
               </Text>
               <TextInput
                 style={[
@@ -79,7 +81,7 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
                     borderColor: error ? colors.secondaryAccent : colors.borderColor,
                   },
                 ]}
-                placeholder="Например: Геометрия"
+                placeholder={t('subjectNamePlaceholder')}
                 placeholderTextColor={colors.textColorSecondary}
                 value={name}
                 onChangeText={(text) => {
@@ -95,17 +97,17 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
               ) : null}
 
               <Text style={[styles.label, { color: colors.textColorSecondary, marginTop: 12 }]}>
-                Целевая оценка:
+                {t('targetGradeLabel')}
               </Text>
               <View style={styles.targetRow}>
-                {targets.map((t) => {
-                  const isSel = target === t;
+                {targets.map((tgt) => {
+                  const isSel = target === tgt;
                   return (
                     <TouchableOpacity
-                      key={String(t)}
-                      onPress={() => setTarget(t)}
+                      key={String(tgt)}
+                      onPress={() => setTarget(tgt)}
                       accessibilityRole="button"
-                      accessibilityLabel={`Цель ${t}`}
+                      accessibilityLabel={t('targetGradeA11y', { target: tgt })}
                       style={[
                         styles.targetBtn,
                         {
@@ -122,7 +124,7 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
                           { color: isSel ? '#ffffff' : colors.textColor },
                         ]}
                       >
-                        {t}
+                        {tgt}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -141,7 +143,7 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
                   ]}
                 >
                   <Text style={[styles.actionBtnText, { color: colors.textColorSecondary }]}>
-                    Отмена
+                    {t('cancel')}
                   </Text>
                 </TouchableOpacity>
 
@@ -150,7 +152,7 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
                   style={[styles.actionBtn, { backgroundColor: colors.primaryAccent }]}
                 >
                   <Text style={[styles.actionBtnText, { color: '#ffffff' }]}>
-                    Добавить
+                    {t('add')}
                   </Text>
                 </TouchableOpacity>
               </View>

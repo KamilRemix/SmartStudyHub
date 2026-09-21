@@ -1,14 +1,23 @@
-# Progress — Worker M1 (Auth & Settings)
+# Progress — Worker M1 (US English & Russian Localization)
 
-Last visited: 2026-09-14T11:14:00Z
+Last visited: 2026-09-21T14:24:00Z
 
 ## Status
-Tasks completed. Verification passed. Ready for commit & handoff.
+In Progress. Starting Phase 1: Translations dictionary update (`src/i18n/translations.ts`).
 
 ## Steps
-- [x] 1. Update `mobile-expo/app.json` (add scheme: smartstudyhub, remove google-signin plugin, verify package: com.smartstudyhub.mobile).
-- [x] 2. Update `mobile-expo/src/services/firebase.ts` (React Native AsyncStorage persistence via initializeAuth & getReactNativePersistence).
-- [x] 3. Update `mobile-expo/src/services/auth.ts`, `AuthContext.tsx`, and `LoginScreen.tsx` (Expo Go safe Google auth via expo-auth-session / WebBrowser, GitHub auth with guest/demo fallback via signInAnonymously & offline session).
-- [x] 4. Update `mobile-expo/src/modules/settings/SettingsScreen.tsx` (remove stubs: duplicate grading card, package name, fake offline stub; include Language Selector with 10 languages and persistent state, theme toggle, cloud sync status row, app version v1.0.2).
-- [x] 5. Verification: run `npx tsc --noEmit` (0 errors) and `npx expo export` (Metro bundled successfully for Android and iOS).
-- [x] 6. Git commit & write `handoff.md`.
+- [x] 0. Baseline verification (`npm run typecheck`: 0 errors).
+- [ ] 1. Update `src/i18n/translations.ts`:
+  - Fix `"back": "Back"` -> `"Назад"` in Russian.
+  - Add all missing keys for Calculator, Grades, Tools, Auth, Notes, Common in `"ru"` and `"en"`.
+  - Add missing network keys in other 8 languages.
+- [ ] 2. Apply `useI18n` in Calculator components (`StandardCalculatorView.tsx`, `HistoryTapeView.tsx`, `FractionStepRenderer.tsx`, `MixedFractionInput.tsx`).
+- [ ] 3. Apply `useI18n` in Grades components (`GradesScreen.tsx`, `AddSubjectModal.tsx`, `AnnualTableCard.tsx`, `GradeInputKeypad.tsx`, `PeriodSelectorBar.tsx`, `SubjectDetailCard.tsx`, `StrategyEngineCard.tsx`, `ThresholdsModal.tsx`, `WhatIfModal.tsx`).
+- [ ] 4. Apply `useI18n` in Tools components (`UnitConverterScreen.tsx`, `CurrencyConverterScreen.tsx`, `TranslatorScreen.tsx`, `GenPassScreen.tsx`).
+- [ ] 5. Apply `useI18n` in Auth components (`LoginScreen.tsx`, `RegisterScreen.tsx`).
+- [ ] 6. Apply `useI18n` in Notes components (`NoteCard.tsx`, `NoteEditorModal.tsx`, `TagFilter.tsx`, `ColorPicker.tsx`).
+- [ ] 7. Update `src/components/common/OfflineBanner.tsx` and `src/navigation/BottomTabNavigator.tsx`.
+- [ ] 8. Verify `cmd /c npm run typecheck` passes with 0 errors.
+- [ ] 9. Verify 0 emojis and audit for raw Cyrillic strings in UI.
+- [ ] 10. Execute git commit: `git add .` and `git commit -m "feat(i18n): complete US English & Russian localization across all screens and components"`.
+- [ ] 11. Write `handoff.md` and send message to parent orchestrator.

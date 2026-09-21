@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { SubjectItem, GradingSystem, PeriodMode, ThresholdSettings, PeriodType } from '../types';
 import {
   calculateSubjectAverage,
@@ -22,18 +23,19 @@ export const AnnualTableCard: React.FC<AnnualTableCardProps> = ({
   thresholds,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   const periods: { id: PeriodType; label: string }[] =
     periodMode === 'quarters'
       ? [
-          { id: 'q1', label: '1Ч' },
-          { id: 'q2', label: '2Ч' },
-          { id: 'q3', label: '3Ч' },
-          { id: 'q4', label: '4Ч' },
+          { id: 'q1', label: t('shortQ1') },
+          { id: 'q2', label: t('shortQ2') },
+          { id: 'q3', label: t('shortQ3') },
+          { id: 'q4', label: t('shortQ4') },
         ]
       : [
-          { id: 's1', label: '1С' },
-          { id: 's2', label: '2С' },
+          { id: 's1', label: t('shortS1') },
+          { id: 's2', label: t('shortS2') },
         ];
 
   if (subjects.length === 0) return null;
@@ -49,13 +51,13 @@ export const AnnualTableCard: React.FC<AnnualTableCardProps> = ({
       ]}
     >
       <Text style={[styles.title, { color: colors.textColor }]}>
-        Сводная годовая таблица
+        {t('gradesAnnualSummaryTitle')}
       </Text>
 
       {/* Table Header */}
       <View style={[styles.row, styles.headerRow, { borderBottomColor: colors.borderColor }]}>
         <Text style={[styles.colSubject, styles.headerText, { color: colors.textColorSecondary }]}>
-          Предмет
+          {t('subject')}
         </Text>
         {periods.map((p) => (
           <Text
@@ -66,10 +68,10 @@ export const AnnualTableCard: React.FC<AnnualTableCardProps> = ({
           </Text>
         ))}
         <Text style={[styles.colAvg, styles.headerText, { color: colors.textColorSecondary }]}>
-          Год
+          {t('gradesAnnualYear')}
         </Text>
         <Text style={[styles.colFinal, styles.headerText, { color: colors.textColorSecondary }]}>
-          Итог
+          {t('gradesAnnualFinal')}
         </Text>
       </View>
 

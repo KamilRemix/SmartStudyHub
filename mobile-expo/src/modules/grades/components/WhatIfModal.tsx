@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { SubjectItem, GradingSystem, PeriodType } from '../types';
 import { calculateSubjectAverage, simulateWhatIf, LETTER_TO_GPA } from '../utils/gradeMath';
 
@@ -30,6 +31,7 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
   onApplyGrade,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   const [hypoValue, setHypoValue] = useState<number>(system === '5-point' ? 5 : 4);
   const [hypoLetter, setHypoLetter] = useState<'A' | 'B' | 'C' | 'D' | 'F'>('A');
@@ -50,10 +52,10 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
   const grades5 = [5, 4, 3, 2, 1];
   const gradesUS: ('A' | 'B' | 'C' | 'D' | 'F')[] = ['A', 'B', 'C', 'D', 'F'];
   const weights = [
-    { value: 1.0, label: '1.0x Ответ' },
-    { value: 1.5, label: '1.5x Тест' },
-    { value: 2.0, label: '2.0x Контрольная' },
-    { value: 3.0, label: '3.0x Экзамен' },
+    { value: 1.0, label: t('weightOral') },
+    { value: 1.5, label: t('weightTest') },
+    { value: 2.0, label: t('weightExam') },
+    { value: 3.0, label: t('weightFinal') },
   ];
 
   return (
@@ -75,13 +77,13 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
                 <View style={styles.headerLeft}>
                   <Feather name="help-circle" size={20} color={colors.primaryAccent} />
                   <Text style={[styles.title, { color: colors.textColor }]}>
-                    Симулятор «Что если?»
+                    {t('whatIfSimulator')}
                   </Text>
                 </View>
                 <TouchableOpacity
                   onPress={onClose}
                   accessibilityRole="button"
-                  accessibilityLabel="Закрыть симулятор"
+                  accessibilityLabel={t('closeSimulatorA11y')}
                   style={styles.closeBtn}
                 >
                   <Feather name="x" size={20} color={colors.textColorSecondary} />
@@ -89,12 +91,12 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
               </View>
 
               <Text style={[styles.subtitle, { color: colors.textColorSecondary }]}>
-                Предмет: {subject.name}
+                {t('subjectPrefix', { name: subject.name })}
               </Text>
 
               {/* Grade Selector */}
               <Text style={[styles.sectionTitle, { color: colors.textColor }]}>
-                Гипотетическая оценка:
+                {t('hypotheticalGradeLabel')}
               </Text>
               <View style={styles.selectorRow}>
                 {system === '5-point'
@@ -105,7 +107,7 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
                           key={val}
                           onPress={() => setHypoValue(val)}
                           accessibilityRole="button"
-                          accessibilityLabel={`Выбрать оценку ${val}`}
+                          accessibilityLabel={t('selectGradeA11y', { grade: String(val) })}
                           style={[
                             styles.gradeOption,
                             {
@@ -134,7 +136,7 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
                           key={letter}
                           onPress={() => setHypoLetter(letter)}
                           accessibilityRole="button"
-                          accessibilityLabel={`Выбрать оценку ${letter}`}
+                          accessibilityLabel={t('selectGradeA11y', { grade: letter })}
                           style={[
                             styles.gradeOption,
                             {
@@ -160,7 +162,7 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
 
               {/* Weight Selector */}
               <Text style={[styles.sectionTitle, { color: colors.textColor }]}>
-                Вес оценки:
+                {t('gradeWeightLabel')}
               </Text>
               <View style={styles.weightsGrid}>
                 {weights.map((w) => {
@@ -170,7 +172,7 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
                       key={w.value}
                       onPress={() => setHypoWeight(w.value)}
                       accessibilityRole="button"
-                      accessibilityLabel={`Вес ${w.label}`}
+                      accessibilityLabel={t('gradeWeightA11y', { label: w.label })}
                       style={[
                         styles.weightOption,
                         {
@@ -206,7 +208,7 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
               >
                 <View style={styles.statCol}>
                   <Text style={[styles.statLabel, { color: colors.textColorSecondary }]}>
-                    Текущий
+                    {t('currentScoreLabel')}
                   </Text>
                   <Text style={[styles.statValue, { color: colors.textColor }]}>
                     {average.toFixed(2)}
@@ -217,7 +219,7 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
 
                 <View style={styles.statCol}>
                   <Text style={[styles.statLabel, { color: colors.textColorSecondary }]}>
-                    Прогноз
+                    {t('projectedScoreLabel')}
                   </Text>
                   <Text style={[styles.statValue, { color: colors.primaryAccent }]}>
                     {simulatedAverage.toFixed(2)}
@@ -226,7 +228,7 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
 
                 <View style={styles.statCol}>
                   <Text style={[styles.statLabel, { color: colors.textColorSecondary }]}>
-                    Изменение
+                    {t('changeScoreLabel')}
                   </Text>
                   <Text
                     style={[
@@ -244,7 +246,7 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
                 <TouchableOpacity
                   onPress={onClose}
                   accessibilityRole="button"
-                  accessibilityLabel="Отменить симуляцию"
+                  accessibilityLabel={t('cancelSimulationA11y')}
                   style={[
                     styles.actionBtn,
                     {
@@ -254,18 +256,18 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
                   ]}
                 >
                   <Text style={[styles.actionBtnText, { color: colors.textColorSecondary }]}>
-                    Отмена
+                    {t('cancel')}
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={handleApply}
                   accessibilityRole="button"
-                  accessibilityLabel="Применить гипотетическую оценку"
+                  accessibilityLabel={t('applyHypoGradeA11y')}
                   style={[styles.actionBtn, { backgroundColor: colors.primaryAccent }]}
                 >
                   <Text style={[styles.actionBtnText, { color: '#ffffff' }]}>
-                    Применить
+                    {t('apply')}
                   </Text>
                 </TouchableOpacity>
               </View>

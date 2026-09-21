@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { NOTE_COLOR_PALETTE } from '../../../theme/colors';
 
 export interface ColorPickerProps {
@@ -14,6 +15,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
   onSelectColor,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   return (
     <ScrollView
@@ -30,7 +32,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             key={item.id}
             onPress={() => onSelectColor(item.hex)}
             accessibilityRole="button"
-            accessibilityLabel={`Цвет заметки: ${item.name}`}
+            accessibilityLabel={t('noteColorLabel', { color: item.name })}
             style={[
               styles.circle,
               {

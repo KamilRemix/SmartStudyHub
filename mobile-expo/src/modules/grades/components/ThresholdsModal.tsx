@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { GradingSystem, PeriodMode, ThresholdSettings } from '../types';
 
 export interface ThresholdsModalProps {
@@ -34,6 +35,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
   onUpdateThresholds,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   const [t5Text, setT5Text] = useState<string>('4.50');
   const [t4Text, setT4Text] = useState<string>('3.50');
@@ -77,17 +79,17 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
       const v3 = parseFloat(t3Text);
 
       if (isNaN(v5) || isNaN(v4) || isNaN(v3)) {
-        setValidationError('Введите корректные числовые значения');
+        setValidationError(t('thresholdErrorValidNumbers'));
         return;
       }
 
       if (v3 <= 0) {
-        setValidationError('Пороги должны быть больше 0');
+        setValidationError(t('thresholdErrorPositive'));
         return;
       }
 
       if (!(v5 > v4 && v4 > v3)) {
-        setValidationError('Пороги должны убывать: (5) > (4) > (3)');
+        setValidationError(t('thresholdErrorDescending'));
         return;
       }
 
@@ -105,17 +107,17 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
       const vD = parseFloat(tDText);
 
       if (isNaN(vA) || isNaN(vB) || isNaN(vC) || isNaN(vD)) {
-        setValidationError('Введите корректные числовые значения');
+        setValidationError(t('thresholdErrorValidNumbers'));
         return;
       }
 
       if (vD < 0) {
-        setValidationError('Пороги не могут быть отрицательными');
+        setValidationError(t('thresholdErrorNonNegative'));
         return;
       }
 
       if (!(vA > vB && vB > vC && vC > vD)) {
-        setValidationError('Пороги должны убывать: A > B > C > D');
+        setValidationError(t('thresholdErrorDescendingUS'));
         return;
       }
 
@@ -164,7 +166,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
                 <View style={styles.headerTitleRow}>
                   <Feather name="sliders" size={20} color={colors.primaryAccent} />
                   <Text style={[styles.title, { color: colors.textColor }]}>
-                    Настройки оценок
+                    {t('thresholdModalTitle')}
                   </Text>
                 </View>
                 <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -174,7 +176,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
 
               {/* Grading System */}
               <Text style={[styles.sectionTitle, { color: colors.textColor }]}>
-                Шкала оценивания:
+                {t('gradingScaleLabel')}
               </Text>
               <View style={styles.toggleRow}>
                 <TouchableOpacity
@@ -195,7 +197,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
                       { color: system === '5-point' ? '#ffffff' : colors.textColorSecondary },
                     ]}
                   >
-                    5-балльная (РФ)
+                    {t('5Point')}
                   </Text>
                 </TouchableOpacity>
 
@@ -217,14 +219,14 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
                       { color: system === 'us-letter' ? '#ffffff' : colors.textColorSecondary },
                     ]}
                   >
-                    US Letter (GPA 4.0)
+                    {t('letterGrades')}
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {/* Period Mode */}
               <Text style={[styles.sectionTitle, { color: colors.textColor, marginTop: 16 }]}>
-                Учебные периоды:
+                {t('academicPeriodsLabel')}
               </Text>
               <View style={styles.toggleRow}>
                 <TouchableOpacity
@@ -248,7 +250,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
                       },
                     ]}
                   >
-                    4 Четверти
+                    {t('quarters4')}
                   </Text>
                 </TouchableOpacity>
 
@@ -273,7 +275,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
                       },
                     ]}
                   >
-                    2 Семестра
+                    {t('semesters2')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -289,14 +291,14 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
                 ]}
               >
                 <Text style={[styles.infoTitle, { color: colors.textColor }]}>
-                  Пороги округления оценок:
+                  {t('roundingThresholdsTitle')}
                 </Text>
 
                 {system === '5-point' ? (
                   <View style={styles.thresholdInputsContainer}>
                     <View style={styles.thresholdInputRow}>
                       <Text style={[styles.thresholdLabel, { color: colors.textColor }]}>
-                        5 (Отлично): от
+                        {t('threshold5Label')}
                       </Text>
                       <TextInput
                         style={[
@@ -321,7 +323,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
 
                     <View style={styles.thresholdInputRow}>
                       <Text style={[styles.thresholdLabel, { color: colors.textColor }]}>
-                        4 (Хорошо): от
+                        {t('threshold4Label')}
                       </Text>
                       <TextInput
                         style={[
@@ -346,7 +348,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
 
                     <View style={styles.thresholdInputRow}>
                       <Text style={[styles.thresholdLabel, { color: colors.textColor }]}>
-                        3 (Удовл.): от
+                        {t('threshold3Label')}
                       </Text>
                       <TextInput
                         style={[
@@ -370,14 +372,14 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
                     </View>
 
                     <Text style={[styles.infoText, { color: colors.textColorSecondary, marginTop: 4 }]}>
-                      • 2 (Неудовл.): ниже {t3Text || '2.50'}
+                      {t('threshold2Note', { val: t3Text || '2.50' })}
                     </Text>
                   </View>
                 ) : (
                   <View style={styles.thresholdInputsContainer}>
                     <View style={styles.thresholdInputRow}>
                       <Text style={[styles.thresholdLabel, { color: colors.textColor }]}>
-                        A (4.0 GPA): от
+                        {t('thresholdALabel')}
                       </Text>
                       <TextInput
                         style={[
@@ -402,7 +404,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
 
                     <View style={styles.thresholdInputRow}>
                       <Text style={[styles.thresholdLabel, { color: colors.textColor }]}>
-                        B (3.0 GPA): от
+                        {t('thresholdBLabel')}
                       </Text>
                       <TextInput
                         style={[
@@ -427,7 +429,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
 
                     <View style={styles.thresholdInputRow}>
                       <Text style={[styles.thresholdLabel, { color: colors.textColor }]}>
-                        C (2.0 GPA): от
+                        {t('thresholdCLabel')}
                       </Text>
                       <TextInput
                         style={[
@@ -452,7 +454,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
 
                     <View style={styles.thresholdInputRow}>
                       <Text style={[styles.thresholdLabel, { color: colors.textColor }]}>
-                        D (1.0 GPA): от
+                        {t('thresholdDLabel')}
                       </Text>
                       <TextInput
                         style={[
@@ -476,7 +478,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
                     </View>
 
                     <Text style={[styles.infoText, { color: colors.textColorSecondary, marginTop: 4 }]}>
-                      • F (0.0 GPA): ниже {tDText || '0.50'}
+                      {t('thresholdFNote', { val: tDText || '0.50' })}
                     </Text>
                   </View>
                 )}
@@ -496,7 +498,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
                 >
                   <Feather name="rotate-ccw" size={16} color={colors.textColorSecondary} />
                   <Text style={[styles.resetBtnText, { color: colors.textColorSecondary }]}>
-                    По умолчанию
+                    {t('resetDefault')}
                   </Text>
                 </TouchableOpacity>
 
@@ -505,7 +507,7 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
                   style={[styles.doneBtn, { backgroundColor: colors.primaryAccent }]}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.doneBtnText}>Готово</Text>
+                  <Text style={styles.doneBtnText}>{t('done')}</Text>
                 </TouchableOpacity>
               </View>
             </View>

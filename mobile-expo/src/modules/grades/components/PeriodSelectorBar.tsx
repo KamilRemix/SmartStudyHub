@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { PeriodType, PeriodMode } from '../types';
 
 export interface PeriodSelectorBarProps {
@@ -18,20 +19,21 @@ export const PeriodSelectorBar: React.FC<PeriodSelectorBarProps> = ({
   onOpenSettings,
 }) => {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   const periods: { id: PeriodType; label: string }[] =
     periodMode === 'quarters'
       ? [
-          { id: 'q1', label: '1 Четверть' },
-          { id: 'q2', label: '2 Четверть' },
-          { id: 'q3', label: '3 Четверть' },
-          { id: 'q4', label: '4 Четверть' },
-          { id: 'annual', label: 'Годовая' },
+          { id: 'q1', label: t('quarter1') },
+          { id: 'q2', label: t('quarter2') },
+          { id: 'q3', label: t('quarter3') },
+          { id: 'q4', label: t('quarter4') },
+          { id: 'annual', label: t('gradesAnnual') },
         ]
       : [
-          { id: 's1', label: '1 Семестр' },
-          { id: 's2', label: '2 Семестр' },
-          { id: 'annual', label: 'Годовая' },
+          { id: 's1', label: t('semester1') },
+          { id: 's2', label: t('semester2') },
+          { id: 'annual', label: t('gradesAnnual') },
         ];
 
   return (
@@ -48,7 +50,7 @@ export const PeriodSelectorBar: React.FC<PeriodSelectorBarProps> = ({
               key={item.id}
               onPress={() => onSelectPeriod(item.id)}
               accessibilityRole="button"
-              accessibilityLabel={`Выбрать период ${item.label}`}
+              accessibilityLabel={t('selectPeriodA11y', { period: item.label })}
               style={[
                 styles.chip,
                 {
@@ -74,7 +76,7 @@ export const PeriodSelectorBar: React.FC<PeriodSelectorBarProps> = ({
       <TouchableOpacity
         onPress={onOpenSettings}
         accessibilityRole="button"
-        accessibilityLabel="Настройки периодов и шкалы"
+        accessibilityLabel={t('periodSettingsA11y')}
         style={[styles.settingsButton, { backgroundColor: colors.componentBackground, borderColor: colors.borderColor }]}
         activeOpacity={0.7}
       >
