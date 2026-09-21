@@ -1,0 +1,40 @@
+# Environment & Secrets
+.env
+config.json
+google-credentials.json
+*.keystore
+credentials.json
+
+# Dependencies
+node_modules/
+mobile-expo/node_modules/
+.expo/
+mobile-expo/.expo/
+
+# Firebase cache
+.firebase/
+
+# Build output (web & electron & android)
+dist/
+dist-exe/
+icon .png
+*.apk
+android/app/build/
+android/.gradle/
+android/build/
+
+# AI helper/debug scripts (not part of the product)
+find-missing.js
+add_translations.js
+
+# Test files
+public/test_icons.html
+
+# Deploy utilities (local one-time use)
+_deploy.bat
+RELEASE_NOTES.md
+
+# OS files
+Thumbs.db
+.DS_Store
+*.log

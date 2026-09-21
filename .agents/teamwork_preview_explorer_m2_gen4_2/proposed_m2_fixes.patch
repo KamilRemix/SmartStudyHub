@@ -1,0 +1,68 @@
+--- a/mobile-expo/src/i18n/I18nContext.tsx
++++ b/mobile-expo/src/i18n/I18nContext.tsx
+@@ -24,1 +24,2 @@
+-const LANGUAGE_STORAGE_KEY = '@ssh_language';
++const LANGUAGE_STORAGE_KEY = '@smartstudy_language';
++const LEGACY_STORAGE_KEY = '@ssh_language';
+@@ -43,9 +44,11 @@
+   useEffect(() => {
+-    AsyncStorage.getItem(LANGUAGE_STORAGE_KEY).then((saved) => {
+-      if (saved && (saved in translations)) {
+-        setLanguageState(saved as SupportedLanguage);
++    (async () => {
++      try {
++        const saved = (await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY)) || (await AsyncStorage.getItem(LEGACY_STORAGE_KEY));
++        if (saved && (saved in translations)) {
++          setLanguageState(saved as SupportedLanguage);
++        }
++      } catch (err) {
++        console.warn('[I18n] Failed to load saved language:', err);
+       }
+-    }).catch((err) => {
+-      console.warn('[I18n] Failed to load saved language:', err);
+-    });
++    })();
+   }, []);
+@@ -56,1 +59,2 @@
+       await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
++      await AsyncStorage.setItem(LEGACY_STORAGE_KEY, lang);
+@@ -62,7 +66,10 @@
+   const t = useCallback((key: string, params?: Record<string, string | number>): string => {
++    if (!key) return '';
+     const langDict = translations[language] || translations['ru'];
+     let text = langDict[key] || translations['ru']?.[key] || translations['en']?.[key] || key;
+
+     if (params) {
+       Object.entries(params).forEach(([paramKey, val]) => {
+-        text = text.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(val));
++        text = text.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), () => String(val));
+       });
+     }
+
+     return text;
+   }, [language]);
+--- a/mobile-expo/src/navigation/BottomTabNavigator.tsx
++++ b/mobile-expo/src/navigation/BottomTabNavigator.tsx
+@@ -7,1 +7,2 @@
+ import { useTheme } from '../theme';
++import { useI18n } from '../i18n';
+ import { RootTabParamList, TAB_ICONS, TAB_LABELS_RU } from './types';
+@@ -18,1 +20,2 @@
+   const { colors, isDark } = useTheme();
++  const { t } = useI18n();
+   const insets = useSafeAreaInsets();
+@@ -62,1 +65,1 @@
+-          tabBarLabel: TAB_LABELS_RU.Calculator,
++          tabBarLabel: t('calculator'),
+@@ -69,1 +72,1 @@
+-          tabBarLabel: TAB_LABELS_RU.Grades,
++          tabBarLabel: t('grades'),
+@@ -76,1 +79,1 @@
+-          tabBarLabel: TAB_LABELS_RU.Notes,
++          tabBarLabel: t('notes'),
+@@ -83,1 +86,1 @@
+-          tabBarLabel: TAB_LABELS_RU.Tools,
++          tabBarLabel: t('tools'),
+@@ -90,1 +93,1 @@
+-          tabBarLabel: TAB_LABELS_RU.Settings,
++          tabBarLabel: t('settings'),
