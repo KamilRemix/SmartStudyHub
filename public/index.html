@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>SmartStudyHub</title>
+    
+    <link rel="icon" type="image/png" href="favicon.png">
+
+
+
+    <link rel="stylesheet" href="style.css?v=3.6">
+    <style>
+        .ai-chat-input,
+        .ai-chat-input:focus,
+        .ai-chat-input:active,
+        .ai-chat-input:hover {
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            -webkit-box-shadow: none !important;
+            border-top: none !important;
+            border-bottom: none !important;
+            border-left: none !important;
+            border-right: none !important;
+            background: transparent !important;
+            border-radius: 0 !important;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="material-symbols/outlined.css">
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <!-- Firebase Scripts (Compat Version) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://unpkg.com/@vkid/sdk@2.6.8/dist-sdk/umd/index.js"></script>
+    <!-- Firebase initialization moved to js/firebase-init.js -->
+</head>
+<body>
+    <!-- App Splash Screen (Logo in center, SmartStudyHub at bottom) -->
+    <div id="app-splash-screen" class="app-splash-screen">
+        <div class="splash-center">
+            <img src="favicon.png" alt="SmartStudyHub Logo" class="splash-logo" draggable="false">
+        </div>
+        <div class="splash-bottom">
+            <span class="splash-app-name">SmartStudyHub</span>
+        </div>
+    </div>
+
+    <!-- Floating Web Download Button (Shown ONLY on website version) -->
+    <button id="download-desktop-btn" class="download-desktop-btn web-download-trigger" type="button" aria-label="Скачать приложение для ПК и телефона">
+        <span class="pulse-dot"></span>
+        <span class="material-symbols-outlined icon-glow">rocket_launch</span>
+        <span class="btn-label">Скачать App</span>
+    </button>
+
+    <header class="app-titlebar" id="app-titlebar" role="banner">
+        <span class="app-titlebar-title">SmartStudyHub</span>
+        <div class="app-titlebar-controls">
+            <button type="button" class="titlebar-btn titlebar-minimize" aria-label="Minimize">
+                <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><rect width="10" height="1"/></svg>
+            </button>
+            <button type="button" class="titlebar-btn titlebar-maximize" aria-label="Maximize">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="0.5" y="0.5" width="9" height="9" rx="0.5"/></svg>
+            </button>
+            <button type="button" class="titlebar-btn titlebar-close" aria-label="Close">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1 1l8 8M9 1L1 9"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <div id="calculator-page" class="page active">
+            <smart-calculator></smart-calculator>
+        </div>
+        <div id="grades-page" class="page">
+            <grade-average-calculator></grade-average-calculator>
+        </div>
+        <div id="tools-page" class="page">
+            <div class="tools-page-content">
+                <!-- HUB: show only tiles by default -->
+                <div id="tools-hub" class="tools-hub">
+                    <button class="tool-tile" id="tile-settings" aria-label="Settings">
+                        <div class="tile-icon">
+                            <i data-feather="settings"></i>
+                        </div>
+                        <div class="tile-title" data-i18n="settings">Settings</div>
+                    </button>
+
+                    <button class="tool-tile" id="tile-converter" aria-label="Unit Converter">
+                        <div class="tile-icon">
+                            <i data-feather="sliders"></i>
+                        </div>
+                        <div class="tile-title" data-i18n="unitConverter">Unit Converter</div>
+                    </button>
+
+                    <button class="tool-tile" id="tile-currency" aria-label="Currency Rates">
+                        <div class="tile-icon">
+                            <i data-feather="dollar-sign"></i>
+                        </div>
+                        <div class="tile-title" data-i18n="currencyRates">Currency Rates</div>
+                    </button>
+
+                    <button class="tool-tile" id="tile-notes" aria-label="Notes">
+                        <div class="tile-icon">
+                            <i data-feather="file-text"></i>
+                        </div>
+                        <div class="tile-title" data-i18n="notes">Notes</div>
+                    </button>
+
+                    <button class="tool-tile tool-tile--ai" id="tile-ai" aria-label="AI Assistant">
+                        <div class="tile-icon tile-icon--ai">
+                            <svg class="ai-tile-spark" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M24 4L26.8 17.2L40 20L26.8 22.8L24 36L21.2 22.8L8 20L21.2 17.2L24 4Z" fill="#007aff"/>
+                                <path d="M36 8L37.2 14.8L44 16L37.2 17.2L36 24L34.8 17.2L28 16L34.8 14.8L36 8Z" fill="#007aff" opacity="0.55"/>
+                                <circle cx="14" cy="32" r="3" fill="#007aff" opacity="0.4"/>
+                            </svg>
+                        </div>
+                        <div class="tile-title" data-i18n="aiAssistant">AI Помощник</div>
+                    </button>
+
+                    <button class="tool-tile" id="tile-translator" aria-label="Translator">
+                        <div class="tile-icon">
+                            <i data-feather="globe"></i>
+                        </div>
+                        <div class="tile-title" data-i18n="translator">Переводчик</div>
+                    </button>
+
+                    <button class="tool-tile" id="tile-genpass" aria-label="GenPass">
+                        <div class="tile-icon">
+                            <span class="material-symbols-outlined" style="font-size: 28px; color: var(--primary-accent);">vpn_key</span>
+                        </div>
+                        <div class="tile-title" data-i18n="genpass">GenPass</div>
+                    </button>
+
+                    <button class="tool-tile tool-tile--download web-download-trigger" id="tile-download" aria-label="Скачать приложения">
+                        <div class="tile-icon tile-icon--download">
+                            <span class="material-symbols-outlined" style="font-size: 28px; color: var(--primary-accent);">download_for_offline</span>
+                        </div>
+                        <div class="tile-title">Скачать App</div>
+                    </button>
+                </div>
+
+                <!-- Panels: hidden by default -->
+                <section id="tools-genpass-panel" class="tool-panel hidden" aria-label="GenPass">
+                    <div class="panel-header">
+                        <button class="panel-back" data-panel="genpass">← <span data-i18n="back">Back</span></button>
+                        <div class="panel-title">GenPass</div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="genpass-tabs">
+                            <button class="genpass-tab active" data-target="genpass-generator" data-i18n="genpassTabGen">Генератор</button>
+                            <button class="genpass-tab" data-target="genpass-analyzer" data-i18n="genpassTabCheck">Проверить пароль</button>
+                            <button class="genpass-tab" data-target="genpass-vault" data-i18n="genpassTabVault">Мои пароли</button>
+                        </div>
+                        
+                        <!-- TAB 1: Generator -->
+                        <div id="genpass-generator" class="genpass-content active">
+                            <div class="converter-card">
+                                <div class="password-display-wrapper" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                                    <input type="text" id="genpass-output" class="genpass-display" readonly style="flex: 1; padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: var(--text-color); font-family: monospace; font-size: 1.2rem; text-align: center;">
+                                    <button id="genpass-save-generated" class="notes-icon-btn" style="width: 50px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;" title="Сохранить в хранилище"><span class="material-symbols-outlined" style="color: var(--text-color);">bookmark_add</span></button>
+                                    <button id="genpass-copy-btn" class="notes-icon-btn" style="width: 50px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;" title="Копировать"><span class="material-symbols-outlined" style="color: var(--text-color);">content_copy</span></button>
+                                </div>
+                                <div class="genpass-controls" style="display: flex; flex-direction: column; gap: 15px;">
+                                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                                        <label style="color: var(--text-color); font-weight: 600;"><span data-i18n="genpassLength">Длина</span>: <span id="genpass-length-val">16</span></label>
+                                        <input type="range" id="genpass-length" min="5" max="64" value="16" style="width: 100%;">
+                                        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-color);">
+                                                <span data-i18n="genpassUpper">Заглавные буквы (A-Z)</span>
+                                                <label class="premium-switch">
+                                                    <input type="checkbox" id="genpass-upper" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-color);">
+                                                <span data-i18n="genpassLower">Строчные буквы (a-z)</span>
+                                                <label class="premium-switch">
+                                                    <input type="checkbox" id="genpass-lower" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-color);">
+                                                <span data-i18n="genpassNumbers">Цифры (0-9)</span>
+                                                <label class="premium-switch">
+                                                    <input type="checkbox" id="genpass-numbers" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-color);">
+                                                <span data-i18n="genpassSymbols">Символы (!@#$)</span>
+                                                <label class="premium-switch">
+                                                    <input type="checkbox" id="genpass-symbols" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button id="genpass-generate-btn" class="glass-button" style="width: 100%; margin-top: 20px; padding: 12px; background: var(--primary-accent); border:none; border-radius:10px; color:white; font-weight:bold; cursor: pointer; transition: opacity 0.2s;" data-i18n="genpassGenerate">Сгенерировать</button>
+                            </div>
+                        </div>
+
+                        <!-- TAB 2: Checker -->
+                        <div id="genpass-analyzer" class="genpass-content hidden" style="display: none;">
+                            <div class="converter-card">
+                                <div class="password-input-wrapper" style="position: relative; display: flex; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid color-mix(in srgb, var(--primary-accent) 40%, transparent); border-radius: 10px; padding-right: 10px;">
+                                    <input type="password" id="genpass-analyze-input" placeholder="Введите пароль для проверки" style="width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; color: var(--text-color); font-family: inherit; font-size: 0.9rem; outline: none;" data-i18n-placeholder="genpassCheckPlaceholder">
+                                    <button id="genpass-save-analyzed" class="notes-icon-btn" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--text-color-secondary);" title="Сохранить в хранилище"><span class="material-symbols-outlined">bookmark_add</span></button>
+                                    <button id="genpass-toggle-vis" class="notes-icon-btn" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--text-color-secondary);"><span class="material-symbols-outlined">visibility</span></button>
+                                    <button id="genpass-clear-input" class="notes-icon-btn" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--text-color-secondary);"><span class="material-symbols-outlined">close</span></button>
+                                </div>
+
+                                <div class="genpass-verdict-card" style="margin-top: 20px; padding: 20px; text-align: center; border-radius: 15px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
+                                    <div class="score-ring" style="display: inline-flex; align-items: center; justify-content: center; width: 100px; height: 100px; border-radius: 50%; border: 6px solid #444; margin-bottom: 15px; transition: border-color 0.3s;">
+                                        <h1 id="genpass-score" style="margin: 0; font-size: 2rem; color: var(--text-color);">0%</h1>
+                                    </div>
+                                    <h3 id="genpass-status" style="margin: 10px 0; font-size: 1.2rem; color: var(--text-color);" data-i18n="genpassWaiting">Ожидание ввода...</h3>
+                                    <p id="genpass-crack-time" style="color: var(--text-color-secondary); font-size: 0.9rem; margin-bottom: 0;">Время на взлом: -</p>
+                                    <p id="genpass-leak-warning" style="color: #ff4c4c; font-weight: bold; margin-top: 10px; display: none; align-items: center; justify-content: center; gap: 6px;"><span class="material-symbols-outlined" style="font-size: 20px; color: #ff4c4c; vertical-align: middle;">warning</span> <span id="genpass-leak-warning-text">Этот пароль найден в утечках!</span></p>
+                                </div>
+
+                                <div class="genpass-checklist" style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
+                                    <div class="check-item" id="check-length" style="display: flex; align-items: center; gap: 8px; color: var(--text-color-secondary);"><span class="material-symbols-outlined" style="color: #ff4c4c; font-size: 20px;">cancel</span> Длина минимум 12 символов</div>
+                                    <div class="check-item" id="check-upperlower" style="display: flex; align-items: center; gap: 8px; color: var(--text-color-secondary);"><span class="material-symbols-outlined" style="color: #ff4c4c; font-size: 20px;">cancel</span> Заглавные и строчные буквы</div>
+                                    <div class="check-item" id="check-numsym" style="display: flex; align-items: center; gap: 8px; color: var(--text-color-secondary);"><span class="material-symbols-outlined" style="color: #ff4c4c; font-size: 20px;">cancel</span> Цифры и спецсимволы</div>
+                                    <div class="check-item" id="check-patterns" style="display: flex; align-items: center; gap: 8px; color: var(--text-color-secondary);"><span class="material-symbols-outlined" style="color: #4caf50; font-size: 20px;">check_circle</span> Нет простых паттернов</div>
+                                    <div class="check-item" id="check-pwned" style="display: flex; align-items: center; gap: 8px; color: var(--text-color-secondary);"><span class="material-symbols-outlined" style="color: #4caf50; font-size: 20px;">check_circle</span> Не скомпрометирован</div>
+                                </div>
+
+                                <button id="genpass-improve-btn" class="glass-button" style="display: none; width: 100%; margin-top: 20px; padding: 12px; background: #ff9800; border:none; border-radius:10px; color:white; font-weight:bold; cursor: pointer;" data-i18n="genpassImprove">Улучшить пароль</button>
+                            </div>
+                        </div>
+
+                        <!-- TAB 3: Vault / My Passwords -->
+                        <div id="genpass-vault" class="genpass-content hidden" style="display: none;">
+                            <div class="converter-card">
+                                <div class="converter-header" style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div class="converter-title" style="font-size: 1.1rem; font-weight: 600; color: var(--text-color);" data-i18n="genpassSavedTitle">Сохраненные пароли</div>
+                                        <div id="genpass-sync-status" class="converter-sub" style="font-size: 0.8rem; color: var(--text-color-secondary);">Синхронизация...</div>
+                                    </div>
+                                    <div style="display: flex; gap: 10px; align-items: center;">
+                                        <span class="material-symbols-outlined" id="genpass-add-btn" style="color: var(--primary-accent); cursor: pointer; font-size: 24px;" title="Добавить пароль вручную">add_circle</span>
+                                        <span class="material-symbols-outlined" id="genpass-sync-icon" style="color: var(--text-color-secondary); cursor: pointer; font-size: 22px;" title="Синхронизировать">sync</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Manual Add Form (initially hidden) -->
+                                <div id="genpass-add-form" class="hidden" style="margin-bottom: 20px; padding: 15px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); display: none; flex-direction: column; gap: 12px; transition: all 0.3s ease;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-color);" data-i18n="genpassAddNew">Добавить новый пароль</h4>
+                                        <span class="material-symbols-outlined" id="genpass-add-close" style="cursor: pointer; font-size: 20px; color: var(--text-color-secondary);">close</span>
+                                    </div>
+                                    <input type="text" id="genpass-add-label" placeholder="Название сервиса (например, Google)" style="width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.15); color: var(--text-color); font-size: 0.85rem; outline: none;" data-i18n-placeholder="genpassAddLabelPlaceholder">
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <div style="position: relative; flex: 1; display: flex; align-items: center; background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding-right: 8px;">
+                                            <input type="password" id="genpass-add-password" placeholder="Пароль" style="width: 100%; padding: 10px 12px; border: none; background: transparent; color: var(--text-color); font-size: 0.85rem; outline: none;" data-i18n-placeholder="genpassAddPwdPlaceholder">
+                                            <span class="material-symbols-outlined" id="genpass-add-toggle-vis" style="cursor: pointer; font-size: 18px; color: var(--text-color-secondary);">visibility</span>
+                                        </div>
+                                        <button id="genpass-add-gen-btn" class="notes-icon-btn" style="width: 38px; height: 38px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;" title="Сгенерировать безопасный пароль"><span class="material-symbols-outlined" style="color: var(--primary-accent); font-size: 20px;">vpn_key</span></button>
+                                    </div>
+                                    <button id="genpass-add-save-btn" class="glass-button" style="width: 100%; padding: 10px; background: var(--primary-accent); border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer;" data-i18n="genpassAddBtn">Добавить пароль</button>
+                                </div>
+                                <div id="genpass-saved-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto; padding-right: 5px;">
+                                    <!-- List populated dynamically -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Floating Hover Tooltip -->
+                        <div id="genpass-tooltip" class="genpass-tooltip"></div>
+                    </div>
+                </section>
+
+                <section id="tools-settings-panel" class="tool-panel hidden">
+                    <div class="panel-header">
+                        <button class="panel-back" data-panel="settings">← <span data-i18n="back">Back</span></button>
+                    </div>
+                    <div class="panel-body">
+                        <settings-component></settings-component>
+                    </div>
+                </section>
+
+                <section id="tools-converter-panel" class="tool-panel hidden">
+                    <div class="panel-header">
+                        <button class="panel-back" data-panel="converter">← <span data-i18n="back">Back</span></button>
+                        <div class="panel-title" data-i18n="unitConverter">Unit Converter</div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="converter-card">
+                            <div class="converter-header">
+                                <div class="converter-icon"><i data-feather="sliders"></i></div>
+                                <div>
+                                    <div class="converter-title" data-i18n="unitConverter">Unit Converter</div>
+                                    <div class="converter-sub" data-i18n="converterSub">Convert values quickly</div>
+                                </div>
+                            </div>
+
+                            <div class="converter-controls">
+                                <div class="converter-input">
+                                    <input class="conv-display" type="number" id="conv-value" value="1" inputmode="decimal" aria-label="Value" />
+                                </div>
+
+                                <div class="converter-selects">
+                                    <select class="form-control" id="conv-type" aria-label="Unit Type">
+                                        <option value="length" data-i18n="length">Length</option>
+                                        <option value="mass" data-i18n="mass">Mass</option>
+                                        <option value="temp" data-i18n="temperature">Temperature</option>
+                                    </select>
+                                    <select class="form-control" id="conv-from" aria-label="From Unit"></select>
+                                    <div class="curr-swap-btn" id="conv-swap" style="cursor: pointer; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); transition: all 0.3s ease; flex-shrink: 0;" title="Swap Units">
+                                        <i data-feather="repeat" style="width: 18px; height: 18px; color: var(--primary-accent);"></i>
+                                    </div>
+                                    <select class="form-control" id="conv-to" aria-label="To Unit"></select>
+                                </div>
+
+                                <div class="converter-result-card">
+                                    <div class="result-label" data-i18n="result">Result</div>
+                                    <div class="converter-result" id="conv-result" style="text-align: left; padding: 0; font-size: 1.5rem; background: none; border: none; box-shadow: none;">0.0000</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tools-currency-panel" class="tool-panel hidden">
+                    <div class="panel-header">
+                        <button class="panel-back" data-panel="currency">← <span data-i18n="back">Back</span></button>
+                        <div class="panel-title" data-i18n="currencyRates">Currency Rates</div>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Interactive Currency Converter Card -->
+                        <div class="converter-card" style="margin-bottom: 20px;">
+                            <div class="converter-header">
+                                <div class="converter-icon"><i data-feather="dollar-sign"></i></div>
+                                <div>
+                                    <div class="converter-title" data-i18n="currencyConverterTitle">Currency Converter</div>
+                                    <div class="converter-sub" data-i18n="currencyConverterSub">Convert between world currencies</div>
+                                </div>
+                            </div>
+
+                            <div class="converter-controls">
+                                <div class="converter-input">
+                                    <input class="conv-display" type="number" id="curr-amount" value="1" inputmode="decimal" aria-label="Amount" />
+                                </div>
+
+                                <div class="converter-selects">
+                                    <select class="form-control" id="curr-from" aria-label="From Currency">
+                                        <!-- Will populate dynamically -->
+                                    </select>
+                                    <div class="curr-swap-btn" id="curr-swap" style="cursor: pointer; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); transition: all 0.3s ease; flex-shrink: 0;" title="Swap Currencies">
+                                        <i data-feather="repeat" style="width: 18px; height: 18px; color: var(--primary-accent);"></i>
+                                    </div>
+                                    <select class="form-control" id="curr-to" aria-label="To Currency">
+                                        <!-- Will populate dynamically -->
+                                    </select>
+                                </div>
+
+                                <div class="converter-result-card">
+                                    <div class="result-label" data-i18n="result">Result</div>
+                                    <div class="converter-result" id="curr-result" style="text-align: left; padding: 0; font-size: 1.5rem; background: none; border: none; box-shadow: none;">0.0000</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Live Rates Section -->
+                        <div class="converter-card">
+                            <div class="converter-header" style="margin-bottom: 16px;">
+                                <div class="converter-title" data-i18n="popularRates">Popular Rates</div>
+                                <div class="converter-sub" id="currency-last-update" style="margin-top: 2px;">Updating...</div>
+                            </div>
+                            <div id="currency-message" class="card-message"></div>
+                            <div id="currency-rates" class="currency-rates"></div>
+                            <div class="currency-actions" style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                                <button id="currency-refresh" class="btn btn-secondary" style="border-radius: 12px; padding: 8px 16px; display: flex; align-items: center; gap: 8px;" data-i18n="refresh">
+                                    <i data-feather="refresh-cw" style="width: 14px; height: 14px;"></i>
+                                    <span>Refresh</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tools-notes-panel" class="tool-panel hidden" aria-label="Notes">
+                    <!-- Notes Header Bar -->
+                    <div class="notes-header">
+                        <button class="panel-back notes-back-btn" data-panel="notes">
+                            <span class="material-symbols-outlined">arrow_back</span>
+                        </button>
+                        <div class="notes-search-wrap">
+                            <span class="material-symbols-outlined notes-search-icon">search</span>
+                            <input type="text" id="notes-search-input" class="notes-search-input" data-i18n-placeholder="noteSearch" placeholder="Search notes...">
+                        </div>
+                        <button id="notes-view-toggle" class="notes-icon-btn" title="Toggle view" aria-label="Toggle view">
+                            <span class="material-symbols-outlined" id="notes-view-icon">grid_view</span>
+                        </button>
+                        <button id="notes-filter-reminders" class="notes-icon-btn" title="Reminders" aria-label="Reminders">
+                            <span class="material-symbols-outlined">notifications</span>
+                        </button>
+                    </div>
+
+                    <!-- Note Creator (collapsed) -->
+                    <div class="notes-creator-outer">
+                        <div class="note-creator-card" id="note-creator">
+                            <div class="note-creator-collapsed" id="note-creator-collapsed">
+                                <span data-i18n="takeANote" class="note-creator-placeholder">Take a note...</span>
+                                <div class="note-creator-quick-btns">
+                                    <button class="notes-icon-btn" id="btn-new-note-check" title="New checkbox note" aria-label="Checkbox">
+                                        <span class="material-symbols-outlined">check_box</span>
+                                    </button>
+                                    <button class="notes-icon-btn" id="btn-new-note-img" title="New image note" aria-label="Image">
+                                        <span class="material-symbols-outlined">image</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="note-creator-expanded hidden" id="note-creator-expanded">
+                                <div id="note-creator-image-container" class="note-image-container hidden">
+                                    <img id="note-creator-image" src="" alt="Note image">
+                                    <button id="note-creator-image-remove" class="notes-icon-btn note-image-remove" aria-label="Remove image">
+                                        <span class="material-symbols-outlined">close</span>
+                                    </button>
+                                </div>
+                                <input type="file" id="note-creator-file-input" accept="image/*" class="hidden">
+                                <input type="text" id="note-title-input" class="note-input-title" data-i18n-placeholder="noteTitlePlaceholder" placeholder="Title...">
+                                <textarea id="note-text-input" class="note-input-text" data-i18n-placeholder="takeANote" placeholder="Take a note..." rows="3"></textarea>
+                                <!-- Checklist items area -->
+                                <div id="note-checklist-area" class="note-checklist-area hidden"></div>
+                                <!-- Footer toolbar -->
+                                <div class="note-creator-toolbar">
+                                    <div class="note-toolbar-left">
+                                        <button class="notes-icon-btn" id="btn-note-pin" title="Pin note" aria-label="Pin">
+                                            <span class="material-symbols-outlined">push_pin</span>
+                                        </button>
+                                        <button class="notes-icon-btn" id="btn-note-reminder" title="Reminder" aria-label="Reminder">
+                                            <span class="material-symbols-outlined">add_alert</span>
+                                        </button>
+                                        <div class="note-color-popup-wrap">
+                                            <button class="notes-icon-btn" id="btn-note-color" title="Background color" aria-label="Color">
+                                                <span class="material-symbols-outlined">palette</span>
+                                            </button>
+                                            <div class="note-color-popup hidden" id="note-color-popup">
+                                                <button class="note-color-dot note-color-dot--default" data-color="" aria-label="Default"><span class="material-symbols-outlined" style="font-size:16px;color:#fff;opacity:0.7;">close</span></button>
+                                                <button class="note-color-dot" data-color="#5c2b29" style="background:#5c2b29" aria-label="Red"></button>
+                                                <button class="note-color-dot" data-color="#614a19" style="background:#614a19" aria-label="Orange"></button>
+                                                <button class="note-color-dot" data-color="#635d19" style="background:#635d19" aria-label="Yellow"></button>
+                                                <button class="note-color-dot" data-color="#345920" style="background:#345920" aria-label="Green"></button>
+                                                <button class="note-color-dot" data-color="#16504b" style="background:#16504b" aria-label="Teal"></button>
+                                                <button class="note-color-dot" data-color="#2d555e" style="background:#2d555e" aria-label="Blue"></button>
+                                                <button class="note-color-dot" data-color="#1e3a8a" style="background:#1e3a8a" aria-label="Dark Blue"></button>
+                                                <button class="note-color-dot" data-color="#42275e" style="background:#42275e" aria-label="Purple"></button>
+                                                <button class="note-color-dot" data-color="#5b2245" style="background:#5b2245" aria-label="Pink"></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button id="btn-close-note" class="notes-close-btn" data-i18n="noteClose">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes Body -->
+                    <div class="notes-body" id="notes-body">
+                        <!-- Pinned section -->
+                        <div id="notes-pinned-section" class="notes-section hidden">
+                            <div class="notes-section-label" data-i18n="notePinned">Pinned</div>
+                            <div id="notes-pinned-grid" class="notes-grid"></div>
+                        </div>
+                        <!-- Others section -->
+                        <div id="notes-others-section" class="notes-section">
+                            <div class="notes-section-label notes-others-label hidden" id="notes-others-label" data-i18n="noteOthers">Others</div>
+                            <div id="notes-grid" class="notes-grid"></div>
+                        </div>
+                        <!-- Empty state -->
+                        <div id="notes-empty-state" class="notes-empty-state hidden">
+                            <span class="material-symbols-outlined notes-empty-icon">lightbulb</span>
+                            <p data-i18n="noteEmptyState">Your notes will appear here</p>
+                        </div>
+                    </div>
+
+                    <!-- Note Edit Modal -->
+                    <div id="note-edit-modal" class="note-edit-modal hidden" aria-modal="true">
+                        <div class="note-edit-backdrop" id="note-edit-backdrop"></div>
+                        <div class="note-edit-card" id="note-edit-card">
+                            <div id="note-edit-image-container" class="note-image-container hidden">
+                                <img id="note-edit-image" src="" alt="Note image">
+                                <button id="note-edit-image-remove" class="notes-icon-btn note-image-remove" aria-label="Remove image">
+                                    <span class="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+                            <input type="file" id="note-edit-file-input" accept="image/*" class="hidden">
+                            <input type="text" id="note-edit-title" class="note-input-title" data-i18n-placeholder="noteTitlePlaceholder" placeholder="Title...">
+                            <textarea id="note-edit-text" class="note-input-text note-edit-text" data-i18n-placeholder="takeANote" placeholder="Take a note..."></textarea>
+                            <div id="note-edit-checklist" class="note-checklist-area"></div>
+                            <div class="note-creator-toolbar note-edit-toolbar">
+                                <div class="note-toolbar-left">
+                                    <button class="notes-icon-btn" id="btn-edit-pin" title="Pin note" aria-label="Pin">
+                                        <span class="material-symbols-outlined">push_pin</span>
+                                    </button>
+                                    <button class="notes-icon-btn" id="btn-edit-reminder" title="Reminder" aria-label="Reminder">
+                                        <span class="material-symbols-outlined">add_alert</span>
+                                    </button>
+                                    <button class="notes-icon-btn" id="btn-edit-img" title="Add image" aria-label="Image">
+                                        <span class="material-symbols-outlined">image</span>
+                                    </button>
+                                    <div class="note-color-popup-wrap">
+                                        <button class="notes-icon-btn" id="btn-edit-color" title="Background color" aria-label="Color">
+                                            <span class="material-symbols-outlined">palette</span>
+                                        </button>
+                                        <div class="note-color-popup hidden" id="note-edit-color-popup">
+                                            <button class="note-color-dot note-color-dot--default" data-color="" aria-label="Default"><span class="material-symbols-outlined" style="font-size:16px;color:#fff;opacity:0.7;">close</span></button>
+                                            <button class="note-color-dot" data-color="#5c2b29" style="background:#5c2b29" aria-label="Red"></button>
+                                            <button class="note-color-dot" data-color="#614a19" style="background:#614a19" aria-label="Orange"></button>
+                                            <button class="note-color-dot" data-color="#635d19" style="background:#635d19" aria-label="Yellow"></button>
+                                            <button class="note-color-dot" data-color="#345920" style="background:#345920" aria-label="Green"></button>
+                                            <button class="note-color-dot" data-color="#16504b" style="background:#16504b" aria-label="Teal"></button>
+                                            <button class="note-color-dot" data-color="#2d555e" style="background:#2d555e" aria-label="Blue"></button>
+                                            <button class="note-color-dot" data-color="#1e3a8a" style="background:#1e3a8a" aria-label="Dark Blue"></button>
+                                            <button class="note-color-dot" data-color="#42275e" style="background:#42275e" aria-label="Purple"></button>
+                                            <button class="note-color-dot" data-color="#5b2245" style="background:#5b2245" aria-label="Pink"></button>
+                                        </div>
+                                    </div>
+                                    <button class="notes-icon-btn" id="btn-edit-delete" title="Delete note" aria-label="Delete">
+                                        <span class="material-symbols-outlined">delete</span>
+                                    </button>
+                                </div>
+                                <button id="btn-edit-close" class="notes-close-btn" data-i18n="noteClose">Close</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reminder Modal Popover -->
+                    <div id="note-reminder-modal" class="note-reminder-modal hidden">
+                        <div class="note-reminder-backdrop" id="note-reminder-backdrop"></div>
+                        <div class="note-reminder-card glass-ai">
+                            <div class="note-reminder-header">
+                                <span class="material-symbols-outlined note-reminder-icon">notifications_active</span>
+                                <span class="note-reminder-title" data-i18n="noteReminderTitle">Установить напоминание</span>
+                            </div>
+                            <div class="note-reminder-body">
+                                <label class="note-reminder-label" data-i18n="noteReminderSelectDate">Выберите дату и время:</label>
+                                <input type="datetime-local" id="note-reminder-datetime" class="note-reminder-input">
+                            </div>
+                            <div class="note-reminder-footer">
+                                <button id="note-reminder-clear" class="notes-icon-btn note-reminder-clear-btn hidden" title="Удалить напоминание">
+                                    <span class="material-symbols-outlined" style="font-size:18px;color:var(--secondary-accent,#ff3b30);">delete</span>
+                                </button>
+                                <div style="flex:1"></div>
+                                <button id="note-reminder-cancel" class="notes-close-btn" data-i18n="noteClose">Отмена</button>
+                                <button id="note-reminder-save" class="notes-close-btn note-reminder-save-btn" data-i18n="save">Сохранить</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+
+                <section id="tools-ai-panel" class="tool-panel tool-panel--ai hidden" aria-label="SmartStudyAI">
+                    <!-- AI Settings Dialog (Personalization & API Key) -->
+                    <div id="ai-persona-modal" class="ai-persona-modal hidden" aria-hidden="true">
+                        <div class="ai-persona-content glass-ai" style="max-width: 440px; width: 100%;">
+                            <button type="button" id="ai-persona-close" class="ai-persona-close" aria-label="Close">×</button>
+                            <h3 style="margin-top: 0; color: var(--primary-accent); margin-bottom: 12px; font-size: 1.25rem;" data-i18n="aiSettings">AI Settings</h3>
+                            
+                            <!-- API Key section -->
+                            <div style="margin-bottom: 1.2rem; text-align: left;">
+                                <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-color); display: block; margin-bottom: 6px;" data-i18n="aiPersonalApiKey">Personal Gemini API key:</label>
+                                <input type="password" id="ai-api-key-input-local" data-i18n-placeholder="aiApiKeyPlaceholder" placeholder="Paste your API key (AIzaSy...)" style="width: 100%; padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--primary-accent) 40%, transparent); background: rgba(255,255,255,0.04); color: var(--text-color); font-family: inherit; font-size: 0.9rem; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
+                                <span style="font-size: 0.78rem; color: var(--text-color-secondary); display: block; margin-top: 4px; line-height: 1.3;" data-i18n="aiApiKeyHint">Using a personal key removes the daily message limit. The key is stored locally only.</span>
+                            </div>
+
+                            <!-- Personalization section -->
+                            <div style="margin-bottom: 1.2rem; text-align: left;">
+                                <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-color); display: block; margin-bottom: 6px;" data-i18n="aiAboutMe">About me (Personalization):</label>
+                                <textarea id="ai-persona-input" style="width: 100%; height: 90px; resize: none; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--primary-accent) 40%, transparent); background: rgba(255,255,255,0.04); color: var(--text-color); padding: 10px; font-family: inherit; font-size: 0.9rem; box-sizing: border-box; outline: none;" data-i18n-placeholder="aiPersonaPlaceholder" placeholder="E.g.: Explain complex topics simply. Keep answers brief with bullet points."></textarea>
+                                <span style="font-size: 0.78rem; color: var(--text-color-secondary); display: block; margin-top: 4px; line-height: 1.3;" data-i18n="aiPersonaHint">Helps adapt the AI response style to your preferences (e.g. short answers, specific programming language, etc.).</span>
+                            </div>
+
+                            <!-- AI Extensions Section -->
+                            <div style="margin-bottom: 1.2rem; text-align: left; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
+                                <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-color); display: block; margin-bottom: 12px;" data-i18n="aiExtensions">AI Extensions</label>
+                                <div class="extensions-list">
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <img src="google-icons/gmail.png" alt="Gmail" class="extension-icon-symbol">
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extGmailTitle">Gmail</div>
+                                                <div class="extension-desc" data-i18n="extGmailDesc">Read and send emails</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-gmail">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <span class="material-symbols-outlined extension-icon-symbol" style="color: #fbbc04; font-size: 24px;">description</span>
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extNotesTitle">Notes (Keep)</div>
+                                                <div class="extension-desc" data-i18n="extNotesDesc">AI can read, create, and manage your notes</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-notes">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+            
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <img src="google-icons/drive.png" alt="Google Drive" class="extension-icon-symbol">
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extDriveTitle">Google Drive</div>
+                                                <div class="extension-desc" data-i18n="extDriveDesc">Manage files and documents</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-drive">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <img src="google-icons/docs.png" alt="Google Docs" class="extension-icon-symbol">
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extDocsTitle">Google Docs</div>
+                                                <div class="extension-desc" data-i18n="extDocsDesc">Create and edit documents</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-docs">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+            
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <img src="google-icons/keep.png" alt="Google Keep" class="extension-icon-symbol">
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extKeepTitle">Google Keep</div>
+                                                <div class="extension-desc" data-i18n="extKeepDesc">Create and view notes</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-keep">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+            
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <img src="google-icons/calendar.png" alt="Google Calendar" class="extension-icon-symbol">
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extCalendarTitle">Google Calendar</div>
+                                                <div class="extension-desc" data-i18n="extCalendarDesc">View and manage calendar events</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-calendar">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+            
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <span class="material-symbols-outlined extension-icon-symbol tasks-icon">task_alt</span>
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extTasksTitle">Google Tasks</div>
+                                                <div class="extension-desc" data-i18n="extTasksDesc">Manage tasks and to-do lists</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-tasks">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+            
+                                    <div class="extension-row">
+                                        <div class="extension-info">
+                                            <div class="extension-icon">
+                                                <span class="material-symbols-outlined extension-icon-symbol youtube-icon">play_circle</span>
+                                            </div>
+                                            <div class="extension-text">
+                                                <div class="extension-title" data-i18n="extYoutubeTitle">YouTube</div>
+                                                <div class="extension-desc" data-i18n="extYoutubeDesc">Search for videos and music</div>
+                                            </div>
+                                        </div>
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="ext-youtube">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
+                                <button type="button" id="ai-persona-cancel" style="border-radius: 10px; padding: 8px 18px; background: transparent; border: 1px solid var(--text-color-secondary); color: var(--text-color-secondary); cursor: pointer; font-weight: 600; font-family: inherit;" data-i18n="cancel">Cancel</button>
+                                <button type="button" id="ai-persona-save" style="background: var(--primary-accent); color: white; border-radius: 10px; padding: 8px 22px; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px var(--glow-color-primary); font-family: inherit;" data-i18n="save">Save</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chats History Drawer -->
+                    <div id="ai-drawer" class="ai-drawer hidden" aria-hidden="true">
+                        <div class="ai-drawer-header">
+                            <h3 style="margin: 0; font-size: 1.1rem; color: var(--primary-accent);" data-i18n="aiChatHistory">Chat History</h3>
+                            <button type="button" id="ai-drawer-close" style="background: none; border: none; color: var(--text-color-secondary); font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px;">×</button>
+                        </div>
+                        <button type="button" id="ai-new-chat-btn" style="width: 100%; margin: 10px 0; padding: 10px; border-radius: 10px; border: 1px dashed var(--primary-accent); background: rgba(0, 255, 255, 0.03); color: var(--primary-accent); font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit;">
+                            <span data-i18n="aiNewChat">+ New Chat</span>
+                        </button>
+                        <div id="ai-chats-list" class="ai-chats-list">
+                            <!-- Injected dynamically -->
+                        </div>
+                        <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; margin-top: auto;">
+                            <button type="button" id="ai-toggle-persona" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255, 255, 255, 0.03); color: var(--text-color); font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; transition: background 0.2s;">
+                                <span><span class="material-symbols-outlined" style="font-size: 1.1rem; line-height: 1; vertical-align: middle;">settings</span> <span data-i18n="aiSettingsBtn">AI Settings</span></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="ai-chat-shell glass-ai">
+                        <header class="ai-chat-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box;">
+                            <button class="ai-chat-back panel-back" type="button" data-panel="ai">
+                                ← <span data-i18n="back">Назад</span>
+                            </button>
+                            <h2 class="ai-chat-title" style="margin: 0;">SmartStudyAI</h2>
+                            
+                            <!-- Toggle history drawer (hamburger menu) -->
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <button type="button" id="ai-toggle-history" title="История и настройки" style="background: none; border: 1px solid rgba(255,255,255,0.15); color: var(--text-color); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; transition: all 0.2s;">
+                                    ☰
+                                </button>
+                            </div>
+                        </header>
+
+                        <div class="ai-chat-body">
+                            <div id="ai-chat-messages" class="ai-chat-messages" role="log" aria-live="polite"></div>
+
+                            <div id="ai-offline-toast" class="ai-offline-toast hidden" role="alert">
+                                <div class="ai-offline-toast-inner glass-ai">
+                                    <svg class="ai-offline-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                                        <path d="M8 38L40 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                                        <path d="M6 28C10 22 16 18 24 18C28 18 32 19.5 35.5 22" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                                        <path d="M12.5 32C15.5 28.5 19.5 26 24 26C27 26 29.8 27 32.5 28.8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                                        <circle cx="24" cy="36" r="2.5" fill="currentColor"/>
+                                    </svg>
+                                    <p class="ai-offline-text" data-i18n="aiOfflineMessage">Соединение потеряно. Проверьте Wi-Fi или мобильный интернет</p>
+                                    <button type="button" id="ai-offline-retry" class="ai-offline-retry" data-i18n="aiRetry">Повторить попытку</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <footer class="ai-chat-footer">
+                            <div id="ai-limit-notice" class="ai-limit-notice hidden" role="status"></div>
+                            <div class="ai-input-row">
+                                <textarea id="ai-chat-input" class="ai-chat-input" rows="1" data-i18n-placeholder="aiInputPlaceholder" placeholder="Напишите сообщение…" aria-label="Message"></textarea>
+                                <button type="button" id="ai-chat-send" class="ai-send-btn" aria-label="Send">
+                                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                        <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </footer>
+                    </div>
+                </section>
+
+                <section id="tools-translator-panel" class="tool-panel hidden" aria-label="Translator">
+                    <div class="panel-header">
+                        <button class="panel-back" data-panel="translator">← <span data-i18n="back">Back</span></button>
+                        <div class="panel-title" data-i18n="translator">Переводчик</div>
+                    </div>
+                    <div class="panel-body" id="translator-container"></div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <nav>
+            <button id="calculator-tab" class="nav-tab active">
+                <i data-feather="cpu"></i>
+                <span class="nav-label" data-i18n="calculator">Калькулятор</span>
+            </button>
+            <button id="grades-tab" class="nav-tab">
+                <i data-feather="bar-chart-2"></i>
+                <span class="nav-label" data-i18n="grades">Средний балл</span>
+            </button>
+            <button id="tools-tab" class="nav-tab">
+                <i data-feather="grid"></i>
+                <span class="nav-label" data-i18n="tools">Tools</span>
+            </button>
+            <button id="web-download-tab" class="nav-tab web-download-trigger" title="Скачать приложение для ПК и Android">
+                <i data-feather="download-cloud"></i>
+                <span class="nav-label">Скачать App</span>
+            </button>
+        </nav>
+    </footer>
+
+    <div id="app-toast-container" class="app-toast-container" aria-live="polite" aria-atomic="true"></div>
+
+
+
+    <!-- Generic app dialog for confirmations, prompts and alerts -->
+    <div id="app-generic-modal" class="app-dialog-modal" aria-hidden="true">
+        <div class="generic-modal-content" role="dialog" aria-modal="true" aria-labelledby="app-generic-modal-title">
+            <button type="button" class="generic-modal-close" data-dialog-close="app-generic" aria-label="Close">×</button>
+            <h2 id="app-generic-modal-title" class="generic-modal-title"></h2>
+            <div id="app-generic-modal-body" class="generic-modal-body"></div>
+            <input id="app-generic-modal-input" class="generic-modal-input" type="text" />
+            <div class="generic-modal-actions">
+                <button type="button" id="app-generic-modal-accept" class="generic-modal-btn generic-modal-btn-primary"></button>
+                <button type="button" id="app-generic-modal-cancel" class="generic-modal-btn generic-modal-btn-secondary"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Desktop app download modal -->
+    <!-- Beautiful Web Download Hub Modal (PC & Android) -->
+    <div id="download-hub-modal" class="download-hub-modal" aria-hidden="true">
+        <div class="download-hub-content" role="dialog" aria-modal="true" aria-labelledby="download-hub-title">
+            <button class="download-hub-close" type="button" data-hub-close aria-label="Close">&times;</button>
+            
+            <div class="download-hub-header">
+                <div class="download-hub-badge">
+                    <span class="material-symbols-outlined">rocket_launch</span>
+                    <span>SMARTSTUDYHUB APPS</span>
+                </div>
+                <h2 id="download-hub-title" class="download-hub-title">Установите приложение на ПК и Телефон</h2>
+                <p class="download-hub-subtitle">
+                    Получите максимум производительности: быстрый запуск без браузера, фоновые уведомления и оффлайн-доступ к оценкам и заметкам.
+                </p>
+                <div class="download-hub-version-tag">
+                    <span class="pulse-dot"></span>
+                    <span>Последний релиз: <strong id="hub-release-tag">v1.1.0</strong> (Официальные сборки GitHub)</span>
+                </div>
+            </div>
+
+            <div class="download-hub-grid">
+                <!-- Windows Card -->
+                <div class="download-card download-card--windows">
+                    <div class="card-glow-bg"></div>
+                    <div class="card-header">
+                        <div class="platform-icon platform-icon--win">
+                            <svg viewBox="0 0 48 48" fill="currentColor">
+                                <path d="M4 6L22 3.5V23H4V6Z" />
+                                <path d="M26 3L44 0.5V23H26V3Z" />
+                                <path d="M4 25H22V44.5L4 42V25Z" />
+                                <path d="M26 25H44V47.5L26 45V25Z" />
+                            </svg>
+                        </div>
+                        <div class="platform-info">
+                            <span class="platform-tag">Windows x64</span>
+                            <h3 class="platform-title">SmartStudyHub for PC</h3>
+                        </div>
+                    </div>
+
+                    <ul class="platform-features">
+                        <li>
+                            <span class="material-symbols-outlined check-icon">check_circle</span>
+                            <span>Быстрый запуск с рабочего стола без браузера</span>
+                        </li>
+                        <li>
+                            <span class="material-symbols-outlined check-icon">check_circle</span>
+                            <span>Системный трей и удобный вход через Deep Link</span>
+                        </li>
+                        <li>
+                            <span class="material-symbols-outlined check-icon">check_circle</span>
+                            <span>Безопасное автообновление в фоновом режиме</span>
+                        </li>
+                    </ul>
+
+                    <a id="hub-win-download-btn" class="download-btn download-btn--win" href="https://github.com/KamilRemix/SmartStudyHub/releases/latest" target="_blank" rel="noopener">
+                        <div class="btn-icon">
+                            <span class="material-symbols-outlined">desktop_windows</span>
+                        </div>
+                        <div class="btn-text-block">
+                            <span class="btn-main-text">Скачать для Windows</span>
+                            <span class="btn-subtext">Setup .exe • Win 10/11</span>
+                        </div>
+                        <span class="material-symbols-outlined btn-arrow">arrow_forward</span>
+                    </a>
+                </div>
+
+                <!-- Android Card -->
+                <div class="download-card download-card--android">
+                    <div class="card-glow-bg"></div>
+                    <div class="card-header">
+                        <div class="platform-icon platform-icon--android">
+                            <span class="material-symbols-outlined">android</span>
+                        </div>
+                        <div class="platform-info">
+                            <span class="platform-tag">Android 7.0+</span>
+                            <h3 class="platform-title">SmartStudyHub Mobile</h3>
+                        </div>
+                    </div>
+
+                    <ul class="platform-features">
+                        <li>
+                            <span class="material-symbols-outlined check-icon">check_circle</span>
+                            <span>Оптимизировано под сенсорное управление</span>
+                        </li>
+                        <li>
+                            <span class="material-symbols-outlined check-icon">check_circle</span>
+                            <span>Быстрое оффлайн-хранение оценок и заметок</span>
+                        </li>
+                        <li>
+                            <span class="material-symbols-outlined check-icon">check_circle</span>
+                            <span>Безопасный системный PackageInstaller</span>
+                        </li>
+                    </ul>
+
+                    <div class="android-actions-block">
+                        <a id="hub-apk-download-btn" class="download-btn download-btn--android" href="https://github.com/KamilRemix/SmartStudyHub/releases/latest" target="_blank" rel="noopener">
+                            <div class="btn-icon">
+                                <span class="material-symbols-outlined">smartphone</span>
+                            </div>
+                            <div class="btn-text-block">
+                                <span class="btn-main-text">Скачать для Android</span>
+                                <span class="btn-subtext">Release .apk</span>
+                            </div>
+                            <span class="material-symbols-outlined btn-arrow">arrow_forward</span>
+                        </a>
+
+                        <div class="qr-code-box" title="Отсканируйте камерой телефона">
+                            <img id="hub-apk-qr-img" class="qr-code-img" src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=https%3A%2F%2Fgithub.com%2FKamilRemix%2FSmartStudyHub%2Freleases%2Flatest&color=ffffff&bgcolor=1e293b" alt="QR Code for Mobile Download" loading="lazy" />
+                            <span class="qr-hint">QR-код на телефон</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="download-hub-footer">
+                <div class="footer-note">
+                    <span class="material-symbols-outlined">language</span>
+                    <span>Вы сейчас используете <strong>SmartStudyHub Web</strong></span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                    <a class="footer-github-link" href="/privacy.html" target="_blank" rel="noopener">
+                        <i data-feather="shield"></i>
+                        <span data-i18n="privacyPolicy">Конфиденциальность</span>
+                    </a>
+                    <a class="footer-github-link" href="https://github.com/KamilRemix/SmartStudyHub" target="_blank" rel="noopener">
+                        <i data-feather="github"></i>
+                        <span>GitHub</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    
+    <!-- Auto-Update Modal (Electron + Android) -->
+    <div id="update-modal" class="update-modal" aria-hidden="true">
+        <div class="update-modal-content" role="dialog" aria-modal="true" aria-labelledby="update-modal-title">
+            <button class="update-modal-close" type="button" aria-label="Close">&times;</button>
+            <div class="update-modal-header">
+                <div class="update-modal-icon" aria-hidden="true">
+                    <span class="material-symbols-outlined">system_update</span>
+                </div>
+                <div class="update-modal-title-block">
+                    <h2 class="update-modal-title" id="update-modal-title">Доступно обновление</h2>
+                </div>
+            </div>
+            <div class="update-modal-changelog">
+                <p>Загрузка информации...</p>
+            </div>
+            <div class="update-modal-progress-container" style="display: none;">
+                <div class="update-modal-progress-track">
+                    <div class="update-modal-progress-bar" style="width: 0%;"></div>
+                </div>
+                <span class="update-modal-progress-text">0%</span>
+            </div>
+            <div class="update-modal-actions">
+                <button class="update-modal-btn-primary">Скачать</button>
+                <button class="update-modal-btn-secondary">Позже</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container for notifications -->
+    <div id="app-toast-container"></div>
+    
+    <!-- Translations (must be first - all modules depend on window.translations) -->
+    <script src="translations.js?v=3.6"></script>
+
+    <!-- Core modules: Firebase → Auth → UI -->
+    <script src="js/firebase-init.js?v=3.6"></script>
+    <script src="js/auth.js?v=3.6"></script>
+    <script src="js/ui.js?v=3.6"></script>
+
+    <!-- Tool implementations (original scripts) -->
+    <script src="notes.js?v=3.6"></script>
+    <script src="js/notes.js?v=3.6"></script>
+    <script src="translator.js?v=3.6"></script>
+    <script src="js/translator.js?v=3.6"></script>
+    <script src="genpass.js?v=3.6"></script>
+    <script src="js/genpass.js?v=3.6"></script>
+
+    <!-- Tools hub: unit converter + currency converter -->
+    <script src="js/calculator.js?v=3.6"></script>
+
+    <!-- AI Assistant -->
+    <script src="ai-assistant.js?v=3.6"></script>
+
+    <!-- Android updater -->
+    <script src="updater-android.js?v=3.6"></script>
+
+    <!-- Main dispatcher + Web Components (SettingsComponent, SmartCalculator, GradeAverageCalculator) -->
+    <script src="renderer.js?v=3.6"></script>
+
+    <!-- Bulletproof emergency splash dismiss: runs unconditionally regardless of module errors -->
+    <script>
+      window.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+          try {
+            var splash = document.getElementById('app-splash-screen')
+              || document.querySelector('.splash-screen')
+              || document.querySelector('.loading-screen');
+            if (splash) {
+              splash.style.opacity = '0';
+              splash.style.transition = 'opacity 0.4s ease';
+              setTimeout(function() {
+                try { splash.remove(); } catch(e) {}
+              }, 400);
+            }
+          } catch(e) {
+            console.warn('[splash-guard] Emergency dismiss error:', e);
+          }
+        }, 200);
+      });
+    </script>
+</body>
+</html>

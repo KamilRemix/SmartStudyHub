@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tools</title>
+    <link rel="stylesheet" href="tools.css">
+</head>
+<body>
+    <div class="tools-container">
+        <!-- Settings Card -->
+        <div class="tool-card glassmorphism">
+            <div class="card-content">
+                <h3>Settings</h3>
+                <p>Manage your account and preferences</p>
+            </div>
+        </div>
+
+        <!-- Unit Converter Card -->
+        <div class="tool-card glassmorphism">
+            <div class="card-content">
+                <h3>Unit Converter</h3>
+                <div class="converter">
+                    <select id="conv-type" class="glass-select">
+                        <option value="length">Length</option>
+                        <option value="mass">Mass</option>
+                        <option value="temp">Temperature</option>
+                    </select>
+                    <div class="input-group">
+                        <input type="number" id="conv-value" class="glass-input" placeholder="Enter value">
+                        <select id="conv-from" class="glass-select">
+                            <option value="m">Meters</option>
+                            <option value="ft">Feet</option>
+                        </select>
+                        <select id="conv-to" class="glass-select">
+                            <option value="m">Meters</option>
+                            <option value="ft">Feet</option>
+                        </select>
+                    </div>
+                    <div class="result glass-result">
+                        <p id="conv-result">0.0000</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Currency Card -->
+        <div class="tool-card glassmorphism error-card">
+            <div class="card-content">
+                <h3>Currency Converter</h3>
+                <div id="currency-rates"></div>
+                <div id="currency-message"></div>
+                <button id="currency-refresh" class="glass-button">Refresh</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

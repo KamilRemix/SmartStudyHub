@@ -1,0 +1,131 @@
+name: Build & Release (Android APK + Windows EXE)
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: "\U0001F4F1 Build Android APK"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - name: Build Web Assets
+        run: npm run build:web
+        env:
+          REACT_APP_GEMINI_API_KEY: ${{ secrets.REACT_APP_GEMINI_API_KEY }}
+
+      - name: Sync Capacitor Android
+        run: |
+          npx cap add android || true
+          npx cap sync android
+
+      - name: Build Android APK (Release)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Rename APK
+        run: |
+          TAG=${{ github.ref_name }}
+          cp android/app/build/outputs/apk/debug/app-debug.apk SmartStudyHub-${TAG}.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartStudyHub-Android-APK
+          path: SmartStudyHub-*.apk
+
+      - name: Publish APK to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "SmartStudyHub ${{ github.ref_name }}"
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: SmartStudyHub-*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-exe:
+    name: "\U0001F4BB Build Windows EXE"
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - name: Build Web Assets
+        run: npm run build:web
+        env:
+          REACT_APP_GEMINI_API_KEY: ${{ secrets.REACT_APP_GEMINI_API_KEY }}
+
+      - name: Build Windows Executable (NSIS)
+        run: npm run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH: never
+
+      - name: Rename EXE
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $exe = Get-ChildItem -Path dist-exe -Filter '*.exe' | Select-Object -First 1
+          if ($exe) {
+            $newName = "SmartStudyHub-Setup-${tag}.exe"
+            Copy-Item $exe.FullName -Destination $newName
+            Write-Host "Renamed to $newName"
+          } else {
+            Write-Error "No .exe found in dist-exe/"
+            exit 1
+          }
+
+      - name: Upload EXE Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartStudyHub-Windows-EXE
+          path: SmartStudyHub-Setup-*.exe
+
+      - name: Publish EXE to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "SmartStudyHub ${{ github.ref_name }}"
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: SmartStudyHub-Setup-*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

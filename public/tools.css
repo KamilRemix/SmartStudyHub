@@ -1,0 +1,82 @@
+/* Glassmorphism Styles */
+.glassmorphism {
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04);
+    border-radius: 12px;
+    padding: 20px;
+    transition: transform 0.2s;
+}
+
+.glassmorphism:hover {
+    transform: scale(0.97);
+}
+
+/* Glass Elements */
+.glass-select, .glass-input, .glass-button {
+    width: 100%;
+    border-radius: 12px;
+    padding: 12px;
+    border: 1px solid rgba(0, 122, 255, 0.2);
+    background: rgba(255, 255, 255, 0.7);
+    appearance: none;
+    transition: border-color 0.2s;
+}
+
+.glass-select::-webkit-inner-spin-button,
+.glass-select::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.glass-input {
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.glass-button {
+    background: rgba(0, 122, 255, 0.2);
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.glass-result {
+    font-size: 1.2rem;
+    text-align: center;
+    margin: 15px 0;
+    color: var(--text-color);
+}
+
+/* Error Card Styles */
+.error-card {
+    background: rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 0, 0, 0.3);
+    box-shadow: 0 4px 15px rgba(255, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 15px;
+}
+
+.error-card .glass-result {
+    color: red;
+    font-weight: bold;
+}
+
+.error-card .glass-button {
+    background: rgba(255, 0, 0, 0.3);
+    color: white;
+    border: 1px solid rgba(255, 0, 0, 0.3);
+}
+
+/* Additional Styling */
+.tools-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 20px;
+}
+
+.card-content {
+    text-align: center;
+}
