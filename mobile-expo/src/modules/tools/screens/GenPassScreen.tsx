@@ -280,16 +280,28 @@ export const GenPassScreen: React.FC = () => {
   const trackWidthRef = useRef<number>(240);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Load initial vault
+  // Load initial vault & subscribe to cloud sync
   useEffect(() => {
-    AsyncStorage.getItem(VAULT_KEY).then((raw) => {
-      if (raw) {
-        try {
-          setVault(JSON.parse(raw));
-        } catch {}
+    const refreshVault = () => {
+      AsyncStorage.getItem(VAULT_KEY).then((raw) => {
+        if (raw) {
+          try {
+            setVault(JSON.parse(raw));
+          } catch {}
+        }
+      });
+    };
+
+    refreshVault();
+
+    const unsubscribe = cloudSyncService.subscribe((status) => {
+      if (!status.isSyncing && status.lastSyncedAt) {
+        refreshVault();
       }
     });
-  }, []);
+
+    return unsubscribe;
+  }, [user?.uid]);
 
   const saveVault = useCallback(async (updated: VaultEntry[]) => {
     setVault(updated);

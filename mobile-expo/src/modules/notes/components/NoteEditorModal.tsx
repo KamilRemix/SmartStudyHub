@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -63,6 +63,12 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const [reminderTimestamp, setReminderTimestamp] = useState<number | undefined>(undefined);
   const [newTagInput, setNewTagInput] = useState('');
 
+  // Reminder picker modal state
+  const [isReminderPickerVisible, setIsReminderPickerVisible] = useState(false);
+  const [selectedDayOffset, setSelectedDayOffset] = useState(0); // 0 = today, 1 = tomorrow, 2 = day after tomorrow, 7 = week
+  const [selectedHour, setSelectedHour] = useState(18);
+  const [selectedMinute, setSelectedMinute] = useState(0);
+
   useEffect(() => {
     if (note) {
       setTitle(note.title);
@@ -73,6 +79,11 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
       setPinned(note.pinned || false);
       setImages(note.images ? [...note.images] : []);
       setReminderTimestamp(note.reminderTimestamp);
+      if (note.reminderTimestamp) {
+        const d = new Date(note.reminderTimestamp);
+        setSelectedHour(d.getHours());
+        setSelectedMinute(Math.floor(d.getMinutes() / 5) * 5);
+      }
     } else {
       setTitle('');
       setContent('');
@@ -82,9 +93,79 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
       setPinned(false);
       setImages([]);
       setReminderTimestamp(undefined);
+      setSelectedDayOffset(0);
+      setSelectedHour(18);
+      setSelectedMinute(0);
     }
     setNewTagInput('');
+    setIsReminderPickerVisible(false);
   }, [note, visible]);
+
+  const formattedReminder = useMemo(() => {
+    if (!reminderTimestamp) return null;
+    const d = new Date(reminderTimestamp);
+    const now = new Date();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const timeStr = `${hours}:${minutes}`;
+
+    const isToday =
+      d.getDate() === now.getDate() &&
+      d.getMonth() === now.getMonth() &&
+      d.getFullYear() === now.getFullYear();
+
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isTomorrow =
+      d.getDate() === tomorrow.getDate() &&
+      d.getMonth() === tomorrow.getMonth() &&
+      d.getFullYear() === tomorrow.getFullYear();
+
+    if (isToday) {
+      return t('reminderFormattedToday', { time: timeStr });
+    }
+    if (isTomorrow) {
+      return t('reminderFormattedTomorrow', { time: timeStr });
+    }
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${day}.${month}, ${timeStr}`;
+  }, [reminderTimestamp, t]);
+
+  const handleQuickPreset = (type: '1h' | 'todayEvening' | 'tomorrowMorning') => {
+    const now = new Date();
+    if (type === '1h') {
+      setReminderTimestamp(now.getTime() + 3600 * 1000);
+    } else if (type === 'todayEvening') {
+      const d = new Date(now);
+      if (d.getHours() >= 18) {
+        d.setDate(d.getDate() + 1);
+      }
+      d.setHours(18, 0, 0, 0);
+      setReminderTimestamp(d.getTime());
+    } else if (type === 'tomorrowMorning') {
+      const d = new Date(now);
+      d.setDate(d.getDate() + 1);
+      d.setHours(9, 0, 0, 0);
+      setReminderTimestamp(d.getTime());
+    }
+    setIsReminderPickerVisible(false);
+  };
+
+  const handleConfirmCustomReminder = () => {
+    const target = new Date();
+    target.setDate(target.getDate() + selectedDayOffset);
+    target.setHours(selectedHour, selectedMinute, 0, 0);
+    if (target.getTime() <= Date.now()) {
+      target.setDate(target.getDate() + 1);
+    }
+    setReminderTimestamp(target.getTime());
+    setIsReminderPickerVisible(false);
+  };
+
+  const handleClearReminder = () => {
+    setReminderTimestamp(undefined);
+  };
 
   const handleAddChecklistItem = () => {
     const newItem: NoteChecklistItem = {
@@ -138,14 +219,6 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
 
   const handleRemoveImage = (index: number) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSetReminder = (hoursFromNow: number) => {
-    setReminderTimestamp(Date.now() + hoursFromNow * 3600 * 1000);
-  };
-
-  const handleClearReminder = () => {
-    setReminderTimestamp(undefined);
   };
 
   const handleSave = () => {
@@ -280,38 +353,51 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
               </Text>
             </TouchableOpacity>
 
-            {/* Quick reminder triggers */}
+            {/* Reminder trigger */}
             <View style={styles.reminderTriggers}>
-              <TouchableOpacity
-                style={[
-                  styles.reminderChip,
-                  {
-                    backgroundColor: reminderTimestamp ? colors.primaryAccent + '15' : colors.surfaceSecondary,
-                    borderColor: reminderTimestamp ? colors.primaryAccent : colors.borderColor,
-                  },
-                ]}
-                onPress={() => handleSetReminder(1)}
-                activeOpacity={0.7}
-              >
-                <Feather
-                  name="bell"
-                  size={13}
-                  color={reminderTimestamp ? colors.primaryAccent : colors.textColorSecondary}
-                />
-                <Text
+              {reminderTimestamp ? (
+                <TouchableOpacity
                   style={[
-                    styles.reminderChipText,
-                    { color: reminderTimestamp ? colors.primaryAccent : colors.textColorSecondary },
+                    styles.reminderChipActive,
+                    {
+                      backgroundColor: colors.primaryAccent + '18',
+                      borderColor: colors.primaryAccent,
+                    },
                   ]}
+                  onPress={() => setIsReminderPickerVisible(true)}
+                  activeOpacity={0.7}
                 >
-                  {reminderTimestamp ? t('reminderActive') : t('reminderPlus1h')}
-                </Text>
-                {reminderTimestamp ? (
-                  <TouchableOpacity onPress={handleClearReminder} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Feather name="x" size={12} color={colors.primaryAccent} />
+                  <Feather name="bell" size={13} color={colors.primaryAccent} />
+                  <Text
+                    style={[
+                      styles.reminderChipTextActive,
+                      { color: colors.primaryAccent },
+                    ]}
+                  >
+                    {formattedReminder}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={handleClearReminder}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Feather name="x" size={13} color={colors.primaryAccent} />
                   </TouchableOpacity>
-                ) : null}
-              </TouchableOpacity>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.attachBtn,
+                    { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderColor },
+                  ]}
+                  onPress={() => setIsReminderPickerVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Feather name="bell" size={15} color={colors.primaryAccent} />
+                  <Text style={[styles.attachBtnText, { color: colors.textColor }]}>
+                    {t('reminderButtonLabel')}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -476,6 +562,235 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Reminder Picker Modal */}
+      <Modal
+        visible={isReminderPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsReminderPickerVisible(false)}
+      >
+        <View style={styles.pickerOverlay}>
+          <View
+            style={[
+              styles.pickerCard,
+              { backgroundColor: colors.componentBackground, borderColor: colors.borderColor },
+            ]}
+          >
+            {/* Header */}
+            <View style={styles.pickerHeader}>
+              <View style={styles.pickerHeaderLeft}>
+                <Feather name="bell" size={18} color={colors.primaryAccent} />
+                <Text style={[styles.pickerTitle, { color: colors.textColor }]}>
+                  {t('reminderSetTitle')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsReminderPickerVisible(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Feather name="x" size={20} color={colors.textColorSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Presets */}
+            <View style={styles.pickerPresetRow}>
+              <TouchableOpacity
+                style={[styles.pickerPresetChip, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderColor }]}
+                onPress={() => handleQuickPreset('1h')}
+              >
+                <Feather name="clock" size={13} color={colors.primaryAccent} />
+                <Text style={[styles.pickerPresetText, { color: colors.textColor }]}>
+                  {t('reminderIn1Hour')}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.pickerPresetChip, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderColor }]}
+                onPress={() => handleQuickPreset('todayEvening')}
+              >
+                <Feather name="sunset" size={13} color={colors.primaryAccent} />
+                <Text style={[styles.pickerPresetText, { color: colors.textColor }]}>
+                  {t('reminderTodayEvening')}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.pickerPresetChip, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderColor }]}
+                onPress={() => handleQuickPreset('tomorrowMorning')}
+              >
+                <Feather name="sunrise" size={13} color={colors.primaryAccent} />
+                <Text style={[styles.pickerPresetText, { color: colors.textColor }]}>
+                  {t('reminderTomorrowMorning')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.pickerDivider, { backgroundColor: colors.borderColor }]} />
+
+            {/* Custom Date Selector */}
+            <Text style={[styles.pickerSectionLabel, { color: colors.textColorSecondary }]}>
+              {t('reminderDateLabel')}
+            </Text>
+            <View style={styles.pickerDaysRow}>
+              {[
+                { offset: 0, label: t('reminderDayToday') },
+                { offset: 1, label: t('reminderDayTomorrow') },
+                { offset: 2, label: t('reminderDayAfterTomorrow') },
+                { offset: 7, label: t('reminderDayInAWeek') },
+              ].map((item) => {
+                const isSelected = selectedDayOffset === item.offset;
+                return (
+                  <TouchableOpacity
+                    key={item.offset}
+                    style={[
+                      styles.pickerDayChip,
+                      {
+                        backgroundColor: isSelected ? colors.primaryAccent : colors.surfaceSecondary,
+                        borderColor: isSelected ? colors.primaryAccent : colors.borderColor,
+                      },
+                    ]}
+                    onPress={() => setSelectedDayOffset(item.offset)}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerDayChipText,
+                        { color: isSelected ? '#ffffff' : colors.textColor },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Time Section */}
+            <Text style={[styles.pickerSectionLabel, { color: colors.textColorSecondary, marginTop: 12 }]}>
+              {t('reminderTimeLabel')}
+            </Text>
+
+            {/* Quick Time Slots */}
+            <View style={styles.pickerQuickTimeRow}>
+              {[
+                { h: 9, m: 0, label: '09:00' },
+                { h: 12, m: 0, label: '12:00' },
+                { h: 15, m: 0, label: '15:00' },
+                { h: 18, m: 0, label: '18:00' },
+                { h: 21, m: 0, label: '21:00' },
+              ].map((slot) => {
+                const isMatch = selectedHour === slot.h && selectedMinute === slot.m;
+                return (
+                  <TouchableOpacity
+                    key={slot.label}
+                    style={[
+                      styles.pickerTimeSlot,
+                      {
+                        backgroundColor: isMatch ? colors.primaryAccent + '22' : colors.surfaceSecondary,
+                        borderColor: isMatch ? colors.primaryAccent : colors.borderColor,
+                      },
+                    ]}
+                    onPress={() => {
+                      setSelectedHour(slot.h);
+                      setSelectedMinute(slot.m);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerTimeSlotText,
+                        { color: isMatch ? colors.primaryAccent : colors.textColor },
+                      ]}
+                    >
+                      {slot.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Tumbler / Steppers for Hour & Minute */}
+            <View style={styles.tumblerContainer}>
+              {/* Hours Tumbler */}
+              <View style={styles.tumblerCol}>
+                <Text style={[styles.tumblerHeader, { color: colors.textColorSecondary }]}>
+                  {t('reminderHourLabel')}
+                </Text>
+                <View style={[styles.tumblerBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderColor }]}>
+                  <TouchableOpacity
+                    style={styles.tumblerBtn}
+                    onPress={() => setSelectedHour((prev) => (prev > 0 ? prev - 1 : 23))}
+                  >
+                    <Feather name="minus" size={16} color={colors.textColor} />
+                  </TouchableOpacity>
+                  <Text style={[styles.tumblerValue, { color: colors.textColor }]}>
+                    {String(selectedHour).padStart(2, '0')}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.tumblerBtn}
+                    onPress={() => setSelectedHour((prev) => (prev < 23 ? prev + 1 : 0))}
+                  >
+                    <Feather name="plus" size={16} color={colors.textColor} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <Text style={[styles.tumblerColon, { color: colors.textColor }]}>:</Text>
+
+              {/* Minutes Tumbler */}
+              <View style={styles.tumblerCol}>
+                <Text style={[styles.tumblerHeader, { color: colors.textColorSecondary }]}>
+                  {t('reminderMinuteLabel')}
+                </Text>
+                <View style={[styles.tumblerBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderColor }]}>
+                  <TouchableOpacity
+                    style={styles.tumblerBtn}
+                    onPress={() => setSelectedMinute((prev) => (prev >= 5 ? prev - 5 : 55))}
+                  >
+                    <Feather name="minus" size={16} color={colors.textColor} />
+                  </TouchableOpacity>
+                  <Text style={[styles.tumblerValue, { color: colors.textColor }]}>
+                    {String(selectedMinute).padStart(2, '0')}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.tumblerBtn}
+                    onPress={() => setSelectedMinute((prev) => (prev <= 50 ? prev + 5 : 0))}
+                  >
+                    <Feather name="plus" size={16} color={colors.textColor} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* Push Notification Notice */}
+            <View style={[styles.pickerNotice, { backgroundColor: colors.surfaceSecondary }]}>
+              <Feather name="info" size={14} color={colors.primaryAccent} />
+              <Text style={[styles.pickerNoticeText, { color: colors.textColorSecondary }]}>
+                {t('reminderNoticeApk')}
+              </Text>
+            </View>
+
+            {/* Actions */}
+            <View style={styles.pickerActionRow}>
+              <TouchableOpacity
+                style={[styles.pickerCancelBtn, { borderColor: colors.borderColor }]}
+                onPress={() => setIsReminderPickerVisible(false)}
+              >
+                <Text style={[styles.pickerCancelText, { color: colors.textColorSecondary }]}>
+                  {t('reminderCancelBtn')}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.pickerConfirmBtn, { backgroundColor: colors.primaryAccent }]}
+                onPress={handleConfirmCustomReminder}
+              >
+                <Feather name="check" size={16} color="#ffffff" />
+                <Text style={styles.pickerConfirmText}>{t('reminderConfirmBtn')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };
@@ -673,17 +988,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  reminderChip: {
+  reminderChipActive: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
+    gap: 6,
+    paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 10,
     borderWidth: 1,
   },
-  reminderChipText: {
-    fontFamily: 'Inter_500Medium',
+  reminderChipTextActive: {
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
   },
   imageScroll: {
@@ -708,5 +1023,184 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.65)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Reminder Picker Modal Styles
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  pickerCard: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 20,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  pickerHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pickerTitle: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 16,
+  },
+  pickerPresetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  pickerPresetChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  pickerPresetText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+  },
+  pickerDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 12,
+  },
+  pickerSectionLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  pickerDaysRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  pickerDayChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  pickerDayChipText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+  },
+  pickerQuickTimeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  pickerTimeSlot: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  pickerTimeSlotText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+  },
+  tumblerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginVertical: 10,
+  },
+  tumblerCol: {
+    alignItems: 'center',
+  },
+  tumblerHeader: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    marginBottom: 4,
+  },
+  tumblerBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    gap: 8,
+  },
+  tumblerBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tumblerValue: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 20,
+    minWidth: 32,
+    textAlign: 'center',
+  },
+  tumblerColon: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 24,
+    marginTop: 14,
+  },
+  pickerNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  pickerNoticeText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    flex: 1,
+  },
+  pickerActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
+  },
+  pickerCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  pickerCancelText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+  },
+  pickerConfirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  pickerConfirmText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 13,
+    color: '#ffffff',
   },
 });

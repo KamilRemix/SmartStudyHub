@@ -22,7 +22,7 @@ describe('Tier 1 - R1: Safe Expo Go Authentication Flow', () => {
     jest.clearAllMocks();
   });
 
-  test('R1-1: Zero TurboModule native binary references in codebase', () => {
+  test('R1-1: Native Google Sign-In plugin configured for standalone APK build', () => {
     const srcDir = path.resolve(__dirname, '../../src');
     const packageJsonPath = path.resolve(__dirname, '../../package.json');
     const appJsonPath = path.resolve(__dirname, '../../app.json');
@@ -30,16 +30,16 @@ describe('Tier 1 - R1: Safe Expo Go Authentication Flow', () => {
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
     const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
 
-    // Verify package.json does NOT declare @react-native-google-signin/google-signin
+    // Verify package.json declares @react-native-google-signin/google-signin for APK builds
     const deps = { ...packageJson.dependencies, ...packageJson.devDependencies };
-    expect(deps['@react-native-google-signin/google-signin']).toBeUndefined();
+    expect(deps['@react-native-google-signin/google-signin']).toBeDefined();
 
-    // Verify app.json plugins do NOT include @react-native-google-signin/google-signin
+    // Verify app.json plugins include @react-native-google-signin/google-signin
     const plugins = appJson.expo?.plugins || [];
     const hasGoogleSigninPlugin = plugins.some((p: any) =>
       (typeof p === 'string' ? p : p[0]) === '@react-native-google-signin/google-signin'
     );
-    expect(hasGoogleSigninPlugin).toBe(false);
+    expect(hasGoogleSigninPlugin).toBe(true);
 
     // Verify app.json specifies custom URL scheme for AuthSession redirect
     expect(appJson.expo?.scheme).toBe('smartstudyhub');

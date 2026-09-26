@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../theme';
 import { useI18n } from '../../i18n';
+import { useAuth } from '../../context/AuthContext';
+import { cloudSyncService } from '../../services/cloudSync';
 import { AppHeader } from '../../components/common/AppHeader';
 import {
   GradesStorageData,
@@ -38,6 +40,7 @@ const QUICK_CALC_ID = '__QUICK_CALC__';
 export const GradesScreen: React.FC = () => {
   const { colors } = useTheme();
   const { t } = useI18n();
+  const { user } = useAuth();
 
   const [data, setData] = useState<GradesStorageData>(INITIAL_GRADES_DATA);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(QUICK_CALC_ID);
@@ -48,14 +51,31 @@ export const GradesScreen: React.FC = () => {
   const [showWhatIfModal, setShowWhatIfModal] = useState(false);
 
   useEffect(() => {
-    loadGradesData().then((stored) => {
-      setData(stored);
+    const refreshGrades = () => {
+      loadGradesData().then((stored) => {
+        setData(stored);
+      });
+    };
+
+    refreshGrades();
+
+    const unsubscribe = cloudSyncService.subscribe((status) => {
+      if (!status.isSyncing && status.lastSyncedAt) {
+        refreshGrades();
+      }
     });
-  }, []);
+
+    return unsubscribe;
+  }, [user?.uid]);
 
   const persistData = async (updated: GradesStorageData) => {
     setData(updated);
     await saveGradesData(updated);
+    if (user?.uid && !user?.isAnonymous && !user?.isOfflineDemo) {
+      cloudSyncService.syncAll(user.uid).catch((err) => {
+        console.warn('[GradesScreen] cloud sync error:', err);
+      });
+    }
   };
 
   const { settings, subjects } = data;

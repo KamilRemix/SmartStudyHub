@@ -35,14 +35,26 @@ export const NotesScreen: React.FC = () => {
   const [isEditorVisible, setIsEditorVisible] = useState(false);
 
   useEffect(() => {
-    loadNotes().then((loaded) => {
-      const sorted = [...loaded].sort(
-        (a, b) =>
-          (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0)
-      );
-      setNotes(sorted);
+    const refreshNotes = () => {
+      loadNotes().then((loaded) => {
+        const sorted = [...loaded].sort(
+          (a, b) =>
+            (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0)
+        );
+        setNotes(sorted);
+      });
+    };
+
+    refreshNotes();
+
+    const unsubscribe = cloudSyncService.subscribe((status) => {
+      if (!status.isSyncing && status.lastSyncedAt) {
+        refreshNotes();
+      }
     });
-  }, []);
+
+    return unsubscribe;
+  }, [user?.uid]);
 
   const persistNotes = async (updated: NoteItem[]) => {
     const sorted = [...updated].sort(

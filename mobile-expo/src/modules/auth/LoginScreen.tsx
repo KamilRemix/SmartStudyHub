@@ -12,8 +12,6 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import { makeRedirectUri } from 'expo-auth-session';
 import { useTheme } from '../../theme';
 import { useI18n } from '../../i18n';
 import { GoogleLogoIcon } from '../../components/common';
@@ -25,6 +23,7 @@ import {
   signInWithGithubCredential,
   signInWithGithubPopup,
 } from '../../services/auth';
+import { performGoogleSignIn } from '../../services/googleAuth';
 import { cloudSyncService } from '../../services/cloudSync';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -44,52 +43,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
   const [socialLoading, setSocialLoading] = useState<'google' | 'github' | null>(null);
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
-
-  // Google OAuth Configuration
-  // Web: Uses Firebase signInWithGooglePopup() directly for seamless browser authentication.
-  // Mobile / Standalone APK: Uses useIdTokenAuthRequest with redirect scheme 'smartstudyhub'.
-  //
-  // NOTE on Expo Go:
-  // In Expo Go, Google blocks authorization with "Доступ заблокирован: ошибка авторизации"
-  // (Error 400: redirect_uri_mismatch or disallowed_useragent) because Expo Go runs inside
-  // package 'host.exp.exponent' and uses redirect schemes that Google blocks for Web Client IDs.
-  // The registered SHA-1 fingerprint belongs to package 'com.smartstudyhub.mobile' for the standalone APK.
-  // Standalone builds (APK via EAS Build / expo run:android) properly match package name and SHA-1.
-  const [googleRequest, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
-    clientId: '121615915195-kddc512lnra4b2eo2qjnnbuc0sb0pcbh.apps.googleusercontent.com',
-    webClientId: '121615915195-kddc512lnra4b2eo2qjnnbuc0sb0pcbh.apps.googleusercontent.com',
-    androidClientId: '121615915195-kddc512lnra4b2eo2qjnnbuc0sb0pcbh.apps.googleusercontent.com',
-    iosClientId: '121615915195-kddc512lnra4b2eo2qjnnbuc0sb0pcbh.apps.googleusercontent.com',
-    scopes: ['profile', 'email'],
-    redirectUri: makeRedirectUri({ scheme: 'smartstudyhub' }),
-  });
-
-  useEffect(() => {
-    if (googleResponse?.type === 'success') {
-      const { id_token } = googleResponse.params;
-      if (id_token) {
-        setSocialLoading('google');
-        signInWithGoogleCredential(id_token)
-          .then(async (cred) => {
-            if (cred?.user?.uid) {
-              await cloudSyncService.syncAll(cred.user.uid);
-            }
-          })
-          .catch((err) => {
-            console.warn('[LoginScreen] Firebase Google auth error:', err);
-            setError(t('authErrorGoogleFailed'));
-          })
-          .finally(() => {
-            setSocialLoading(null);
-          });
-      }
-    } else if (googleResponse?.type === 'error') {
-      setSocialLoading(null);
-      setError(t('authErrorGoogleFailed'));
-    } else if (googleResponse?.type === 'cancel' || googleResponse?.type === 'dismiss') {
-      setSocialLoading(null);
-    }
-  }, [googleResponse, t]);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -121,38 +74,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
   const handleGoogleSignIn = async () => {
     setError('');
     setSocialLoading('google');
-    if (Platform.OS === 'web') {
-      try {
-        const cred = await signInWithGooglePopup();
-        if (cred?.user?.uid) {
-          await cloudSyncService.syncAll(cred.user.uid);
-        }
-      } catch (e: any) {
-        console.warn('[LoginScreen] Google popup error:', e);
-        if (e?.code === 'auth/popup-blocked') {
+    try {
+      const res = await performGoogleSignIn();
+      if (res.isExpoGoNotice) {
+        setError(t('authGoogleExpoGoNotice'));
+      } else if (res.success && res.user?.uid) {
+        await cloudSyncService.syncAll(res.user.uid);
+      } else if (res.error && res.error !== 'cancelled' && res.error !== 'in_progress') {
+        if (res.error === 'play_services_not_available') {
+          setError(t('authErrorGooglePlayServices'));
+        } else if (res.error === 'auth/popup-blocked') {
           setError(t('authErrorPopupBlocked'));
-        } else if (e?.code === 'auth/account-exists-with-different-credential') {
+        } else if (res.error === 'auth/account-exists-with-different-credential') {
           setError(t('authErrorAccountExistsDiff'));
-        } else if (e?.code !== 'auth/popup-closed-by-user' && e?.code !== 'auth/cancelled-popup-request') {
+        } else {
           setError(t('authErrorGoogleFailed'));
         }
-      } finally {
-        setSocialLoading(null);
-      }
-      return;
-    }
-
-    try {
-      const res = await promptGoogleAsync({
-        showInRecents: false,
-      });
-      if (res?.type !== 'success') {
-        setSocialLoading(null);
       }
     } catch (e: any) {
+      console.warn('[LoginScreen] Google sign-in error:', e);
+      setError(t('authErrorGoogleFailed'));
+    } finally {
       setSocialLoading(null);
-      console.warn('[LoginScreen] Google sign-in prompt error:', e);
-      setError(t('authErrorGoogleSignInPrompt'));
     }
   };
 
@@ -180,51 +123,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
       return;
     }
 
-    try {
-      const redirectUri = makeRedirectUri({ scheme: 'smartstudyhub' });
-      const clientId = 'Ov23liIcmvQvSH0hOLwR'; // GitHub OAuth App Client ID
-
-      const authUrl =
-        `https://github.com/login/oauth/authorize?client_id=${clientId}` +
-        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-        `&scope=read:user%20user:email`;
-
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri, {
-        showInRecents: false,
-      });
-
-      if (result.type === 'success' && result.url) {
-        const parsedUrl = new URL(result.url);
-        const errorParam = parsedUrl.searchParams.get('error');
-        if (errorParam) {
-          if (errorParam !== 'access_denied') {
-            setError(t('authErrorGithubFailed'));
-          }
-          return;
-        }
-
-        const accessToken = parsedUrl.searchParams.get('access_token');
-        if (accessToken) {
-          const cred = await signInWithGithubCredential(accessToken);
-          if (cred?.user?.uid) {
-            await cloudSyncService.syncAll(cred.user.uid);
-          }
-          return;
-        }
-
-        const authCode = parsedUrl.searchParams.get('code');
-        if (authCode) {
-          console.log('[LoginScreen] GitHub auth code received');
-        }
-      } else if (result.type === 'cancel' || result.type === 'dismiss') {
-        // Closed by user
-      }
-    } catch (e: any) {
-      console.warn('[LoginScreen] GitHub sign-in error:', e);
-      setError(t('authErrorGithubPrompt'));
-    } finally {
-      setSocialLoading(null);
-    }
+    // On mobile native, GitHub OAuth code flow requires a backend secret exchange.
+    // Gracefully inform mobile users to use Email or Google, or Web for GitHub.
+    setSocialLoading(null);
+    setError(t('authGithubMobileNotice'));
   };
 
 

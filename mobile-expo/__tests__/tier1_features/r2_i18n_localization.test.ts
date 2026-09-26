@@ -20,8 +20,7 @@ describe('Tier 1 - R2: i18n Localization Engine', () => {
   let translations: Record<string, Record<string, string>>;
 
   beforeAll(() => {
-    const translationsPath = path.resolve(__dirname, '../../../public/translations.js');
-    translations = require(translationsPath);
+    translations = require('../../src/i18n/translations').translations;
   });
 
   beforeEach(async () => {

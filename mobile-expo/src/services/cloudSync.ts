@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { database } from './firebase';
+import { auth, database } from './firebase';
 import { ref, get, set } from 'firebase/database';
 import { networkService } from './network';
 
@@ -90,16 +90,27 @@ class CloudSyncService {
     });
   }
 
+  private isDefaultSeedGrades(data: any): boolean {
+    if (!data || !Array.isArray(data.subjects) || data.subjects.length !== 3) return false;
+    const seedIds = new Set(['subj_algebra', 'subj_russian', 'subj_physics']);
+    return data.subjects.every((s: any) => seedIds.has(s.id));
+  }
+
+  private isDefaultSeedNotes(notes: any[]): boolean {
+    if (!Array.isArray(notes) || notes.length === 0 || notes.length > 2) return false;
+    const seedIds = new Set(['note_seed_1', 'note_seed_2']);
+    return notes.every((n: any) => seedIds.has(n.id));
+  }
+
   private async triggerAutoSync() {
     try {
-      const userStr = await AsyncStorage.getItem('@ssh_auth_user');
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        if (user?.uid && !user?.isAnonymous) {
-          await this.syncAll(user.uid);
-        }
+      const user = auth.currentUser;
+      if (user?.uid && !user?.isAnonymous) {
+        await this.syncAll(user.uid);
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[CloudSync] triggerAutoSync error:', e);
+    }
   }
 
   /**
@@ -177,6 +188,13 @@ class CloudSyncService {
       const localStr = await getStoredItemWithFallback(SYNC_KEYS.GRADES, LEGACY_KEYS.GRADES);
       const localData = localStr ? JSON.parse(localStr) : null;
 
+      // If local data is purely unedited initial demo seed and remote user has real data,
+      // overwrite local with remote to prevent seed pollution in cloud!
+      if (this.isDefaultSeedGrades(localData) && remoteGrades && Array.isArray(remoteGrades.subjects) && remoteGrades.subjects.length > 0) {
+        await AsyncStorage.setItem(SYNC_KEYS.GRADES, JSON.stringify(remoteGrades));
+        return;
+      }
+
       if (!localData && remoteGrades) {
         await AsyncStorage.setItem(SYNC_KEYS.GRADES, JSON.stringify(remoteGrades));
       } else if (localData && !remoteGrades) {
@@ -227,6 +245,13 @@ class CloudSyncService {
     try {
       const localStr = await getStoredItemWithFallback(SYNC_KEYS.NOTES, LEGACY_KEYS.NOTES);
       const localNotes: any[] = localStr ? JSON.parse(localStr) : [];
+
+      // If local data is purely unedited initial demo seed and remote user has real data,
+      // overwrite local with remote to prevent seed pollution in cloud!
+      if (this.isDefaultSeedNotes(localNotes) && Array.isArray(remoteNotes) && remoteNotes.length > 0) {
+        await AsyncStorage.setItem(SYNC_KEYS.NOTES, JSON.stringify(remoteNotes));
+        return;
+      }
 
       const map = new Map<string, any>();
       if (Array.isArray(remoteNotes)) {
