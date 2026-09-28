@@ -18,6 +18,7 @@ import { AppHeader } from '../../../components/common/AppHeader';
 import { useAuth } from '../../../context/AuthContext';
 import { cloudSyncService } from '../../../services/cloudSync';
 import { useI18n } from '../../../i18n';
+import { useNavigation } from '@react-navigation/native';
 
 const CHAR_SETS = {
   uppercase: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
@@ -247,6 +248,7 @@ export const GenPassScreen: React.FC = () => {
   const { colors } = useTheme();
   const { t } = useI18n();
   const { user } = useAuth();
+  const navigation = useNavigation();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('generator');
 
@@ -277,7 +279,9 @@ export const GenPassScreen: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
 
+  const trackContainerRef = useRef<View>(null);
   const trackWidthRef = useRef<number>(240);
+  const trackPageXRef = useRef<number>(0);
   const abortRef = useRef<AbortController | null>(null);
 
   // Load initial vault & subscribe to cloud sync
@@ -426,12 +430,16 @@ export const GenPassScreen: React.FC = () => {
     setVisiblePasswords((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Continuous slider math
-  const updateLengthFromTouch = (locationX: number) => {
+  // Continuous slider math (using absolute pageX to prevent coordinate jumping/flickering)
+  const updateLengthFromPageX = (pageX: number) => {
     const width = trackWidthRef.current || 240;
-    const ratio = Math.max(0, Math.min(1, locationX / width));
+    const relativeX = pageX - trackPageXRef.current;
+    const ratio = Math.max(0, Math.min(1, relativeX / width));
     const newLen = Math.round(4 + ratio * 60);
-    setOptions((prev) => ({ ...prev, length: newLen }));
+    setOptions((prev) => {
+      if (prev.length === newLen) return prev;
+      return { ...prev, length: newLen };
+    });
   };
 
   const panResponder = useRef(
@@ -439,10 +447,14 @@ export const GenPassScreen: React.FC = () => {
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt: GestureResponderEvent) => {
-        updateLengthFromTouch(evt.nativeEvent.locationX);
+        trackContainerRef.current?.measure((x, y, width, height, pageX) => {
+          if (width > 0) trackWidthRef.current = width;
+          if (pageX !== undefined) trackPageXRef.current = pageX;
+          updateLengthFromPageX(evt.nativeEvent.pageX);
+        });
       },
       onPanResponderMove: (evt: GestureResponderEvent) => {
-        updateLengthFromTouch(evt.nativeEvent.locationX);
+        updateLengthFromPageX(evt.nativeEvent.pageX);
       },
     })
   ).current;
@@ -470,6 +482,11 @@ export const GenPassScreen: React.FC = () => {
       <AppHeader
         title="GenPass"
         subtitle="Генератор и хранилище паролей"
+        leftAction={{
+          icon: 'arrow-left',
+          accessibilityLabel: t('back') || 'Назад',
+          onPress: () => navigation.goBack(),
+        }}
       />
 
       {/* Tabs */}
@@ -655,13 +672,20 @@ export const GenPassScreen: React.FC = () => {
 
               {/* Continuous Track */}
               <View
+                ref={trackContainerRef}
                 style={styles.sliderTrackContainer}
                 onLayout={(e) => {
                   trackWidthRef.current = e.nativeEvent.layout.width;
+                  trackContainerRef.current?.measure((x, y, width, height, pageX) => {
+                    if (pageX !== undefined) trackPageXRef.current = pageX;
+                  });
                 }}
                 {...panResponder.panHandlers}
               >
-                <View style={[styles.sliderTrackBg, { backgroundColor: colors.borderColor }]}>
+                <View
+                  pointerEvents="none"
+                  style={[styles.sliderTrackBg, { backgroundColor: colors.borderColor }]}
+                >
                   <View
                     style={[
                       styles.sliderTrackFill,
