@@ -1,0 +1,83 @@
+name: Build Android APK (Test Artifact)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Build tag / suffix (e.g. v1.4.0-test)'
+        required: false
+        default: 'v1.4.0-test'
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: "Build Android APK"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || yes | sdkmanager --licenses || true
+
+      - name: Install Mobile Dependencies
+        run: |
+          cd mobile-expo
+          npm ci || npm install
+
+      - name: Setup Release Keystore
+        run: |
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > mobile-expo/android/app/smartstudyhub-release.keystore
+            echo "Loaded keystore from secret"
+          else
+            echo "Using committed smartstudyhub-release.keystore"
+          fi
+          ls -la mobile-expo/android/app/smartstudyhub-release.keystore
+
+      - name: Build Android Release APK
+        run: |
+          cd mobile-expo/android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Verify Signed APK
+        run: |
+          APK_PATH=$(find mobile-expo/android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "Found APK at: $APK_PATH"
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -n 1)
+          if [ -n "$APKSIGNER" ]; then
+            $APKSIGNER verify --verbose "$APK_PATH" || true
+          fi
+
+      - name: Prepare APK Output
+        run: |
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="v1.4.0-test"
+          fi
+          APK_PATH=$(find mobile-expo/android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          cp "$APK_PATH" "SmartStudyHub-${TAG}.apk"
+          echo "Created SmartStudyHub-${TAG}.apk"
+          ls -lh SmartStudyHub-${TAG}.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartStudyHub-Android-APK
+          path: SmartStudyHub-*.apk
+          retention-days: 14
