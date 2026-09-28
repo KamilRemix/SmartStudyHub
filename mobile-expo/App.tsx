@@ -6,7 +6,8 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme, useAppFonts } from './src/theme';
 import { RootNavigator } from './src/navigation';
 import { AuthProvider } from './src/context/AuthContext';
@@ -18,6 +19,7 @@ function AppContent() {
   const { colors, isDark, isLoading } = useTheme();
   const { isReady } = useAppFonts();
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   if (!isReady || isLoading) {
     return (
@@ -55,11 +57,13 @@ function AppContent() {
 
   return (
     <View style={[styles.outerWrapper, { backgroundColor: pageBg }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} translucent backgroundColor="transparent" />
       <View
         style={[
           styles.container,
           {
             backgroundColor: colors.background,
+            paddingTop: !isDesktop && insets.top > 0 ? insets.top : 0,
           },
           frameStyle,
         ]}
