@@ -63,14 +63,14 @@ export const registerWithEmail = (
   email: string,
   password: string
 ): Promise<UserCredential> => {
-  return createUserWithEmailAndPassword(auth, email, password);
+  return createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
 };
 
 export const loginWithEmail = (
   email: string,
   password: string
 ): Promise<UserCredential> => {
-  return signInWithEmailAndPassword(auth, email, password);
+  return signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
 };
 
 export const USER_DATA_STORAGE_KEYS = [
@@ -110,7 +110,7 @@ export const logout = async (): Promise<void> => {
 };
 
 export const resetPassword = (email: string): Promise<void> => {
-  return sendPasswordResetEmail(auth, email);
+  return sendPasswordResetEmail(auth, email.trim().toLowerCase());
 };
 
 export const updateUserProfile = (

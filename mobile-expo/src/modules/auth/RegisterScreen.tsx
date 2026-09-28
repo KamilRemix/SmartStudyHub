@@ -31,29 +31,37 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
   const [error, setError] = useState('');
 
   const handleRegister = async () => {
-    if (!name.trim() || !email.trim() || !password.trim()) {
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    if (!cleanName || !cleanEmail || !cleanPassword) {
       setError(t('authErrorFillFields'));
       return;
     }
-    if (password.length < 6) {
+    if (cleanPassword.length < 6) {
       setError(t('authErrorPasswordMin6'));
       return;
     }
     setError('');
     setLoading(true);
     try {
-      await registerWithEmail(email.trim(), password);
-      await updateUserProfile(name.trim());
+      await registerWithEmail(cleanEmail, cleanPassword);
+      await updateUserProfile(cleanName);
     } catch (e: any) {
       const code = e?.code || '';
       if (code === 'auth/email-already-in-use') {
-        setError(t('authErrorEmailInUse'));
+        setError(t('authErrorEmailAlreadyInUse') || t('authErrorEmailInUse'));
       } else if (code === 'auth/invalid-email') {
-        setError(t('authErrorLoginConnection'));
+        setError(t('authErrorInvalidEmail'));
       } else if (code === 'auth/weak-password') {
-        setError(t('authErrorPasswordMin6'));
+        setError(t('authErrorWeakPassword') || t('authErrorPasswordMin6'));
+      } else if (code === 'auth/network-request-failed') {
+        setError(t('authErrorNetworkFailed'));
+      } else if (code === 'auth/too-many-requests') {
+        setError(t('authErrorTooManyRequests'));
       } else {
-        setError(t('authErrorLoginConnection'));
+        setError(t('authErrorGeneric') || t('authErrorLoginConnection'));
         console.warn('[RegisterScreen] register error:', e);
       }
     } finally {

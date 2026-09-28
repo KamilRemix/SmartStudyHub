@@ -45,25 +45,36 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
   const [resetSent, setResetSent] = useState(false);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password.trim()) {
       setError(t('authErrorEnterEmailPassword'));
       return;
     }
     setError('');
     setLoading(true);
     try {
-      const cred = await loginWithEmail(email.trim(), password);
+      const cred = await loginWithEmail(cleanEmail, password);
       if (cred?.user?.uid) {
         await cloudSyncService.syncAll(cred.user.uid);
       }
     } catch (e: any) {
       const code = e?.code || '';
-      if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+      if (
+        code === 'auth/user-not-found' ||
+        code === 'auth/wrong-password' ||
+        code === 'auth/invalid-credential'
+      ) {
         setError(t('authErrorInvalidCredentials'));
+      } else if (code === 'auth/invalid-email') {
+        setError(t('authErrorInvalidEmail'));
+      } else if (code === 'auth/user-disabled') {
+        setError(t('authErrorUserDisabled'));
       } else if (code === 'auth/too-many-requests') {
-        setError(t('authErrorLoginConnection'));
+        setError(t('authErrorTooManyRequests'));
+      } else if (code === 'auth/network-request-failed') {
+        setError(t('authErrorNetworkFailed'));
       } else {
-        setError(t('authErrorLoginConnection'));
+        setError(t('authErrorGeneric') || t('authErrorLoginConnection'));
         console.warn('[LoginScreen] login error:', e);
       }
     } finally {
@@ -131,18 +142,30 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
 
 
   const handleResetPassword = async () => {
-    if (!email.trim()) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
       setError(t('authErrorEnterEmailReset'));
       return;
     }
     setError('');
     setLoading(true);
     try {
-      await resetPassword(email.trim());
+      await resetPassword(cleanEmail);
       setResetSent(true);
     } catch (e: any) {
-      setError(t('authErrorSendMailFailed'));
-      console.warn('[LoginScreen] reset error:', e);
+      const code = e?.code || '';
+      if (code === 'auth/invalid-email') {
+        setError(t('authErrorInvalidEmail'));
+      } else if (code === 'auth/user-not-found') {
+        setError(t('authErrorUserNotFound'));
+      } else if (code === 'auth/network-request-failed') {
+        setError(t('authErrorNetworkFailed'));
+      } else if (code === 'auth/too-many-requests') {
+        setError(t('authErrorTooManyRequests'));
+      } else {
+        setError(t('authErrorSendMailFailed'));
+        console.warn('[LoginScreen] reset error:', e);
+      }
     } finally {
       setLoading(false);
     }

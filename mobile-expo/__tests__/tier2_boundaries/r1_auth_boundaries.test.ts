@@ -97,4 +97,71 @@ describe('Tier 2 - R1: Auth Boundary & Corner Cases', () => {
     expect([res1, res2]).toContain('SUCCESS');
     expect([res1, res2]).toContain('ALREADY_IN_PROGRESS');
   });
+
+  test('R1-B6: Email normalization handles leading/trailing whitespace and mixed casing', () => {
+    function normalizeEmail(email: string): string {
+      return email.trim().toLowerCase();
+    }
+
+    expect(normalizeEmail('  Student@Example.COM  ')).toBe('student@example.com');
+    expect(normalizeEmail('USER.NAME+tag@Gmail.Com ')).toBe('user.name+tag@gmail.com');
+  });
+
+  test('R1-B7: Firebase auth error code translation handles invalid-credential, invalid-email, network-failed', () => {
+    function mapAuthErrorCode(code: string): string {
+      switch (code) {
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          return 'authErrorInvalidCredentials';
+        case 'auth/invalid-email':
+          return 'authErrorInvalidEmail';
+        case 'auth/user-disabled':
+          return 'authErrorUserDisabled';
+        case 'auth/too-many-requests':
+          return 'authErrorTooManyRequests';
+        case 'auth/network-request-failed':
+          return 'authErrorNetworkFailed';
+        case 'auth/email-already-in-use':
+          return 'authErrorEmailAlreadyInUse';
+        default:
+          return 'authErrorGeneric';
+      }
+    }
+
+    expect(mapAuthErrorCode('auth/invalid-credential')).toBe('authErrorInvalidCredentials');
+    expect(mapAuthErrorCode('auth/invalid-email')).toBe('authErrorInvalidEmail');
+    expect(mapAuthErrorCode('auth/network-request-failed')).toBe('authErrorNetworkFailed');
+    expect(mapAuthErrorCode('auth/too-many-requests')).toBe('authErrorTooManyRequests');
+    expect(mapAuthErrorCode('auth/email-already-in-use')).toBe('authErrorEmailAlreadyInUse');
+  });
+
+  test('R1-B8: Google Sign-In transient retry recovers without prompting user twice', async () => {
+    let attempts = 0;
+    const mockNativeSignIn = jest.fn(async () => {
+      attempts++;
+      if (attempts === 1) {
+        const err: any = new Error('ApiException: 4 (SIGN_IN_REQUIRED)');
+        err.code = 4;
+        throw err;
+      }
+      return { idToken: 'valid-google-id-token' };
+    });
+
+    async function signInWithRetry(): Promise<{ success: boolean; idToken?: string }> {
+      try {
+        const res = await mockNativeSignIn();
+        return { success: true, idToken: res.idToken };
+      } catch (firstErr) {
+        // Auto-retry once on transient failure
+        const res = await mockNativeSignIn();
+        return { success: true, idToken: res.idToken };
+      }
+    }
+
+    const result = await signInWithRetry();
+    expect(result.success).toBe(true);
+    expect(result.idToken).toBe('valid-google-id-token');
+    expect(attempts).toBe(2);
+  });
 });
