@@ -17,6 +17,7 @@ import { useTheme } from '../../../theme';
 import { useI18n } from '../../../i18n';
 import { NoteItem, NoteChecklistItem } from '../types';
 import { ColorPicker } from './ColorPicker';
+import { WheelPicker, WheelItem } from '../../../components/common/WheelPicker';
 
 export interface NoteEditorModalProps {
   visible: boolean;
@@ -35,6 +36,16 @@ export interface NoteEditorModalProps {
   }) => void;
   onDelete?: (id: string) => void;
 }
+
+const HOURS_ITEMS: WheelItem[] = Array.from({ length: 24 }, (_, i) => ({
+  label: String(i).padStart(2, '0'),
+  value: i,
+}));
+
+const MINUTES_ITEMS: WheelItem[] = Array.from({ length: 60 }, (_, i) => ({
+  label: String(i).padStart(2, '0'),
+  value: i,
+}));
 
 const PRESET_TAG_KEYS: { key: string; defaultText: string }[] = [
   { key: 'tagStudies', defaultText: 'Учеба' },
@@ -82,7 +93,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
       if (note.reminderTimestamp) {
         const d = new Date(note.reminderTimestamp);
         setSelectedHour(d.getHours());
-        setSelectedMinute(Math.floor(d.getMinutes() / 5) * 5);
+        setSelectedMinute(d.getMinutes());
       }
     } else {
       setTitle('');
@@ -708,65 +719,55 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
               })}
             </View>
 
-            {/* Tumbler / Steppers for Hour & Minute */}
-            <View style={styles.tumblerContainer}>
-              {/* Hours Tumbler */}
-              <View style={styles.tumblerCol}>
-                <Text style={[styles.tumblerHeader, { color: colors.textColorSecondary }]}>
+            {/* Wheel Drum Roller Picker for Hour & Minute */}
+            <View style={styles.wheelSectionWrap}>
+              <View style={styles.wheelHeaderRow}>
+                <Text style={[styles.wheelColHeader, { color: colors.textColorSecondary }]}>
                   {t('reminderHourLabel')}
                 </Text>
-                <View style={[styles.tumblerBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderColor }]}>
-                  <TouchableOpacity
-                    style={styles.tumblerBtn}
-                    onPress={() => setSelectedHour((prev) => (prev > 0 ? prev - 1 : 23))}
-                  >
-                    <Feather name="minus" size={16} color={colors.textColor} />
-                  </TouchableOpacity>
-                  <Text style={[styles.tumblerValue, { color: colors.textColor }]}>
-                    {String(selectedHour).padStart(2, '0')}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.tumblerBtn}
-                    onPress={() => setSelectedHour((prev) => (prev < 23 ? prev + 1 : 0))}
-                  >
-                    <Feather name="plus" size={16} color={colors.textColor} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <Text style={[styles.tumblerColon, { color: colors.textColor }]}>:</Text>
-
-              {/* Minutes Tumbler */}
-              <View style={styles.tumblerCol}>
-                <Text style={[styles.tumblerHeader, { color: colors.textColorSecondary }]}>
+                <View style={{ width: 28 }} />
+                <Text style={[styles.wheelColHeader, { color: colors.textColorSecondary }]}>
                   {t('reminderMinuteLabel')}
                 </Text>
-                <View style={[styles.tumblerBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderColor }]}>
-                  <TouchableOpacity
-                    style={styles.tumblerBtn}
-                    onPress={() => setSelectedMinute((prev) => (prev >= 5 ? prev - 5 : 55))}
-                  >
-                    <Feather name="minus" size={16} color={colors.textColor} />
-                  </TouchableOpacity>
-                  <Text style={[styles.tumblerValue, { color: colors.textColor }]}>
-                    {String(selectedMinute).padStart(2, '0')}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.tumblerBtn}
-                    onPress={() => setSelectedMinute((prev) => (prev <= 50 ? prev + 5 : 0))}
-                  >
-                    <Feather name="plus" size={16} color={colors.textColor} />
-                  </TouchableOpacity>
-                </View>
               </View>
-            </View>
 
-            {/* Push Notification Notice */}
-            <View style={[styles.pickerNotice, { backgroundColor: colors.surfaceSecondary }]}>
-              <Feather name="info" size={14} color={colors.primaryAccent} />
-              <Text style={[styles.pickerNoticeText, { color: colors.textColorSecondary }]}>
-                {t('reminderNoticeApk')}
-              </Text>
+              <View style={[styles.wheelContainer, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderColor }]}>
+                {/* Center selection highlight window */}
+                <View
+                  style={[
+                    styles.wheelSelectionWindow,
+                    {
+                      backgroundColor: colors.componentBackground,
+                      borderColor: colors.primaryAccent + '44',
+                    },
+                  ]}
+                  pointerEvents="none"
+                />
+
+                <WheelPicker
+                  items={HOURS_ITEMS}
+                  selectedValue={selectedHour}
+                  onValueChange={setSelectedHour}
+                  textColor={colors.textColorSecondary}
+                  activeColor={colors.primaryAccent}
+                  itemHeight={44}
+                  visibleCount={3}
+                  width={80}
+                />
+
+                <Text style={[styles.wheelColon, { color: colors.primaryAccent }]}>:</Text>
+
+                <WheelPicker
+                  items={MINUTES_ITEMS}
+                  selectedValue={selectedMinute}
+                  onValueChange={setSelectedMinute}
+                  textColor={colors.textColorSecondary}
+                  activeColor={colors.primaryAccent}
+                  itemHeight={44}
+                  visibleCount={3}
+                  width={80}
+                />
+              </View>
             </View>
 
             {/* Actions */}
@@ -1118,62 +1119,49 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
   },
-  tumblerContainer: {
+  wheelSectionWrap: {
+    marginVertical: 14,
+    alignItems: 'center',
+  },
+  wheelHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    marginVertical: 10,
-  },
-  tumblerCol: {
     alignItems: 'center',
+    marginBottom: 6,
+    width: 200,
   },
-  tumblerHeader: {
-    fontFamily: 'Inter_400Regular',
+  wheelColHeader: {
+    fontFamily: 'Inter_500Medium',
     fontSize: 11,
-    marginBottom: 4,
-  },
-  tumblerBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    gap: 8,
-  },
-  tumblerBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tumblerValue: {
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 20,
-    minWidth: 32,
+    width: 80,
     textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  tumblerColon: {
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 24,
-    marginTop: 14,
-  },
-  pickerNotice: {
+  wheelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 16,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    marginTop: 8,
-    marginBottom: 16,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  pickerNoticeText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    flex: 1,
+  wheelSelectionWindow: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    top: 44,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  wheelColon: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 22,
+    marginHorizontal: 4,
+    textAlign: 'center',
   },
   pickerActionRow: {
     flexDirection: 'row',
