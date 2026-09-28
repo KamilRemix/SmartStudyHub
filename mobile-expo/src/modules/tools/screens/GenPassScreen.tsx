@@ -104,18 +104,23 @@ function estimateCrackTime(password: string, t?: (k: any, p?: any) => string): s
   const combinations = Math.pow(poolSize, password.length);
   const seconds = combinations / 100000000000;
 
-  if (!t) {
-    if (seconds < 1) return '< 1s';
-    return `${Math.round(seconds)}s`;
+  if (t) {
+    if (seconds < 1) return t('crackLessSec') || '< 1 с';
+    if (seconds < 60) return t('crackSec', { s: Math.round(seconds) }) || `${Math.round(seconds)} с`;
+    if (seconds < 3600) return t('crackMin', { m: Math.round(seconds / 60) }) || `${Math.round(seconds / 60)} мин`;
+    if (seconds < 86400) return t('crackHours', { h: Math.round(seconds / 3600) }) || `${Math.round(seconds / 3600)} ч`;
+    if (seconds < 31536000) return t('crackDays', { d: Math.round(seconds / 86400) }) || `${Math.round(seconds / 86400)} дн`;
+    if (seconds < 31536000000) return t('crackYears', { y: Math.round(seconds / 31536000) }) || `${Math.round(seconds / 31536000)} лет`;
+    return t('crackMillennia') || 'тысячи лет';
   }
 
-  if (seconds < 1) return t('crackLessSec');
-  if (seconds < 60) return t('crackSec', { s: Math.round(seconds) });
-  if (seconds < 3600) return t('crackMin', { m: Math.round(seconds / 60) });
-  if (seconds < 86400) return t('crackHours', { h: Math.round(seconds / 3600) });
-  if (seconds < 31536000) return t('crackDays', { d: Math.round(seconds / 86400) });
-  if (seconds < 31536000000) return t('crackYears', { y: Math.round(seconds / 31536000) });
-  return t('crackMillennia');
+  if (seconds < 1) return '< 1s';
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
+  if (seconds < 31536000) return `${Math.round(seconds / 86400)}d`;
+  if (seconds < 31536000000) return `${Math.round(seconds / 31536000)}y`;
+  return '> 1000y';
 }
 
 function calculateScore(password: string, isPwned: boolean): number {
@@ -463,14 +468,14 @@ export const GenPassScreen: React.FC = () => {
   const checkScore = calculateScore(checkInput, checkPwned);
   const checkStrength = getStrength(checkScore);
   const checkEntropy = calculateEntropy(checkInput);
-  const checkCrack = estimateCrackTime(checkInput);
+  const checkCrack = estimateCrackTime(checkInput, t);
   const checkList = evaluateChecklist(checkInput, checkPwned, checkLeakCount);
 
   // Generator calculations
   const genScore = calculateScore(generatedPassword, false);
   const genStrength = getStrength(genScore);
   const genEntropy = calculateEntropy(generatedPassword);
-  const genCrack = estimateCrackTime(generatedPassword);
+  const genCrack = estimateCrackTime(generatedPassword, t);
 
   const filteredVault = vault.filter((v) =>
     v.label.toLowerCase().includes(searchVault.toLowerCase()) ||
@@ -505,6 +510,7 @@ export const GenPassScreen: React.FC = () => {
             color={activeTab === 'generator' ? colors.primaryAccent : colors.textColorSecondary}
           />
           <Text
+            numberOfLines={1}
             style={[
               styles.tabBtnText,
               { color: activeTab === 'generator' ? colors.textColor : colors.textColorSecondary },
@@ -528,6 +534,7 @@ export const GenPassScreen: React.FC = () => {
             color={activeTab === 'checker' ? colors.primaryAccent : colors.textColorSecondary}
           />
           <Text
+            numberOfLines={1}
             style={[
               styles.tabBtnText,
               { color: activeTab === 'checker' ? colors.textColor : colors.textColorSecondary },
@@ -551,6 +558,7 @@ export const GenPassScreen: React.FC = () => {
             color={activeTab === 'vault' ? colors.primaryAccent : colors.textColorSecondary}
           />
           <Text
+            numberOfLines={1}
             style={[
               styles.tabBtnText,
               { color: activeTab === 'vault' ? colors.textColor : colors.textColorSecondary },
@@ -1048,6 +1056,8 @@ const styles = StyleSheet.create({
   tabBtnText: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 12,
+    flexShrink: 1,
+    textAlign: 'center',
   },
   content: {
     padding: 16,
@@ -1055,16 +1065,18 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   passwordCard: {
-    padding: 18,
+    padding: 16,
     borderRadius: 16,
     borderWidth: 1,
     gap: 12,
+    overflow: 'hidden',
   },
   passwordText: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 18,
     textAlign: 'center',
     letterSpacing: 1,
+    flexWrap: 'wrap',
   },
   strengthSection: { gap: 6 },
   strengthBarBg: {
@@ -1080,39 +1092,49 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
   },
   strengthLabel: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
+    flexShrink: 0,
   },
   entropyText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 11,
+    flexShrink: 1,
+    textAlign: 'right',
   },
   actionRow: {
     flexDirection: 'row',
     gap: 8,
     marginTop: 4,
+    flexWrap: 'wrap',
   },
   actionBtn: {
     flex: 1,
+    minWidth: 95,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
     paddingVertical: 10,
+    paddingHorizontal: 6,
     borderRadius: 10,
   },
   actionBtnText: {
     fontFamily: 'Poppins_500Medium',
     fontSize: 12,
     color: '#ffffff',
+    textAlign: 'center',
   },
   optionCard: {
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
     gap: 10,
+    overflow: 'hidden',
   },
   optionHeader: {
     flexDirection: 'row',
@@ -1203,12 +1225,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     paddingHorizontal: 12,
+    overflow: 'hidden',
   },
   checkInput: {
     flex: 1,
     height: 44,
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
+    paddingRight: 8,
   },
   eyeBtn: {
     padding: 6,
@@ -1217,13 +1241,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
   },
   strengthPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
+    flexShrink: 0,
   },
   strengthPillText: {
     fontFamily: 'Poppins_600SemiBold',
@@ -1232,22 +1259,26 @@ const styles = StyleSheet.create({
   crackTimeSubtitle: {
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
+    flexShrink: 1,
+    textAlign: 'right',
   },
   leakStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginTop: 4,
+    flexWrap: 'wrap',
   },
   leakStatusText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
+    flexShrink: 1,
   },
   leakWarningBox: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
-    padding: 10,
+    padding: 12,
     borderRadius: 10,
     borderWidth: 1,
     marginTop: 6,
@@ -1256,12 +1287,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
     flex: 1,
+    flexWrap: 'wrap',
   },
   leakSafeBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    padding: 10,
+    padding: 12,
     borderRadius: 10,
     borderWidth: 1,
     marginTop: 6,
@@ -1270,6 +1302,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
     flex: 1,
+    flexWrap: 'wrap',
   },
   checklistItem: {
     flexDirection: 'row',
@@ -1280,6 +1313,8 @@ const styles = StyleSheet.create({
   checklistText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
+    flex: 1,
+    flexWrap: 'wrap',
   },
   vaultHeaderRow: {
     flexDirection: 'row',
