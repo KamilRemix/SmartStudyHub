@@ -18,6 +18,7 @@ mobile-expo/.expo/
 dist/
 dist-exe/
 build_artifacts/
+scratch/
 icon .png
 *.apk
 android/app/build/
