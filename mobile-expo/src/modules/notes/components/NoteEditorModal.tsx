@@ -248,8 +248,16 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     onClose();
   };
 
+  const handleModalRequestClose = () => {
+    if (isReminderPickerVisible) {
+      setIsReminderPickerVisible(false);
+    } else {
+      onClose();
+    }
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={handleModalRequestClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={[styles.container, { backgroundColor: colors.background }]}
@@ -574,13 +582,8 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Reminder Picker Modal */}
-      <Modal
-        visible={isReminderPickerVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsReminderPickerVisible(false)}
-      >
+      {/* Reminder Picker Overlay */}
+      {isReminderPickerVisible && (
         <View style={styles.pickerOverlay}>
           <View
             style={[
@@ -791,7 +794,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             </View>
           </View>
         </View>
-      </Modal>
+      )}
     </Modal>
   );
 };
@@ -1027,11 +1030,17 @@ const styles = StyleSheet.create({
   },
   // Reminder Picker Modal Styles
   pickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    zIndex: 100,
+    elevation: 20,
   },
   pickerCard: {
     width: '100%',

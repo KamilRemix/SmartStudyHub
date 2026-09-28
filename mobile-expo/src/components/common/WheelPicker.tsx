@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   NativeSyntheticEvent,
   NativeScrollEvent,
@@ -35,81 +35,147 @@ export const WheelPicker: React.FC<WheelPickerProps> = ({
   activeColor = '#007aff',
   width = 76,
 }) => {
-  const flatListRef = useRef<FlatList>(null);
-  const isScrollingRef = useRef(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const isUserInteracting = useRef(false);
+  const lastReportedValue = useRef(selectedValue);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
 
   const containerHeight = itemHeight * visibleCount;
   const paddingHeight = itemHeight * Math.floor(visibleCount / 2);
 
-  const selectedIndex = items.findIndex((it) => it.value === selectedValue);
-
-  // Scroll to selected value on mount or external update (when not actively dragging)
+  // Keep track of mounted status and clean up timers on unmount
   useEffect(() => {
-    if (!isScrollingRef.current && selectedIndex >= 0) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToOffset({
-          offset: selectedIndex * itemHeight,
-          animated: false,
-        });
-      }, 50);
-    }
-  }, [selectedValue, selectedIndex, itemHeight]);
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
-  const handleScrollEnd = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      isScrollingRef.current = false;
-      const offsetY = e.nativeEvent.contentOffset.y;
+  // Initial scroll position on mount
+  useEffect(() => {
+    const initialIndex = items.findIndex((it) => it.value === selectedValue);
+    if (initialIndex >= 0) {
+      const timer = setTimeout(() => {
+        if (isMountedRef.current) {
+          scrollViewRef.current?.scrollTo({
+            y: initialIndex * itemHeight,
+            animated: false,
+          });
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Programmatic scroll when selectedValue changes from external source (e.g. quick preset buttons)
+  useEffect(() => {
+    if (selectedValue !== lastReportedValue.current && !isUserInteracting.current) {
+      lastReportedValue.current = selectedValue;
+      const targetIndex = items.findIndex((it) => it.value === selectedValue);
+      if (targetIndex >= 0) {
+        scrollViewRef.current?.scrollTo({
+          y: targetIndex * itemHeight,
+          animated: true,
+        });
+      }
+    }
+  }, [selectedValue, items, itemHeight]);
+
+  const handleScrollSettled = useCallback(
+    (offsetY: number) => {
+      isUserInteracting.current = false;
       const index = Math.round(offsetY / itemHeight);
       const clampedIndex = Math.max(0, Math.min(items.length - 1, index));
-      if (items[clampedIndex] && items[clampedIndex].value !== selectedValue) {
-        onValueChange(items[clampedIndex].value);
+      const target = items[clampedIndex];
+      if (target && target.value !== lastReportedValue.current) {
+        lastReportedValue.current = target.value;
+        onValueChange(target.value);
       }
     },
-    [items, itemHeight, selectedValue, onValueChange]
+    [items, itemHeight, onValueChange]
+  );
+
+  const handleMomentumScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offsetY = e?.nativeEvent?.contentOffset?.y ?? 0;
+      handleScrollSettled(offsetY);
+    },
+    [handleScrollSettled]
+  );
+
+  const handleScrollEndDrag = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      // Synchronously capture offset and velocity before synthetic event is recycled
+      const offsetY = e?.nativeEvent?.contentOffset?.y ?? 0;
+      const velocityY = Math.abs(e?.nativeEvent?.velocity?.y ?? 0);
+
+      // If finger was released with negligible velocity, momentum scroll will not fire
+      if (velocityY < 0.08) {
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current);
+        }
+        scrollTimeoutRef.current = setTimeout(() => {
+          if (isMountedRef.current) {
+            handleScrollSettled(offsetY);
+          }
+        }, 60);
+      }
+    },
+    [handleScrollSettled]
   );
 
   const handleItemPress = (index: number, val: number) => {
-    flatListRef.current?.scrollToOffset({
-      offset: index * itemHeight,
+    isUserInteracting.current = true;
+    lastReportedValue.current = val;
+    scrollViewRef.current?.scrollTo({
+      y: index * itemHeight,
       animated: true,
     });
     onValueChange(val);
+
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    scrollTimeoutRef.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        isUserInteracting.current = false;
+      }
+    }, 300);
   };
 
   return (
     <View style={[styles.container, { height: containerHeight, width }]}>
-      <FlatList
-        ref={flatListRef}
-        data={items}
-        keyExtractor={(item) => String(item.value)}
+      <ScrollView
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         snapToInterval={itemHeight}
         decelerationRate="fast"
         bounces={false}
+        nestedScrollEnabled={true}
+        contentContainerStyle={{ paddingVertical: paddingHeight }}
         onScrollBeginDrag={() => {
-          isScrollingRef.current = true;
+          isUserInteracting.current = true;
+          if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current);
+            scrollTimeoutRef.current = null;
+          }
         }}
-        onMomentumScrollEnd={handleScrollEnd}
-        onScrollEndDrag={(e) => {
-          // If momentum scroll doesn't fire (short drag)
-          setTimeout(() => {
-            if (isScrollingRef.current) {
-              handleScrollEnd(e);
-            }
-          }, 80);
+        onMomentumScrollBegin={() => {
+          isUserInteracting.current = true;
         }}
-        getItemLayout={(_, index) => ({
-          length: itemHeight,
-          offset: itemHeight * index,
-          index,
-        })}
-        initialScrollIndex={selectedIndex >= 0 ? selectedIndex : 0}
-        ListHeaderComponent={<View style={{ height: paddingHeight }} />}
-        ListFooterComponent={<View style={{ height: paddingHeight }} />}
-        renderItem={({ item, index }) => {
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+        onScrollEndDrag={handleScrollEndDrag}
+      >
+        {items.map((item, index) => {
           const isSelected = item.value === selectedValue;
           return (
             <TouchableOpacity
+              key={item.value}
               activeOpacity={0.7}
               style={[styles.itemWrap, { height: itemHeight }]}
               onPress={() => handleItemPress(index, item.value)}
@@ -130,8 +196,8 @@ export const WheelPicker: React.FC<WheelPickerProps> = ({
               </Text>
             </TouchableOpacity>
           );
-        }}
-      />
+        })}
+      </ScrollView>
     </View>
   );
 };

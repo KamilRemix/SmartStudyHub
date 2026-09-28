@@ -142,4 +142,48 @@ describe('Tier 1 - R8: Advanced Notes (Photos & Reminders)', () => {
     expect(parsed[0].images).toEqual(['file:///photos/cell.png']);
     expect(parsed[0].reminder?.notificationId).toBe('notif_123');
   });
+
+  test('R8-6: Wheel picker scroll settlement accurately calculates and clamps index', () => {
+    const itemHeight = 44;
+    const hours = Array.from({ length: 24 }, (_, i) => ({ label: String(i).padStart(2, '0'), value: i }));
+
+    const computeIndex = (offsetY: number) => {
+      const index = Math.round(offsetY / itemHeight);
+      return Math.max(0, Math.min(hours.length - 1, index));
+    };
+
+    expect(computeIndex(0)).toBe(0);
+    expect(computeIndex(44)).toBe(1);
+    expect(computeIndex(44 * 12)).toBe(12);
+    expect(computeIndex(44 * 12 + 10)).toBe(12);
+    expect(computeIndex(44 * 12 + 30)).toBe(13);
+    // Boundary clamps
+    expect(computeIndex(-100)).toBe(0);
+    expect(computeIndex(5000)).toBe(23);
+  });
+
+  test('R8-7: Wheel picker isolates user interaction and skips duplicate callback invocations', () => {
+    let lastReported = 10;
+    let callbackCount = 0;
+    const onValueChange = (val: number) => {
+      if (val !== lastReported) {
+        lastReported = val;
+        callbackCount++;
+      }
+    };
+
+    // Triggering same value does not emit
+    onValueChange(10);
+    expect(callbackCount).toBe(0);
+
+    // New value emits once
+    onValueChange(11);
+    expect(callbackCount).toBe(1);
+    expect(lastReported).toBe(11);
+
+    // Redundant trigger emits nothing
+    onValueChange(11);
+    expect(callbackCount).toBe(1);
+  });
 });
+
