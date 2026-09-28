@@ -200,7 +200,7 @@ class NotificationService {
           sound: 'default',
           color: '#007aff',
           channelId: 'smartstudyhub-reminders',
-        },
+        } as any,
         trigger: {
           date: triggerDate,
         } as any,

@@ -57,7 +57,7 @@ function AppContent() {
 
   return (
     <View style={[styles.outerWrapper, { backgroundColor: pageBg }]}>
-      <StatusBar style={isDark ? 'light' : 'dark'} translucent backgroundColor="transparent" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <View
         style={[
           styles.container,
