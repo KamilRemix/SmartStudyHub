@@ -92,21 +92,6 @@ export const ToolsScreen: React.FC = () => {
             </TouchableOpacity>
           ))}
         </View>
-
-        <View
-          style={[
-            styles.infoBanner,
-            {
-              backgroundColor: colors.componentBackground,
-              borderColor: colors.borderColor,
-            },
-          ]}
-        >
-          <Feather name="info" size={18} color={colors.primaryAccent} />
-          <Text style={[styles.infoText, { color: colors.textColorSecondary }]}>
-            {t('toolsOfflineNotice')}
-          </Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -150,19 +135,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
     lineHeight: 16,
-  },
-  infoBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 10,
-  },
-  infoText: {
-    flex: 1,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    lineHeight: 17,
   },
 });

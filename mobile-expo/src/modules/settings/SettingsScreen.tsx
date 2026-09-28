@@ -219,34 +219,6 @@ export const SettingsScreen: React.FC = () => {
         </View>
 
 
-        {/* Section: Application Info */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.textColorSecondary }]}>
-            {t('aboutApp')}
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: colors.componentBackground,
-              borderColor: colors.borderColor,
-            },
-          ]}
-        >
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <Feather name="info" size={18} color={colors.textColorSecondary} />
-              <Text style={[styles.itemTitle, { color: colors.textColor }]}>
-                {t('buildVersion')}
-              </Text>
-            </View>
-            <Text style={[styles.itemValue, { color: colors.textColorSecondary }]}>
-              v1.0.2
-            </Text>
-          </View>
-        </View>
       </ScrollView>
 
       {/* Language Selection Modal */}
