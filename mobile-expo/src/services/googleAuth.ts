@@ -101,3 +101,19 @@ export async function performGoogleSignIn(): Promise<GoogleSignInResult> {
     return { success: false, error: err?.message || 'Google sign-in failed' };
   }
 }
+
+/**
+ * Signs out from Google Play Services on native Android/iOS
+ * so that next login prompts the account chooser instead of auto-logging into previous account.
+ */
+export async function googleSignOutNative(): Promise<void> {
+  if (Platform.OS !== 'web' && !isExpoGo && GoogleSigninModule?.GoogleSignin) {
+    try {
+      await GoogleSigninModule.GoogleSignin.signOut();
+      console.log('[googleAuth] Successfully signed out of native Google Play Services');
+    } catch (e) {
+      console.warn('[googleAuth] Native Google SignOut error:', e);
+    }
+  }
+}
+

@@ -73,8 +73,35 @@ export const loginWithEmail = (
   return signInWithEmailAndPassword(auth, email, password);
 };
 
+export const USER_DATA_STORAGE_KEYS = [
+  '@smartstudy_grades_data',
+  '@ssh_grades_data',
+  '@smartstudy_notes_data',
+  '@ssh_notes',
+  '@ssh_password_vault',
+  '@smartstudy_calc_history',
+  '@ssh_calc_history',
+  '@ssh_user_settings',
+  '@ssh_last_sync_timestamp',
+  OFFLINE_USER_KEY,
+];
+
+export const clearAllLocalUserData = async (): Promise<void> => {
+  try {
+    await AsyncStorage.multiRemove(USER_DATA_STORAGE_KEYS);
+  } catch (e) {
+    console.warn('[auth] clearAllLocalUserData error:', e);
+  }
+};
+
 export const logout = async (): Promise<void> => {
-  await clearOfflineUser();
+  await clearAllLocalUserData();
+  try {
+    const { googleSignOutNative } = await import('./googleAuth');
+    await googleSignOutNative();
+  } catch (e) {
+    console.warn('[auth] googleSignOutNative error:', e);
+  }
   try {
     await signOut(auth);
   } catch (e) {
@@ -154,6 +181,7 @@ export const signInWithGooglePopup = async (): Promise<UserCredential> => {
   const provider = new GoogleAuthProvider();
   provider.addScope('profile');
   provider.addScope('email');
+  provider.setCustomParameters({ prompt: 'select_account' });
   return signInWithPopup(auth, provider);
 };
 

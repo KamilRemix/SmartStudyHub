@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth, database } from './firebase';
+import { auth, database, firestore } from './firebase';
 import { ref, get, set } from 'firebase/database';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { networkService } from './network';
 
 export interface SyncStatus {
@@ -92,8 +93,65 @@ class CloudSyncService {
 
   private isDefaultSeedGrades(data: any): boolean {
     if (!data || !Array.isArray(data.subjects) || data.subjects.length !== 3) return false;
-    const seedIds = new Set(['subj_algebra', 'subj_russian', 'subj_physics']);
-    return data.subjects.every((s: any) => seedIds.has(s.id));
+    const seedIds = ['subj_algebra', 'subj_russian', 'subj_physics'];
+    const hasOnlySeedSubjects = data.subjects.every((s: any) => seedIds.includes(s?.id));
+    if (!hasOnlySeedSubjects) return false;
+    const defaultGradeIds = new Set(['g_1', 'g_2', 'g_3', 'g_4', 'g_5', 'g_6', 'g_7', 'g_8', 'g_9']);
+    const currentGradeIds = data.subjects.flatMap((s: any) => (s?.grades || []).map((g: any) => g?.id));
+    if (currentGradeIds.length === 0) return true;
+    return currentGradeIds.every((id: string) => defaultGradeIds.has(id));
+  }
+
+  private normalizeRemoteGrades(remoteGrades: any): any {
+    if (!remoteGrades) return null;
+    if (remoteGrades.data && (remoteGrades.data.subjects || Array.isArray(remoteGrades.data))) {
+      return this.normalizeRemoteGrades(remoteGrades.data);
+    }
+    if (Array.isArray(remoteGrades.subjects)) {
+      return remoteGrades;
+    }
+    if (Array.isArray(remoteGrades)) {
+      return {
+        settings: {
+          gradingSystem: '5-point',
+          periodMode: 'quarters',
+          activePeriod: 'q1',
+          thresholds: { '5-point': { 5: 4.5, 4: 3.5, 3: 2.5 }, 'us-letter': { A: 90, B: 80, C: 70, D: 60, F: 0 } },
+        },
+        subjects: remoteGrades,
+      };
+    }
+    if (remoteGrades.subjects && typeof remoteGrades.subjects === 'object' && !Array.isArray(remoteGrades.subjects)) {
+      const subjectsArray = Object.entries(remoteGrades.subjects).map(([name, gradesList], index) => {
+        const gradesArray = Array.isArray(gradesList) ? gradesList : [];
+        return {
+          id: `subj_${index}_${name}`,
+          name,
+          targetGrade: 5,
+          grades: gradesArray.map((val: any, gIdx: number) => ({
+            id: `g_web_${index}_${gIdx}`,
+            value: typeof val === 'number' ? val : (val === 'A' ? 5 : val === 'B' ? 4 : val === 'C' ? 3 : val === 'D' ? 2 : 1),
+            letter: typeof val === 'string' ? (val as any) : undefined,
+            weight: 1.0,
+            period: 'q1' as const,
+            date: Date.now() - (gradesArray.length - gIdx) * 86400000,
+          })),
+        };
+      });
+      return {
+        settings: {
+          gradingSystem: remoteGrades.settings?.gradingSystem || '5-point',
+          periodMode: remoteGrades.settings?.periodMode || 'quarters',
+          activePeriod: remoteGrades.settings?.activePeriod || 'q1',
+          thresholds: remoteGrades.settings?.thresholds || {
+            '5-point': { 5: 4.5, 4: 3.5, 3: 2.5 },
+            'us-letter': { A: 90, B: 80, C: 70, D: 60, F: 0 },
+          },
+        },
+        subjects: subjectsArray,
+      };
+    }
+    return null;
   }
 
   private isDefaultSeedNotes(notes: any[]): boolean {
@@ -115,7 +173,7 @@ class CloudSyncService {
 
   /**
    * Sync all modules for an authenticated user:
-   * Two-way merge: pulls remote data, merges with local, pushes combined data.
+   * Two-way merge: pulls remote data from RTDB and Firestore, merges with local, pushes combined data.
    */
   public async syncAll(uid: string): Promise<boolean> {
     if (!uid || this.isSyncing || !networkService.getIsOnline()) {
@@ -127,21 +185,45 @@ class CloudSyncService {
     this.notify();
 
     try {
-      const userRootRef = ref(database, `users/${uid}`);
-      const snapshot = await get(userRootRef);
-      const remoteData = snapshot.exists() ? snapshot.val() : {};
+      let remoteData: any = {};
+      try {
+        const userRootRef = ref(database, `users/${uid}`);
+        const snapshot = await get(userRootRef);
+        if (snapshot.exists()) {
+          remoteData = snapshot.val() || {};
+        }
+      } catch (rtdbErr) {
+        console.warn('[CloudSync] RTDB fetch warning:', rtdbErr);
+      }
+
+      // Fallback/augment with Firestore if available
+      try {
+        if (firestore) {
+          const fsDoc = await getDoc(doc(firestore, 'users', uid));
+          if (fsDoc.exists()) {
+            const fsData = fsDoc.data() || {};
+            remoteData = {
+              ...fsData,
+              ...remoteData,
+            };
+          }
+        }
+      } catch (fsErr) {
+        console.warn('[CloudSync] Firestore fetch warning:', fsErr);
+      }
 
       // 1. Calc History (limit to 50 most recent items)
       await this.syncCalcHistory(uid, remoteData.calcHistory);
 
       // 2. Grades Data (two-way merge of subjects and grades)
-      await this.syncGrades(uid, remoteData.grades);
+      const rawRemoteGrades = remoteData.grades || (remoteData.subjects ? { subjects: remoteData.subjects, settings: remoteData.settings } : null);
+      await this.syncGrades(uid, this.normalizeRemoteGrades(rawRemoteGrades));
 
       // 3. Notes Data (two-way merge by ID and updatedAt)
       await this.syncNotes(uid, remoteData.notes);
 
       // 4. Password Vault Data
-      await this.syncPasswordVault(uid, remoteData.passwordVault);
+      await this.syncPasswordVault(uid, remoteData.passwordVault || remoteData.passwords);
 
       this.lastSyncedAt = Date.now();
       await AsyncStorage.setItem(SYNC_KEYS.LAST_SYNC, String(this.lastSyncedAt));
@@ -177,7 +259,18 @@ class CloudSyncService {
       const capped = combined.slice(0, 50);
 
       await AsyncStorage.setItem(SYNC_KEYS.CALC_HISTORY, JSON.stringify(capped));
-      await set(ref(database, `users/${uid}/calcHistory`), capped);
+      try {
+        await set(ref(database, `users/${uid}/calcHistory`), capped);
+      } catch (e) {
+        console.warn('[CloudSync] RTDB calcHistory write error:', e);
+      }
+      try {
+        if (firestore) {
+          await setDoc(doc(firestore, 'users', uid), { calcHistory: capped }, { merge: true });
+        }
+      } catch (e) {
+        console.warn('[CloudSync] Firestore calcHistory write error:', e);
+      }
     } catch (e) {
       console.warn('[CloudSync] syncCalcHistory error:', e);
     }
@@ -195,10 +288,12 @@ class CloudSyncService {
         return;
       }
 
+      let dataToSave = null;
       if (!localData && remoteGrades) {
         await AsyncStorage.setItem(SYNC_KEYS.GRADES, JSON.stringify(remoteGrades));
+        dataToSave = remoteGrades;
       } else if (localData && !remoteGrades) {
-        await set(ref(database, `users/${uid}/grades`), localData);
+        dataToSave = localData;
       } else if (localData && remoteGrades) {
         // Deep merge subjects: combine remote and local subjects and grades
         const subjectMap = new Map<string, any>();
@@ -225,7 +320,7 @@ class CloudSyncService {
           });
         }
 
-        const mergedGradesData = {
+        dataToSave = {
           settings: {
             ...(remoteGrades.settings || {}),
             ...(localData.settings || {}),
@@ -233,8 +328,22 @@ class CloudSyncService {
           subjects: Array.from(subjectMap.values()),
         };
 
-        await AsyncStorage.setItem(SYNC_KEYS.GRADES, JSON.stringify(mergedGradesData));
-        await set(ref(database, `users/${uid}/grades`), mergedGradesData);
+        await AsyncStorage.setItem(SYNC_KEYS.GRADES, JSON.stringify(dataToSave));
+      }
+
+      if (dataToSave) {
+        try {
+          await set(ref(database, `users/${uid}/grades`), dataToSave);
+        } catch (e) {
+          console.warn('[CloudSync] RTDB grades write error:', e);
+        }
+        try {
+          if (firestore) {
+            await setDoc(doc(firestore, 'users', uid), { grades: dataToSave }, { merge: true });
+          }
+        } catch (e) {
+          console.warn('[CloudSync] Firestore grades write error:', e);
+        }
       }
     } catch (e) {
       console.warn('[CloudSync] syncGrades error:', e);
@@ -267,7 +376,18 @@ class CloudSyncService {
 
       const merged = Array.from(map.values());
       await AsyncStorage.setItem(SYNC_KEYS.NOTES, JSON.stringify(merged));
-      await set(ref(database, `users/${uid}/notes`), merged);
+      try {
+        await set(ref(database, `users/${uid}/notes`), merged);
+      } catch (e) {
+        console.warn('[CloudSync] RTDB notes write error:', e);
+      }
+      try {
+        if (firestore) {
+          await setDoc(doc(firestore, 'users', uid), { notes: merged }, { merge: true });
+        }
+      } catch (e) {
+        console.warn('[CloudSync] Firestore notes write error:', e);
+      }
     } catch (e) {
       console.warn('[CloudSync] syncNotes error:', e);
     }
@@ -292,7 +412,19 @@ class CloudSyncService {
 
       const merged = Array.from(map.values());
       await AsyncStorage.setItem(SYNC_KEYS.VAULT, JSON.stringify(merged));
-      await set(ref(database, `users/${uid}/passwordVault`), merged);
+      try {
+        await set(ref(database, `users/${uid}/passwordVault`), merged);
+        await set(ref(database, `users/${uid}/passwords`), merged);
+      } catch (e) {
+        console.warn('[CloudSync] RTDB vault write error:', e);
+      }
+      try {
+        if (firestore) {
+          await setDoc(doc(firestore, 'users', uid), { passwordVault: merged, passwords: merged }, { merge: true });
+        }
+      } catch (e) {
+        console.warn('[CloudSync] Firestore vault write error:', e);
+      }
     } catch (e) {
       console.warn('[CloudSync] syncPasswordVault error:', e);
     }
