@@ -70,10 +70,12 @@ class NotificationService {
 
       if (finalStatus === 'granted' && Platform.OS === 'android' && !this.hasConfiguredChannel) {
         await Notifications.setNotificationChannelAsync('smartstudyhub-reminders', {
-          name: 'Напоминания заметок',
+          name: 'SmartStudyHub: Напоминания',
           importance: Notifications.AndroidImportance.HIGH,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#007aff',
+          sound: 'default',
+          showBadge: true,
         });
         this.hasConfiguredChannel = true;
       }
@@ -176,21 +178,35 @@ class NotificationService {
       const granted = await this.requestPermissions();
       if (!granted) return null;
 
-      const triggerSeconds = Math.max(1, Math.round((triggerDate.getTime() - Date.now()) / 1000));
+      const diffMs = triggerDate.getTime() - Date.now();
+      if (diffMs <= 3000) {
+        console.warn('[NotificationService] Trigger date is not in future, skipping immediate alert:', diffMs);
+        return null;
+      }
+
+      const notifTitle = title && title.trim().length > 0
+        ? `SmartStudyHub: ${title.trim()}`
+        : 'SmartStudyHub: Напоминание';
+
+      const notifBody = body && body.trim().length > 0
+        ? body.trim()
+        : 'Пора вернуться к вашей заметке в SmartStudyHub';
 
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
-          title: title || 'Напоминание по заметке',
-          body: body || 'Пора вернуться к задачам в SmartStudyHub',
+          title: notifTitle,
+          body: notifBody,
           data: { noteId },
-          sound: true,
-        },
-        trigger: {
-          seconds: triggerSeconds,
+          sound: 'default',
+          color: '#007aff',
           channelId: 'smartstudyhub-reminders',
         },
+        trigger: {
+          date: triggerDate,
+        } as any,
       });
 
+      console.log('[NotificationService] Reminder scheduled id:', notificationId, 'at:', triggerDate.toISOString());
       return notificationId;
     } catch (e) {
       console.warn('[NotificationService] Failed to schedule reminder:', e);
