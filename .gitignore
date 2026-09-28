@@ -17,6 +17,7 @@ mobile-expo/.expo/
 # Build output (web & electron & android)
 dist/
 dist-exe/
+build_artifacts/
 icon .png
 *.apk
 android/app/build/
