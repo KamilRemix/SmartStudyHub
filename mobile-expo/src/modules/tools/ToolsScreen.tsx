@@ -20,6 +20,20 @@ interface ToolItem {
 
 const TOOLS_LIST: ToolItem[] = [
   {
+    id: 'ai',
+    titleKey: 'aiAssistantTitle',
+    subtitleKey: 'aiAssistantSub',
+    icon: 'cpu',
+    screen: 'AIAssistant',
+  },
+  {
+    id: 'presentation',
+    titleKey: 'presentationTitle',
+    subtitleKey: 'presentationSub',
+    icon: 'monitor',
+    screen: 'Presentation',
+  },
+  {
     id: 'converter',
     titleKey: 'unitConverter',
     subtitleKey: 'converterSub',

@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  build-android-apk:
-    name: "Build Android APK (SmartStudyHub)"
+  build-expo-apk:
+    name: "Build Expo Android Release APK (SmartStudyHub)"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -31,27 +31,42 @@ jobs:
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || yes | sdkmanager --licenses || true
 
-      - name: Install Root Dependencies
+      - name: Install Mobile Dependencies
         run: |
-          npm install --legacy-peer-deps
+          cd mobile-expo
+          npm ci || npm install
 
-      - name: Build Web Assets & Sync Capacitor
+      - name: Setup Release Keystore
+        run: |
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > mobile-expo/android/app/smartstudyhub-release.keystore
+            echo "Loaded keystore from secret"
+          else
+            echo "Using committed smartstudyhub-release.keystore"
+          fi
+          ls -la mobile-expo/android/app/smartstudyhub-release.keystore
+
+      - name: Build Android Release APK
         env:
+          EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.REACT_APP_GEMINI_API_KEY || secrets.GEMINI_API_KEY }}
           REACT_APP_GEMINI_API_KEY: ${{ secrets.REACT_APP_GEMINI_API_KEY || secrets.GEMINI_API_KEY }}
         run: |
-          node build-web.js
-          npx @capacitor/cli sync android
-
-      - name: Build Capacitor APK
-        run: |
-          cd android
+          cd mobile-expo/android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Verify Signed APK
+        run: |
+          APK_PATH=$(find mobile-expo/android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "Found APK at: $APK_PATH"
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -n 1)
+          if [ -n "$APKSIGNER" ]; then
+            $APKSIGNER verify --verbose "$APK_PATH" || true
+          fi
 
       - name: Prepare APK Output (SmartStudyHub.apk)
         run: |
-          APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
-          echo "Found APK at: $APK_PATH"
+          APK_PATH=$(find mobile-expo/android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
           cp "$APK_PATH" "SmartStudyHub.apk"
           ls -lh SmartStudyHub.apk
 

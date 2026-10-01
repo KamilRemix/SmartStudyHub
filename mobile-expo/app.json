@@ -3,7 +3,7 @@
     "name": "SmartStudyHub",
     "slug": "smartstudyhub",
     "scheme": "smartstudyhub",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -20,7 +20,7 @@
       "bundleIdentifier": "com.smartstudyhub.mobile"
     },
     "android": {
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

@@ -5,6 +5,8 @@ import { Feather } from '@expo/vector-icons';
 
 export type ToolsStackParamList = {
   ToolsHome: undefined;
+  AIAssistant: undefined;
+  Presentation: undefined;
   UnitConverter: undefined;
   CurrencyConverter: undefined;
   Translator: undefined;
