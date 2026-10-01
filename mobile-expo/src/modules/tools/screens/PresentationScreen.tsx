@@ -7,7 +7,6 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
@@ -26,6 +25,7 @@ export const PresentationScreen: React.FC = () => {
   const [slideCount, setSlideCount] = useState(5);
   const [audience, setAudience] = useState('Студенты');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [slides, setSlides] = useState<SlideItem[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -34,7 +34,9 @@ export const PresentationScreen: React.FC = () => {
   const audienceOptions = ['Школьники', 'Студенты', 'Широкая аудитория'];
 
   const handleGenerate = async () => {
+    setErrorMessage(null);
     if (!topic.trim()) {
+      setErrorMessage('Пожалуйста, введите тему презентации.');
       return;
     }
 
@@ -49,10 +51,13 @@ export const PresentationScreen: React.FC = () => {
       if (generated && generated.length > 0) {
         setSlides(generated);
         setCurrentSlideIndex(0);
+        setErrorMessage(null);
       } else {
-        throw new Error('Не удалось сгенерировать слайды');
+        throw new Error('ИИ не смог сгенерировать слайды. Попробуйте еще раз.');
       }
     } catch (err: any) {
+      const msg = err?.message || 'Не удалось сгенерировать презентацию. Проверьте интернет или API-ключ.';
+      setErrorMessage(msg);
       console.warn('Presentation generation failed:', err);
     } finally {
       setIsLoading(false);
@@ -84,6 +89,7 @@ export const PresentationScreen: React.FC = () => {
   const handleReset = () => {
     setSlides([]);
     setCurrentSlideIndex(0);
+    setErrorMessage(null);
   };
 
   const currentSlide = slides[currentSlideIndex];
@@ -123,6 +129,26 @@ export const PresentationScreen: React.FC = () => {
               Введите тему, выберите количество слайдов, и SmartStudyAI подготовит структурированные слайды с тезисами и заметками.
             </Text>
 
+            {/* Error Banner */}
+            {errorMessage ? (
+              <View style={[styles.errorBox, { backgroundColor: colors.componentBackground, borderColor: '#ef4444' }]}>
+                <Feather name="alert-circle" size={18} color="#ef4444" />
+                <Text style={[styles.errorText, { color: colors.textColor }]}>
+                  {errorMessage}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Loading Banner */}
+            {isLoading ? (
+              <View style={[styles.loadingBox, { backgroundColor: colors.componentBackground, borderColor: colors.borderColor }]}>
+                <ActivityIndicator size="small" color={colors.primaryAccent} />
+                <Text style={[styles.loadingBoxText, { color: colors.textColorSecondary }]}>
+                  SmartStudyAI генерирует {slideCount} слайдов... Пожалуйста, подождите
+                </Text>
+              </View>
+            ) : null}
+
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { color: colors.textColor }]}>
                 Тема презентации:
@@ -133,14 +159,18 @@ export const PresentationScreen: React.FC = () => {
                   {
                     backgroundColor: colors.componentBackground,
                     color: colors.textColor,
-                    borderColor: colors.borderColor,
+                    borderColor: errorMessage && !topic.trim() ? '#ef4444' : colors.borderColor,
                   },
                 ]}
                 value={topic}
-                onChangeText={setTopic}
+                onChangeText={(txt) => {
+                  setTopic(txt);
+                  if (errorMessage) setErrorMessage(null);
+                }}
                 placeholder="Например: Квантовые компьютеры или Экология 2026"
                 placeholderTextColor={colors.textColorSecondary}
                 multiline
+                editable={!isLoading}
               />
             </View>
 
@@ -163,6 +193,7 @@ export const PresentationScreen: React.FC = () => {
                       },
                     ]}
                     onPress={() => setSlideCount(count)}
+                    disabled={isLoading}
                   >
                     <Text
                       style={[
@@ -199,6 +230,7 @@ export const PresentationScreen: React.FC = () => {
                       },
                     ]}
                     onPress={() => setAudience(opt)}
+                    disabled={isLoading}
                   >
                     <Text
                       style={[
@@ -227,7 +259,7 @@ export const PresentationScreen: React.FC = () => {
                 },
               ]}
               onPress={handleGenerate}
-              disabled={!topic.trim() || isLoading}
+              disabled={isLoading}
             >
               {isLoading ? (
                 <View style={styles.btnInner}>
@@ -449,6 +481,34 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: 'center',
     paddingHorizontal: 12,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  errorText: {
+    flex: 1,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  loadingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  loadingBoxText: {
+    flex: 1,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
   },
   inputGroup: {
     gap: 8,
