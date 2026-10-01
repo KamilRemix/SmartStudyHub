@@ -237,6 +237,9 @@ function updateToolsTranslations() {
         if (typeof window.updateGenPassTranslations === 'function') {
             try { window.updateGenPassTranslations(); } catch(e) { console.warn(e); }
         }
+        if (typeof window.SmartPresentation !== 'undefined' && typeof window.SmartPresentation.updateTranslations === 'function') {
+            try { window.SmartPresentation.updateTranslations(); } catch(e) { console.warn(e); }
+        }
     } catch (e) {
         console.warn('[ui] updateToolsTranslations error:', e);
     }

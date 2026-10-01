@@ -334,6 +334,7 @@ function initTools() {
     const panelAi = document.getElementById('tools-ai-panel');
     const panelTranslator = document.getElementById('tools-translator-panel');
     const panelGenpass = document.getElementById('tools-genpass-panel');
+    const panelPresentation = document.getElementById('tools-presentation-panel');
 
     let aiAssistantApi = null;
     if (typeof SmartStudyAI !== 'undefined') {
@@ -344,13 +345,13 @@ function initTools() {
 
     function showHub() {
         if (toolsHub) toolsHub.classList.remove('hidden');
-        [panelSettings, panelConverter, panelCurrency, panelAi, panelTranslator, panelGenpass].forEach(p => p && p.classList.add('hidden'));
+        [panelSettings, panelConverter, panelCurrency, panelAi, panelTranslator, panelGenpass, panelPresentation].forEach(p => p && p.classList.add('hidden'));
         updateToolsTranslations();
     }
 
     function openPanel(name) {
         if (toolsHub) toolsHub.classList.add('hidden');
-        [panelSettings, panelConverter, panelCurrency, panelAi, panelTranslator, panelGenpass].forEach(p => p && p.classList.add('hidden'));
+        [panelSettings, panelConverter, panelCurrency, panelAi, panelTranslator, panelGenpass, panelPresentation].forEach(p => p && p.classList.add('hidden'));
         if (name === 'settings' && panelSettings) panelSettings.classList.remove('hidden');
         if (name === 'converter' && panelConverter) panelConverter.classList.remove('hidden');
         if (name === 'currency' && panelCurrency) panelCurrency.classList.remove('hidden');
@@ -365,6 +366,10 @@ function initTools() {
         if (name === 'genpass' && panelGenpass) {
             panelGenpass.classList.remove('hidden');
         }
+        if (name === 'presentation' && panelPresentation) {
+            panelPresentation.classList.remove('hidden');
+            if (typeof SmartPresentation !== 'undefined') SmartPresentation.init();
+        }
         updateToolsTranslations();
         // trigger currency load when opening currency panel
         if (name === 'currency') loadCurrency();
@@ -378,6 +383,7 @@ function initTools() {
     document.getElementById('tile-ai')?.addEventListener('click', () => openPanel('ai'));
     document.getElementById('tile-translator')?.addEventListener('click', () => openPanel('translator'));
     document.getElementById('tile-genpass')?.addEventListener('click', () => openPanel('genpass'));
+    document.getElementById('tile-presentation')?.addEventListener('click', () => openPanel('presentation'));
 
     document.querySelectorAll('.panel-back').forEach(btn => btn.addEventListener('click', () => showHub()));
 

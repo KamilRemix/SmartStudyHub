@@ -54,11 +54,23 @@ if (fs.existsSync(aiAssistantPath)) {
         fs.writeFileSync(aiAssistantPath, content, 'utf8');
         console.log('✅ Statically injected REACT_APP_GEMINI_API_KEY into dist/ai-assistant.js');
     } else {
-        console.warn('⚠️ Warning: process.env.REACT_APP_GEMINI_API_KEY placeholder not found in ai-assistant.js');
+        console.warn('Warning: process.env.REACT_APP_GEMINI_API_KEY placeholder not found in ai-assistant.js');
     }
 } else {
-    console.error('❌ Error: dist/ai-assistant.js not found');
+    console.error('Error: dist/ai-assistant.js not found');
     process.exit(1);
 }
 
-console.log('🎉 Web build completed successfully! Output is in the /dist folder.');
+// 5. Modify dist/js/presentation.js to embed the API key
+const presentationPath = path.join(distDir, 'js', 'presentation.js');
+if (fs.existsSync(presentationPath)) {
+    let content = fs.readFileSync(presentationPath, 'utf8');
+    const target = 'process.env.REACT_APP_GEMINI_API_KEY';
+    if (content.includes(target)) {
+        content = content.replace(target, `'${apiKey}'`);
+        fs.writeFileSync(presentationPath, content, 'utf8');
+        console.log('Statically injected REACT_APP_GEMINI_API_KEY into dist/js/presentation.js');
+    }
+}
+
+console.log('Web build completed successfully! Output is in the /dist folder.');
