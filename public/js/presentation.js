@@ -10,6 +10,8 @@
     let currentPresentation = null;
     let currentSlideIndex = 0;
     let isGenerating = false;
+    let activeCanvasToken = 0;
+    const imageCache = new Map();
 
     const THEMES = {
         'dark': {
@@ -80,18 +82,27 @@
     async function searchWikimediaImage(query) {
         if (!query || !query.trim()) return null;
         try {
-            const cleanQuery = query.replace(/[^\w\s-]/g, ' ').trim();
-            const url = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(cleanQuery)}&gsrlimit=4&prop=pageimages&pithumbsize=1000&format=json&origin=*`;
-            const res = await fetch(url);
-            if (!res.ok) return null;
-            const data = await res.json();
-            const pages = data.query?.pages;
-            if (!pages) return null;
+            // Clean punctuation but preserve letters/numbers across all alphabets (English, Cyrillic, etc.)
+            const cleanQuery = query.replace(/[^\p{L}\p{N}\s-]/gu, ' ').replace(/\s+/g, ' ').trim();
+            if (!cleanQuery) return null;
 
-            const list = Object.values(pages).filter(p => p.thumbnail?.source);
-            if (list.length === 0) return null;
+            const isCyrillic = /[а-яё]/i.test(cleanQuery);
+            const domains = isCyrillic ? ['ru.wikipedia.org', 'en.wikipedia.org'] : ['en.wikipedia.org', 'commons.wikimedia.org'];
 
-            return list[0].thumbnail.source;
+            for (const domain of domains) {
+                const url = `https://${domain}/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(cleanQuery)}&gsrlimit=5&prop=pageimages&pithumbsize=1200&format=json&origin=*`;
+                const res = await fetch(url);
+                if (!res.ok) continue;
+                const data = await res.json();
+                const pages = data.query?.pages;
+                if (!pages) continue;
+
+                const list = Object.values(pages).filter(p => p.thumbnail?.source);
+                if (list.length > 0) {
+                    return list[0].thumbnail.source;
+                }
+            }
+            return null;
         } catch (e) {
             console.warn('Wikimedia image search error:', e);
             return null;
@@ -197,6 +208,24 @@ Requirements:
         return parsed;
     }
 
+    function getWrappedLines(ctx, text, maxWidth) {
+        const words = (text || '').split(' ');
+        const lines = [];
+        let currentLine = '';
+        for (let n = 0; n < words.length; n++) {
+            const testLine = currentLine ? currentLine + ' ' + words[n] : words[n];
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > maxWidth && currentLine) {
+                lines.push(currentLine);
+                currentLine = words[n];
+            } else {
+                currentLine = testLine;
+            }
+        }
+        if (currentLine) lines.push(currentLine);
+        return lines;
+    }
+
     function renderSlideToCanvas(slide, theme, canvasEl) {
         if (!canvasEl) return;
         const ctx = canvasEl.getContext('2d');
@@ -204,6 +233,8 @@ Requirements:
         const height = 720;
         canvasEl.width = width;
         canvasEl.height = height;
+
+        const currentToken = ++activeCanvasToken;
 
         // Background
         ctx.fillStyle = theme.bg;
@@ -250,36 +281,50 @@ Requirements:
         ctx.font = '700 40px Poppins, sans-serif';
         wrapText(ctx, slide.title, 80, 150, leftWidth, 50);
 
-        // Bullets container
+        // Bullets container with dynamic height calculation (prevent overflow)
         if (slide.bullets && slide.bullets.length > 0) {
-            let currentY = 240;
+            const count = slide.bullets.length;
+            const fontSize = count > 3 ? 19 : 22;
+            const lineHeight = count > 3 ? 26 : 30;
+            const cardPadding = count > 3 ? 12 : 16;
+            let currentY = count > 3 ? 220 : 235;
+
+            ctx.font = `500 ${fontSize}px Poppins, sans-serif`;
+
             slide.bullets.forEach((bullet) => {
+                const lines = getWrappedLines(ctx, bullet, leftWidth - 90);
+                const cardHeight = Math.max(60, lines.length * lineHeight + cardPadding * 2);
+
                 // Bullet card
                 ctx.fillStyle = theme.cardBg;
                 ctx.beginPath();
-                roundRect(ctx, 80, currentY - 28, leftWidth - 20, 84, 12);
+                roundRect(ctx, 80, currentY, leftWidth - 20, cardHeight, 12);
                 ctx.fill();
 
                 // Bullet dot
                 ctx.fillStyle = theme.accent;
                 ctx.beginPath();
-                ctx.arc(110, currentY + 14, 7, 0, Math.PI * 2);
+                ctx.arc(110, currentY + cardPadding + fontSize * 0.5, 6, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Bullet text
+                // Bullet text lines
                 ctx.fillStyle = theme.text;
-                ctx.font = '500 22px Poppins, sans-serif';
-                wrapText(ctx, bullet, 135, currentY + 22, leftWidth - 90, 30);
+                ctx.font = `500 ${fontSize}px Poppins, sans-serif`;
+                let textY = currentY + cardPadding + fontSize * 0.8;
+                lines.forEach(line => {
+                    ctx.fillText(line, 135, textY);
+                    textY += lineHeight;
+                });
 
-                currentY += 105;
+                currentY += cardHeight + (count > 3 ? 10 : 14);
             });
         }
 
-        // Render Image if available
+        // Render Image with Race-Condition Guard & In-Memory Cache
         if (slide.imageUrl) {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => {
+            const drawImageOnCanvas = (img) => {
+                if (currentToken !== activeCanvasToken) return; // Stale render request, ignore
+
                 const imgX = 800;
                 const imgY = 120;
                 const imgW = 400;
@@ -307,25 +352,29 @@ Requirements:
                 roundRect(ctx, imgX, imgY, imgW, imgH, 18);
                 ctx.stroke();
             };
-            img.src = slide.imageUrl;
+
+            const cached = imageCache.get(slide.imageUrl);
+            if (cached && cached.complete && cached.naturalWidth > 0) {
+                drawImageOnCanvas(cached);
+            } else {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    imageCache.set(slide.imageUrl, img);
+                    drawImageOnCanvas(img);
+                };
+                img.src = slide.imageUrl;
+            }
         }
     }
 
     function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-        const words = (text || '').split(' ');
-        let line = '';
-        for (let n = 0; n < words.length; n++) {
-            const testLine = line + words[n] + ' ';
-            const metrics = ctx.measureText(testLine);
-            if (metrics.width > maxWidth && n > 0) {
-                ctx.fillText(line, x, y);
-                line = words[n] + ' ';
-                y += lineHeight;
-            } else {
-                line = testLine;
-            }
-        }
-        ctx.fillText(line, x, y);
+        const lines = getWrappedLines(ctx, text, maxWidth);
+        let currentY = y;
+        lines.forEach(line => {
+            ctx.fillText(line, x, currentY);
+            currentY += lineHeight;
+        });
     }
 
     function roundRect(ctx, x, y, width, height, radius) {
@@ -461,7 +510,11 @@ Requirements:
             }
         }
 
-        const safeTitle = (presentationData.title || 'Presentation').replace(/[^\w\s-]/g, '').trim() || 'presentation';
+        const safeTitle = (presentationData.title || 'Presentation')
+            .replace(/[\/\\:*?"<>|]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .substring(0, 80) || 'presentation';
         await pres.writeFile({ fileName: `${safeTitle}.pptx` });
     }
 
