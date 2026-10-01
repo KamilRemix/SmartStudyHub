@@ -1,22 +1,30 @@
-﻿# Agent Rules and Project Guidelines
+# Agent Rules and Project Guidelines
 
-##наше приложение оринетирвоано в первую очередь на рынок сша 
+## Рыночная ориентация
+- Наше приложение ориентировано в первую очередь на рынок США (глобальный англоязычный сегмент).
+
+## Android APK & Build Distribution (СТРОГОЕ ПРАВИЛО)
+- APK файл ВСЕГДА должен называться строго `SmartStudyHub.apk` без каких-либо суффиксов версий, дат, веток или тегов (никаких `SmartStudyHub-v1.4.0-test.apk` и т.п.).
+- Запрещено создавать вложенные подпапки для хранения APK (никаких `latest-apk`, `SmartStudyHub-Android-APK` и т.д.). Все локальные сборки помещаются строго в `build_artifacts/SmartStudyHub.apk`.
+- Каждый новый билд ОБЯЗАН перезаписывать предыдущий файл `SmartStudyHub.apk`, а любые старые временные сборки немедленно удаляются. В репозитории и релизах всегда должен быть строго один актуальный APK.
+- Основной актуальный APK приложения строится из платформы Capacitor (`android/`), куда компилируется весь веб-код (`public/` -> `dist/`) со всеми новыми функциями (AI Assistant, Генератор презентаций, Калькулятор и др.). Не собирать устаревший `mobile-expo`, если пользователь тестирует актуальный функционал.
+
 ## Git & Version Control (СТРОГОЕ ПРАВИЛО)
 - После реализации КАЖДОЙ задачи, фичи или исправления агент ОБЯЗАН делать коммит:
   `git add .` и `git commit -m "тип(компонент): понятное описание изменений"`
 - Никогда не выполнять скрытые или неконтролируемые откаты (`git reset --hard` / `git checkout .`), которые могут уничтожить код пользователя.
 
 ## Typography & Fonts
-- Для типографики использовать ИСКЛЮЧИТЕЛЬНО Google Fonts (например, Inter, Roboto, Montserrat) через стандартный <link> в head, либо локально подключенные шрифты проекта. Сторонние непроверенные CDN для шрифтов запрещены.Либо свой стиль
+- Для типографики использовать ИСКЛЮЧИТЕЛЬНО Google Fonts (например, Inter, Roboto, Montserrat) через стандартный <link> в head, либо локально подключенные шрифты проекта. Сторонние непроверенные CDN для шрифтов запрещены. Либо свой стиль.
 
 ## Firebase Configuration
 - Запрещено создавать новые проекты Firebase или переключать проект.
 - Единственный разрешенный проект: `studio-9933447149-80d6a` (Hosting site: `studio-9933447149-80d6a`, URL: https://studio-9933447149-80d6a.web.app/).
 - Запрещено использовать команду `firebase projects:create` или менять конфигурацию проекта без прямого указания пользователя.
--и не создовать новые имена пакетов чтобы не было путаницы 
+- Не создавать новые имена пакетов, чтобы не было путаницы.
 
 ## UI & Design Rules
-- Категорически ЗАПРЕЩЕНО использовать эмодзи (никаких 🚫, 🛡️, ✨, 📱, 🎉, 🚀 и т.д.) в интерфейсе приложения, модальных окнах, уведомлениях и кнопках.
+- Категорически ЗАПРЕЩЕНО использовать эмодзи (никаких эмодзи в интерфейсе приложения, модальных окнах, уведомлениях и кнопках).
 - Для иконок использовать исключительно векторную библиотеку Feather Icons (feather-icons) или нативный SVG.
 
 ## File Safety & Code Quality
@@ -24,14 +32,14 @@
 - Не использовать блокирующие заглушки `if (false)` и всплывающие окна `alert()` для обработки ошибок (только console.error / console.warn).
 
 ## Firebase Auth Scopes
-- ��� ��������� Google Sign-In ��������� ��������� ������������� ���������� (��������, YouTube � Google Drive) � ����� �������, ��� �������� Error 400: invalid_request. ������������ ������ ������� profile � email.
+- Для провайдера Google Sign-In запрещено добавлять дополнительные разрешения (например, YouTube и Google Drive) в один запрос, так как вызывает Error 400: invalid_request. Запрашивать только базовые profile и email.
 
 ## Social Sign-In Buttons (Modern UI)
-- ��������� ������������ ���������� HTML/CSS ����� �� 2010-�. ������ ����������� ����������� �������� � ����� �������:
-  - VK: ��� #0077FF, ����� ����� � �������.
-  - GitHub: ��� #24292e ��� #000000, ����� �����.
-  - Google: ����� ���, ����� #3c4043, ������� #dadce0.
-  - �������: ������� �������� (cubic-bezier), ���� (box-shadow) � transform (translateY(-2px)) ��� hover.
+- Запрещено использовать устаревшие стили. Кнопки авторизации оформлять в общем дизайне:
+  - VK: фон #0077FF, белый текст и иконка.
+  - GitHub: фон #24292e или #000000, белый текст.
+  - Google: белый фон, текст #3c4043, граница #dadce0.
+  - Плавные переходы (cubic-bezier), тени (box-shadow) и transform (translateY(-2px)) для hover.
 
 ## Russian Services Auth (VK, Yandex, etc.)
 - Russian services (VK ID, Yandex ID, etc.) MUST use their own native SDK for authentication, NOT Firebase OIDC providers.
@@ -46,4 +54,3 @@
 - Hide VK button for: Ukraine (UA) and all non-CIS countries with non-Russian language.
 - On Android: if installed from RuStore (ru.vk.store), always show VK button regardless of region.
 - The CIS country list is defined in CIS_COUNTRY_CODES constant. Ukraine is explicitly excluded.
-

@@ -8,7 +8,6 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(InAppUpdatePlugin.class);
         registerPlugin(AppChannelPlugin.class);
-        registerPlugin(VkAuthPlugin.class);
         super.onCreate(savedInstanceState);
 
     }
