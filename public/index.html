@@ -572,7 +572,8 @@
                             <div style="margin-bottom: 1.2rem; text-align: left;">
                                 <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-color); display: block; margin-bottom: 6px;" data-i18n="aiPersonalApiKey">Personal Gemini API key:</label>
                                 <input type="password" id="ai-api-key-input-local" data-i18n-placeholder="aiApiKeyPlaceholder" placeholder="Paste your API key (AIzaSy...)" style="width: 100%; padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--primary-accent) 40%, transparent); background: rgba(255,255,255,0.04); color: var(--text-color); font-family: inherit; font-size: 0.9rem; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
-                                <span style="font-size: 0.78rem; color: var(--text-color-secondary); display: block; margin-top: 4px; line-height: 1.3;" data-i18n="aiApiKeyHint">Using a personal key removes the daily message limit. The key is stored locally only.</span>
+                                <span style="font-size: 0.78rem; color: var(--text-color-secondary); display: block; margin-top: 4px; line-height: 1.3;" data-i18n="aiApiKeyHint">The API key is stored locally in your browser.</span>
+                                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="color: var(--primary-accent); text-decoration: none; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;"><span data-i18n="aiGetFreeKey">Get free Gemini API key at Google AI Studio</span> &rarr;</a>
                             </div>
 
                             <!-- Personalization section -->
@@ -748,10 +749,16 @@
                             </button>
                             <h2 class="ai-chat-title" style="margin: 0;">SmartStudyAI</h2>
                             
-                            <!-- Toggle history drawer (hamburger menu) -->
-                            <div style="display: flex; gap: 8px; align-items: center;">
-                                <button type="button" id="ai-toggle-history" title="История и настройки" style="background: none; border: 1px solid rgba(255,255,255,0.15); color: var(--text-color); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; transition: all 0.2s;">
-                                    ☰
+                            <!-- Header actions -->
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <button type="button" id="ai-quick-new-chat-btn" title="New Chat" style="background: none; border: 1px solid rgba(255,255,255,0.15); color: var(--text-color); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; transition: all 0.2s;" aria-label="New Chat">
+                                    <i data-feather="plus" style="width: 16px; height: 16px;"></i>
+                                </button>
+                                <button type="button" id="ai-quick-settings-btn" title="AI Settings" style="background: none; border: 1px solid rgba(255,255,255,0.15); color: var(--text-color); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; transition: all 0.2s;" aria-label="Settings">
+                                    <i data-feather="settings" style="width: 16px; height: 16px;"></i>
+                                </button>
+                                <button type="button" id="ai-toggle-history" title="History" style="background: none; border: 1px solid rgba(255,255,255,0.15); color: var(--text-color); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; transition: all 0.2s;" aria-label="History">
+                                    <i data-feather="message-square" style="width: 16px; height: 16px;"></i>
                                 </button>
                             </div>
                         </header>

@@ -1,5 +1,6 @@
 ﻿# Agent Rules and Project Guidelines
 
+##наше приложение оринетирвоано в первую очередь на рынок сша 
 ## Git & Version Control (СТРОГОЕ ПРАВИЛО)
 - После реализации КАЖДОЙ задачи, фичи или исправления агент ОБЯЗАН делать коммит:
   `git add .` и `git commit -m "тип(компонент): понятное описание изменений"`
@@ -45,3 +46,4 @@
 - Hide VK button for: Ukraine (UA) and all non-CIS countries with non-Russian language.
 - On Android: if installed from RuStore (ru.vk.store), always show VK button regardless of region.
 - The CIS country list is defined in CIS_COUNTRY_CODES constant. Ukraine is explicitly excluded.
+

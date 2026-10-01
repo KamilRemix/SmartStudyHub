@@ -220,47 +220,19 @@
     }
 
     function checkFreeLimit() {
-        if (hasPersonalApiKey()) {
-            return { allowed: true, count: 0, limit: AI_CONFIG.DAILY_LIMIT };
-        }
-        
-        const limitStr = localStorage.getItem('smartStudyAI_freeLimit');
-        const today = new Date().toISOString().split('T')[0];
-        
-        if (limitStr) {
-            try {
-                const parsed = JSON.parse(limitStr);
-                if (parsed.date === today) {
-                    return {
-                        allowed: parsed.count < AI_CONFIG.DAILY_LIMIT,
-                        count: parsed.count,
-                        limit: AI_CONFIG.DAILY_LIMIT
-                    };
-                }
-            } catch (e) {}
-        }
-        
-        return { allowed: true, count: 0, limit: AI_CONFIG.DAILY_LIMIT };
+        // Unlimited mode for testing and development
+        return { allowed: true, count: 0, limit: 999999, unlimited: true };
     }
     
     async function incrementFreeLimit() {
-        if (hasPersonalApiKey()) return;
-        const today = new Date().toISOString().split('T')[0];
-        const current = checkFreeLimit();
-        const nextCount = current.count + 1;
-        const limitObj = {
-            date: today,
-            count: nextCount
-        };
-        localStorage.setItem('smartStudyAI_freeLimit', JSON.stringify(limitObj));
-        await saveLimitsToFirebase(limitObj).catch(() => {});
+        // Unlimited mode active
     }
 
     async function requestAiResponse(message) {
-        // 1. Check personal API key from settings
+        // 1. Check personal API key from settings (stored locally in localStorage)
         const personalKey = getPersonalApiKey();
-        if (personalKey) {
-            return callPersonalAiApi(message, personalKey);
+        if (personalKey && personalKey.trim()) {
+            return callPersonalAiApi(message, personalKey.trim());
         }
 
         // 2. Check fallback keys depending on environment
@@ -269,21 +241,25 @@
 
         if (isElectron) {
             fallbackKey = await getFallbackApiKey();
-        } else {
-            // Web: read directly from environment variable
+        } else if (typeof process !== 'undefined' && process.env && process.env.REACT_APP_GEMINI_API_KEY) {
             fallbackKey = process.env.REACT_APP_GEMINI_API_KEY;
         }
 
-        if (fallbackKey && fallbackKey.trim()) {
+        if (fallbackKey && fallbackKey.trim() && !fallbackKey.startsWith('process.env')) {
             return callPersonalAiApi(message, fallbackKey.trim());
         }
 
-        // 3. Throw authentication error if key is still missing
-        if (getFirebaseUser()) {
-            throw new Error(t('aiKeyMissing', 'Общий API-ключ недоступен. Пожалуйста, укажите ваш собственный API-ключ Gemini в Настройках.'));
+        // 3. Fallback to Firebase Config API key if defined
+        if (window.firebaseConfig && window.firebaseConfig.apiKey) {
+            try {
+                return await callPersonalAiApi(message, window.firebaseConfig.apiKey);
+            } catch (err) {
+                console.warn('Firebase config API key attempt failed:', err);
+            }
         }
 
-        throw new Error(t('aiAuthRequired', 'Войдите через Google в Настройках, чтобы использовать бесплатные запросы SmartStudyAI, или подключите личный API-ключ.'));
+        // 4. Prompt user to set their personal Gemini API key
+        throw new Error(t('aiKeyMissing', 'Укажите ваш бесплатный ключ Gemini API в Настройках AI (значок шестеренки вверху).'));
     }
 
     let gsiTokenClient = null;
@@ -1338,18 +1314,59 @@ ${personalization ? 'Here is some information about the student to tailor your r
     }
 
     function renderMarkdownSimple(text) {
-        // Escaped HTML first to prevent XSS
-        let escaped = escapeHtml(text);
-        // Bold: **text** -> <strong>text</strong>
+        if (!text) return '';
+        // 1. Extract and preserve code blocks ```lang\ncode\n```
+        const codeBlocks = [];
+        let processed = text.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+            const index = codeBlocks.length;
+            codeBlocks.push({ lang: lang || 'code', code: code.trimEnd() });
+            return `__CODE_BLOCK_${index}__`;
+        });
+
+        // 2. Escape HTML
+        let escaped = escapeHtml(processed);
+
+        // 3. Headers: ### Title -> <div class="ai-md-h3">Title</div>
+        escaped = escaped.replace(/^### (.*$)/gim, '<div style="font-weight:700; font-size:1.05em; margin:8px 0 4px;">$1</div>');
+        escaped = escaped.replace(/^## (.*$)/gim, '<div style="font-weight:700; font-size:1.15em; margin:10px 0 6px;">$1</div>');
+        escaped = escaped.replace(/^# (.*$)/gim, '<div style="font-weight:800; font-size:1.25em; margin:12px 0 8px;">$1</div>');
+
+        // 4. Bold and Italic
+        escaped = escaped.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
         escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        // Italic: *text* -> <em>text</em>
         escaped = escaped.replace(/\*(.*?)\*/g, '<em>$1</em>');
-        // Inline code: `code` -> <code>code</code>
+
+        // 5. Inline code: `code`
         escaped = escaped.replace(/`(.*?)`/g, '<code>$1</code>');
-        // Markdown Links: [text](url) -> <a href="$2" target="_blank" class="ai-chat-link">$1</a>
-        escaped = escaped.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" class="ai-chat-link">$1</a>');
-        // Line breaks: \n -> <br>
+
+        // 6. Markdown Links
+        escaped = escaped.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="ai-chat-link" style="color:var(--primary-accent); text-decoration:underline;">$1</a>');
+
+        // 7. Bullet lists: •, -, * at start of line
+        escaped = escaped.replace(/^[\s]*[-*•]\s+(.*$)/gim, '<div style="display:flex; gap:6px; margin:3px 0;"><span style="color:var(--primary-accent);">&bull;</span><span>$1</span></div>');
+
+        // 8. Numbered lists: 1. 2. at start of line
+        escaped = escaped.replace(/^[\s]*(\d+)\.\s+(.*$)/gim, '<div style="display:flex; gap:6px; margin:3px 0;"><span style="font-weight:600; min-width:18px;">$1.</span><span>$2</span></div>');
+
+        // 9. Line breaks
         escaped = escaped.replace(/\n/g, '<br>');
+
+        // 10. Restore code blocks
+        codeBlocks.forEach((item, index) => {
+            const escapedCode = escapeHtml(item.code);
+            const encodedForClipboard = encodeURIComponent(item.code);
+            const blockHtml = `
+                <div class="ai-code-block">
+                    <div class="ai-code-header">
+                        <span>${escapeHtml(item.lang)}</span>
+                        <button type="button" class="ai-code-copy-btn" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodedForClipboard}')).then(() => { this.textContent = 'Copied!'; setTimeout(() => this.textContent = 'Copy', 2000); })">Copy</button>
+                    </div>
+                    <pre><code>${escapedCode}</code></pre>
+                </div>
+            `;
+            escaped = escaped.replace(`__CODE_BLOCK_${index}__`, blockHtml);
+        });
+
         return escaped;
     }
 
@@ -1440,30 +1457,10 @@ ${personalization ? 'Here is some information about the student to tailor your r
     }
 
     async function refreshLimitState() {
-        if (hasPersonalApiKey()) {
-            limitState = { allowed: true, unlimited: true, used: 0, limit: AI_CONFIG.DAILY_LIMIT };
-            const { limitNotice } = getDom();
-            if (limitNotice) limitNotice.classList.add('hidden');
-            setInputLocked(false);
-            return limitState;
-        }
-
-        const current = checkFreeLimit();
-        limitState = {
-            allowed: current.allowed,
-            unlimited: false,
-            used: current.count,
-            limit: current.limit
-        };
-
+        limitState = { allowed: true, unlimited: true, used: 0, limit: 999999 };
         const { limitNotice } = getDom();
-        if (!limitState.allowed) {
-            showLimitExceededUI();
-        } else {
-            if (limitNotice) limitNotice.classList.add('hidden');
-            if (!isSending) setInputLocked(false);
-        }
-
+        if (limitNotice) limitNotice.classList.add('hidden');
+        if (!isSending) setInputLocked(false);
         return limitState;
     }
 
@@ -1486,16 +1483,6 @@ ${personalization ? 'Here is some information about the student to tailor your r
             isSending = false;
             dom.sendBtn.disabled = dom.input.disabled;
             return;
-        }
-
-        if (!hasPersonalApiKey()) {
-            const current = checkFreeLimit();
-            if (!current.allowed) {
-                showLimitExceededUI();
-                isSending = false;
-                dom.sendBtn.disabled = true;
-                return;
-            }
         }
 
         appendMessage('user', text);
@@ -1529,7 +1516,13 @@ ${personalization ? 'Here is some information about the student to tailor your r
             } else if (e.message === 'AUTH_EXPIRED') {
                 appendMessage('system', t('aiAuthExpiredDesc', 'Сессия Google устарела. Пожалуйста, зайдите в Настройки и войдите заново.'));
             } else {
-                appendMessage('system', e.message || t('aiErrorGeneric', 'Не удалось получить ответ. Попробуйте позже.'));
+                const msg = (e.message || '');
+                const isKeyIssue = msg.includes('API_KEY') || msg.includes('API key') || msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('UNAUTHENTICATED') || msg.includes('ключ');
+                if (isKeyIssue) {
+                    appendKeyBannerMessage();
+                } else {
+                    appendMessage('system', e.message || t('aiErrorGeneric', 'Не удалось получить ответ. Попробуйте позже.'));
+                }
             }
         } finally {
             isSending = false;
@@ -1641,6 +1634,81 @@ ${personalization ? 'Here is some information about the student to tailor your r
         chatHistory.forEach(item => {
             appendMessage(item.role, item.content, item.groundingMetadata);
         });
+
+        const hasUserMessage = chatHistory.some(m => m.role === 'user');
+        if (!hasUserMessage) {
+            renderQuickPromptChips(messages);
+        }
+
+        scrollMessagesToBottom();
+    }
+
+    function renderQuickPromptChips(container) {
+        if (!container) return;
+        const chipsWrap = document.createElement('div');
+        chipsWrap.className = 'ai-quick-prompts';
+        
+        const isRu = (typeof currentLang !== 'undefined' ? currentLang : 'ru') === 'ru';
+        const prompts = isRu ? [
+            { title: 'Объясни тему простыми словами', text: 'Объясни сложную учебную тему простыми словами с примерами из жизни.' },
+            { title: 'Помоги решить задачу', text: 'Помоги разобрать и решить эту задачу пошагово:' },
+            { title: 'Сделай карточки для запоминания', text: 'Составь список из 5 флеш-карточек (вопрос — ответ) для подготовки к тесту.' },
+            { title: 'Краткий конспект материала', text: 'Сделай краткий и структурированный конспект по следующей теме:' }
+        ] : [
+            { title: 'Explain concept simply', text: 'Explain this complex study topic simply with everyday examples.' },
+            { title: 'Help solve a problem', text: 'Help me break down and solve this problem step by step:' },
+            { title: 'Generate study flashcards', text: 'Create 5 study flashcards (Question — Answer) for my upcoming exam.' },
+            { title: 'Summarize study notes', text: 'Create a clear and structured summary of the following topic:' }
+        ];
+
+        prompts.forEach(p => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'ai-prompt-chip';
+            btn.innerHTML = `
+                <span class="chip-icon"><i data-feather="corner-down-right" style="width:14px; height:14px;"></i></span>
+                <span>${escapeHtml(p.title)}</span>
+            `;
+            btn.addEventListener('click', () => {
+                const dom = getDom();
+                if (dom.input) {
+                    dom.input.value = p.text + ' ';
+                    dom.input.focus();
+                    autoResizeTextarea(dom.input);
+                }
+            });
+            chipsWrap.appendChild(btn);
+        });
+
+        container.appendChild(chipsWrap);
+        if (typeof feather !== 'undefined') {
+            try { feather.replace(); } catch (_) {}
+        }
+    }
+
+    function appendKeyBannerMessage() {
+        const { messages } = getDom();
+        if (!messages) return;
+        const banner = document.createElement('div');
+        banner.className = 'ai-key-banner';
+        const isRu = (typeof currentLang !== 'undefined' ? currentLang : 'ru') === 'ru';
+        banner.innerHTML = `
+            <div>
+                <div style="font-weight: 600; margin-bottom: 2px;">
+                    ${isRu ? 'Требуется ключ Gemini API' : 'Gemini API Key Required'}
+                </div>
+                <div style="font-size: 0.8rem; opacity: 0.85;">
+                    ${isRu ? 'Укажите бесплатный ключ в Настройках, чтобы общаться с AI.' : 'Please set your free Gemini API key in Settings to use AI.'}
+                </div>
+            </div>
+            <button type="button" class="ai-key-banner-btn" id="ai-open-settings-from-banner">
+                ${isRu ? 'Настройки' : 'Settings'}
+            </button>
+        `;
+        banner.querySelector('#ai-open-settings-from-banner')?.addEventListener('click', () => {
+            document.getElementById('ai-quick-settings-btn')?.click() || document.getElementById('ai-toggle-persona')?.click();
+        });
+        messages.appendChild(banner);
         scrollMessagesToBottom();
     }
 
@@ -1807,6 +1875,14 @@ ${personalization ? 'Here is some information about the student to tailor your r
             }
         });
 
+        document.getElementById('ai-quick-new-chat-btn')?.addEventListener('click', () => {
+            createNewChat();
+        });
+
+        document.getElementById('ai-quick-settings-btn')?.addEventListener('click', () => {
+            document.getElementById('ai-toggle-persona')?.click();
+        });
+
         setupHistoryDrawer();
         setupPersonalization();
         setupExtensions();
@@ -1848,6 +1924,9 @@ ${personalization ? 'Here is some information about the student to tailor your r
     async function onPanelOpen() {
         document.body.classList.add('ai-chat-open');
         applyAiTranslations();
+        if (typeof feather !== 'undefined') {
+            try { feather.replace(); } catch (_) {}
+        }
         
         // Sync user-specific data from Firebase Realtime Database
         const user = getFirebaseUser();
@@ -1873,7 +1952,7 @@ ${personalization ? 'Here is some information about the student to tailor your r
     }
 
     function initAiAssistant(options = {}) {
-        if (window.AI_ASSISTANT_ENABLED === false || true) { // Temporarily hardcoded to disabled for RuStore release
+        if (window.AI_ASSISTANT_ENABLED === false) {
             const aiPanelBody = document.querySelector('#tools-ai-panel .panel-body');
             if (aiPanelBody) {
                 aiPanelBody.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-color-secondary);">AI Assistant temporarily unavailable</div>';
