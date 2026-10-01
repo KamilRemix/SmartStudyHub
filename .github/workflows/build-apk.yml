@@ -1,6 +1,8 @@
 name: Build Android APK (Test Artifact)
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       tag:
@@ -12,8 +14,65 @@ permissions:
   contents: read
 
 jobs:
-  build-apk:
-    name: "Build Android APK"
+  build-capacitor-apk:
+    name: "Build Capacitor Android APK (Web + Presentations)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || yes | sdkmanager --licenses || true
+
+      - name: Install Root Dependencies
+        run: |
+          npm install --legacy-peer-deps
+
+      - name: Build Web Assets & Sync Capacitor
+        env:
+          REACT_APP_GEMINI_API_KEY: ${{ secrets.REACT_APP_GEMINI_API_KEY || secrets.GEMINI_API_KEY }}
+        run: |
+          node build-web.js
+          npx @capacitor/cli sync android
+
+      - name: Build Capacitor APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare Capacitor APK
+        run: |
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="v1.4.0-test"
+          fi
+          APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          echo "Found Capacitor APK at: $APK_PATH"
+          cp "$APK_PATH" "SmartStudyHub-Capacitor-${TAG}.apk"
+          ls -lh SmartStudyHub-Capacitor-${TAG}.apk
+
+      - name: Upload Capacitor APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartStudyHub-Capacitor-APK
+          path: SmartStudyHub-Capacitor-*.apk
+          retention-days: 14
+
+  build-expo-apk:
+    name: "Build Expo Android APK (Native React)"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
