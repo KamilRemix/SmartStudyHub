@@ -71,11 +71,13 @@ class NotificationService {
       if (finalStatus === 'granted' && Platform.OS === 'android' && !this.hasConfiguredChannel) {
         await Notifications.setNotificationChannelAsync('smartstudyhub-reminders', {
           name: 'SmartStudyHub: Напоминания',
-          importance: Notifications.AndroidImportance.HIGH,
+          importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#007aff',
           sound: 'default',
           showBadge: true,
+          enableVibrate: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility?.PUBLIC,
         });
         this.hasConfiguredChannel = true;
       }
@@ -179,9 +181,28 @@ class NotificationService {
       if (!granted) return null;
 
       const diffMs = triggerDate.getTime() - Date.now();
-      if (diffMs <= 3000) {
-        console.warn('[NotificationService] Trigger date is not in future, skipping immediate alert:', diffMs);
+      if (diffMs <= 500) {
+        console.warn('[NotificationService] Trigger date is not in future, skipping alert:', diffMs);
         return null;
+      }
+
+      // Ensure channel is configured on Android
+      if (Platform.OS === 'android' && !this.hasConfiguredChannel) {
+        try {
+          await Notifications.setNotificationChannelAsync('smartstudyhub-reminders', {
+            name: 'SmartStudyHub: Напоминания',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#007aff',
+            sound: 'default',
+            showBadge: true,
+            enableVibrate: true,
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility?.PUBLIC,
+          });
+          this.hasConfiguredChannel = true;
+        } catch (chanErr) {
+          console.warn('[NotificationService] Channel setup warning:', chanErr);
+        }
       }
 
       const notifTitle = title && title.trim().length > 0
@@ -192,6 +213,7 @@ class NotificationService {
         ? body.trim()
         : 'Пора вернуться к вашей заметке в SmartStudyHub';
 
+      const triggerType = (Notifications as any).SchedulableTriggerInputTypes?.DATE ?? 'date';
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
           title: notifTitle,
@@ -202,11 +224,13 @@ class NotificationService {
           channelId: 'smartstudyhub-reminders',
         } as any,
         trigger: {
+          type: triggerType,
           date: triggerDate,
+          channelId: 'smartstudyhub-reminders',
         } as any,
       });
 
-      console.log('[NotificationService] Reminder scheduled id:', notificationId, 'at:', triggerDate.toISOString());
+      console.log('[NotificationService] Reminder successfully scheduled. ID:', notificationId, 'at:', triggerDate.toISOString());
       return notificationId;
     } catch (e) {
       console.warn('[NotificationService] Failed to schedule reminder:', e);
