@@ -53,7 +53,7 @@ jobs:
         run: |
           cd mobile-expo/android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx3072m -XX:MaxMetaspaceSize=768m" -Dkotlin.daemon.jvm.options="-Xmx1024m"
 
       - name: Verify Signed APK
         run: |
