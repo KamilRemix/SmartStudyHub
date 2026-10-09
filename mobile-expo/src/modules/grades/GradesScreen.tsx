@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../theme';
 import { useI18n } from '../../i18n';
@@ -50,6 +51,14 @@ export const GradesScreen: React.FC = () => {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showWhatIfModal, setShowWhatIfModal] = useState(false);
 
+  const navigation = useNavigation<any>();
+
+  const handleOpenAIAnalysis = () => {
+    navigation.navigate('Tools', {
+      screen: 'AIAssistant',
+    });
+  };
+
   useEffect(() => {
     const refreshGrades = () => {
       loadGradesData().then((stored) => {
@@ -58,6 +67,10 @@ export const GradesScreen: React.FC = () => {
     };
 
     refreshGrades();
+
+    if (user?.uid && !user?.isAnonymous && !user?.isOfflineDemo) {
+      cloudSyncService.syncAll(user.uid).catch(() => {});
+    }
 
     const unsubscribe = cloudSyncService.subscribe((status) => {
       if (!status.isSyncing && status.lastSyncedAt) {
@@ -326,7 +339,6 @@ export const GradesScreen: React.FC = () => {
         periodMode={settings.periodMode}
         activePeriod={settings.activePeriod}
         onSelectPeriod={handleSelectPeriod}
-        onOpenSettings={() => setShowSettingsModal(true)}
       />
 
       <ScrollView
@@ -344,29 +356,50 @@ export const GradesScreen: React.FC = () => {
             },
           ]}
         >
-          <View style={styles.globalCardLeft}>
-            <Text style={[styles.globalLabel, { color: colors.textColorSecondary }]}>
-              {t('gradesTotalScore')} ({getPeriodTitle()}):
-            </Text>
-            <Text style={[styles.globalValue, { color: globalGradeColor }]}>
-              {globalAvg > 0 ? globalAvg.toFixed(2) : '—'}
-            </Text>
-            <Text style={[styles.globalSubtext, { color: colors.textColorSecondary }]}>
-              {t('subjects')}: {subjects.length}
-            </Text>
-          </View>
-          <View style={styles.globalCardRight}>
-            <View
-              style={[
-                styles.globalBadge,
-                { backgroundColor: globalGradeColor + '20', borderColor: globalGradeColor },
-              ]}
-            >
-              <Text style={[styles.globalBadgeText, { color: globalGradeColor }]}>
-                {globalFinalGrade}
+          <View style={styles.globalCardTop}>
+            <View style={styles.globalCardLeft}>
+              <Text style={[styles.globalLabel, { color: colors.textColorSecondary }]}>
+                {t('gradesTotalScore')} ({getPeriodTitle()}):
+              </Text>
+              <Text style={[styles.globalValue, { color: globalGradeColor }]}>
+                {globalAvg > 0 ? globalAvg.toFixed(2) : '—'}
+              </Text>
+              <Text style={[styles.globalSubtext, { color: colors.textColorSecondary }]}>
+                {t('subjects')}: {subjects.length}
               </Text>
             </View>
+            <View style={styles.globalCardRight}>
+              <View
+                style={[
+                  styles.globalBadge,
+                  { backgroundColor: globalGradeColor + '20', borderColor: globalGradeColor },
+                ]}
+              >
+                <Text style={[styles.globalBadgeText, { color: globalGradeColor }]}>
+                  {globalFinalGrade}
+                </Text>
+              </View>
+            </View>
           </View>
+
+          <TouchableOpacity
+            style={[
+              styles.aiAnalysisBtn,
+              {
+                backgroundColor: colors.primaryAccent + '15',
+                borderColor: colors.primaryAccent + '40',
+              },
+            ]}
+            onPress={handleOpenAIAnalysis}
+            activeOpacity={0.7}
+            accessibilityLabel="AI Academic Analysis"
+          >
+            <Feather name="cpu" size={14} color={colors.primaryAccent} />
+            <Text style={[styles.aiAnalysisBtnText, { color: colors.primaryAccent }]}>
+              AI-Анализ успеваемости и прогноз
+            </Text>
+            <Feather name="arrow-right" size={13} color={colors.primaryAccent} />
+          </TouchableOpacity>
         </View>
 
         {/* Subjects Horizontal Track */}
@@ -570,13 +603,30 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   globalCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
     marginBottom: 12,
+  },
+  globalCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  aiAnalysisBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 12,
+    gap: 6,
+  },
+  aiAnalysisBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
   },
   globalCardLeft: {
     flex: 1,

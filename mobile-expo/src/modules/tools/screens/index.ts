@@ -3,4 +3,4 @@ export { CurrencyConverterScreen } from './CurrencyConverterScreen';
 export { TranslatorScreen } from './TranslatorScreen';
 export { GenPassScreen } from './GenPassScreen';
 export { AIAssistantScreen } from './AIAssistantScreen';
-export { PresentationScreen } from './PresentationScreen';
+export { QuizGeneratorScreen } from './QuizGeneratorScreen';

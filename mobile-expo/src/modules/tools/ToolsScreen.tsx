@@ -27,11 +27,11 @@ const TOOLS_LIST: ToolItem[] = [
     screen: 'AIAssistant',
   },
   {
-    id: 'presentation',
-    titleKey: 'presentationTitle',
-    subtitleKey: 'presentationSub',
-    icon: 'monitor',
-    screen: 'Presentation',
+    id: 'quiz',
+    titleKey: 'quizGeneratorTitle',
+    subtitleKey: 'quizGeneratorSub',
+    icon: 'check-circle',
+    screen: 'QuizGenerator',
   },
   {
     id: 'converter',

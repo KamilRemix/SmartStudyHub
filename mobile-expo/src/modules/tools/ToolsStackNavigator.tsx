@@ -3,7 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ToolsStackParamList } from '../../navigation/types';
 import { ToolsScreen } from './ToolsScreen';
 import { AIAssistantScreen } from './screens/AIAssistantScreen';
-import { PresentationScreen } from './screens/PresentationScreen';
+import { QuizGeneratorScreen } from './screens/QuizGeneratorScreen';
 import { UnitConverterScreen } from './screens/UnitConverterScreen';
 import { CurrencyConverterScreen } from './screens/CurrencyConverterScreen';
 import { TranslatorScreen } from './screens/TranslatorScreen';
@@ -19,7 +19,7 @@ export const ToolsStackNavigator: React.FC = () => {
     >
       <Stack.Screen name="ToolsHome" component={ToolsScreen} />
       <Stack.Screen name="AIAssistant" component={AIAssistantScreen} />
-      <Stack.Screen name="Presentation" component={PresentationScreen} />
+      <Stack.Screen name="QuizGenerator" component={QuizGeneratorScreen} />
       <Stack.Screen name="UnitConverter" component={UnitConverterScreen} />
       <Stack.Screen name="CurrencyConverter" component={CurrencyConverterScreen} />
       <Stack.Screen name="Translator" component={TranslatorScreen} />

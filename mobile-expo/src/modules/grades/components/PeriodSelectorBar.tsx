@@ -9,7 +9,7 @@ export interface PeriodSelectorBarProps {
   periodMode: PeriodMode;
   activePeriod: PeriodType;
   onSelectPeriod: (period: PeriodType) => void;
-  onOpenSettings: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const PeriodSelectorBar: React.FC<PeriodSelectorBarProps> = ({
@@ -73,15 +73,17 @@ export const PeriodSelectorBar: React.FC<PeriodSelectorBarProps> = ({
         })}
       </ScrollView>
 
-      <TouchableOpacity
-        onPress={onOpenSettings}
-        accessibilityRole="button"
-        accessibilityLabel={t('periodSettingsA11y')}
-        style={[styles.settingsButton, { backgroundColor: colors.componentBackground, borderColor: colors.borderColor }]}
-        activeOpacity={0.7}
-      >
-        <Feather name="sliders" size={16} color={colors.textColor} />
-      </TouchableOpacity>
+      {onOpenSettings && (
+        <TouchableOpacity
+          onPress={onOpenSettings}
+          accessibilityRole="button"
+          accessibilityLabel={t('periodSettingsA11y')}
+          style={[styles.settingsButton, { backgroundColor: colors.componentBackground, borderColor: colors.borderColor }]}
+          activeOpacity={0.7}
+        >
+          <Feather name="sliders" size={16} color={colors.textColor} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };

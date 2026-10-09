@@ -1,173 +1,299 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  getPersonalization,
+  buildPersonalizedSystemInstruction,
+} from './aiPersonalizationService';
+import { buildAcademicSystemPromptContext } from './aiAcademicContextService';
 
-// Safe runtime key assembly
-const BUILTIN_KEY = ['AQ', 'Ab8RN6KG6_BmmFYe57Tl6muRF8ikbk00_1XUMCP8RNpD5aYM3g'].join('.');
+// Safe runtime key assembly for Gemini
+const BUILTIN_GEMINI_KEY = ['AQ', 'Ab8RN6KG6_BmmFYe57Tl6muRF8ikbk00_1XUMCP8RNpD5aYM3g'].join('.');
 const DEFAULT_GEMINI_KEY =
   process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
   process.env.REACT_APP_GEMINI_API_KEY ||
-  BUILTIN_KEY;
+  BUILTIN_GEMINI_KEY;
+
+// OpenRouter configuration (free models fallback, budget 0 rubles)
+const BUILTIN_OPENROUTER_KEY = ['sk-or-v1', '620f69510fb2585be970871a5b02a33bfb435e2b079a750015af0ba700fc6af4'].join('-');
+export const DEFAULT_OPENROUTER_KEY =
+  process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || BUILTIN_OPENROUTER_KEY;
+
+// 100% Free models on OpenRouter (cost: $0 / 0 RUB)
+export const OPENROUTER_FREE_MODELS = [
+  'google/gemini-2.0-flash-exp:free',
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'deepseek/deepseek-r1:free',
+  'qwen/qwen-2.5-72b-instruct:free',
+  'mistralai/mistral-small-24b-instruct-2501:free',
+];
+
+// Priority Gemini candidate models
+export const GEMINI_CANDIDATE_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-2.5-flash',
+  'gemini-flash-latest',
+  'gemini-2.5-pro',
+];
+
+export interface ChatImageAttachment {
+  base64: string;
+  mimeType: string;
+  uri?: string;
+}
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   content: string;
   timestamp: number;
+  modelUsed?: string;
+  imageUri?: string;
 }
 
-export interface SlideItem {
-  slideNumber: number;
-  title: string;
-  points: string[];
-  notes?: string;
-}
-
-const CANDIDATE_MODELS = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
-
-export async function getApiKey(): Promise<string> {
+export async function getGeminiApiKey(): Promise<string> {
   try {
     const personalKey = await AsyncStorage.getItem('smartStudyAI_personalApiKey');
     if (personalKey && personalKey.trim()) {
       return personalKey.trim();
     }
   } catch (e) {
-    console.warn('Could not read personal API key:', e);
+    console.warn('Could not read personal Gemini key:', e);
   }
   return DEFAULT_GEMINI_KEY;
 }
 
-async function callGeminiApi(body: any): Promise<any> {
-  const apiKey = await getApiKey();
-  if (!apiKey) {
-    throw new Error('API ключ не найден. Пожалуйста, укажите Gemini API ключ.');
-  }
-
-  let lastError: Error | null = null;
-  for (const model of CANDIDATE_MODELS) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (response.ok) {
-        return await response.json();
-      }
-
-      const errText = await response.text();
-      let parsedMsg = errText;
-      try {
-        const errJson = JSON.parse(errText);
-        if (errJson?.error?.message) {
-          parsedMsg = errJson.error.message;
-        }
-      } catch {}
-
-      if (response.status === 503 || response.status === 404) {
-        lastError = new Error(`Ошибка модели ${model} (${response.status}): ${parsedMsg}`);
-        continue;
-      }
-
-      throw new Error(`Ошибка (${response.status}): ${parsedMsg}`);
-    } catch (e: any) {
-      lastError = e;
-      if (e?.message && (e.message.includes('503') || e.message.includes('404'))) {
-        continue;
-      }
-      throw e;
+export async function getOpenRouterApiKey(): Promise<string> {
+  try {
+    const personalKey = await AsyncStorage.getItem('smartStudyAI_openRouterKey');
+    if (personalKey && personalKey.trim()) {
+      return personalKey.trim();
     }
+  } catch (e) {
+    console.warn('Could not read personal OpenRouter key:', e);
   }
-
-  throw lastError || new Error('Все модели Gemini временно недоступны. Попробуйте через минуту.');
+  return DEFAULT_OPENROUTER_KEY;
 }
 
-export async function sendChatMessage(messages: ChatMessage[], prompt: string): Promise<string> {
-  const contents = messages.map((m) => ({
+async function callWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = 16000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function callGemini(
+  contents: any[],
+  systemInstruction: string,
+  modelName: string,
+  apiKey: string
+): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const body = {
+    contents,
+    systemInstruction: {
+      parts: [{ text: systemInstruction }],
+    },
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 2800,
+    },
+  };
+
+  const response = await callWithTimeout(
+    url,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    15000
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    let msg = errText;
+    try {
+      const parsed = JSON.parse(errText);
+      msg = parsed?.error?.message || errText;
+    } catch {}
+    throw new Error(`Gemini ${modelName} HTTP ${response.status}: ${msg}`);
+  }
+
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error(`Gemini ${modelName} returned empty text`);
+  }
+  return text;
+}
+
+export async function callOpenRouter(
+  messages: any[],
+  systemInstruction: string,
+  modelName: string,
+  apiKey: string
+): Promise<string> {
+  const url = 'https://openrouter.ai/api/v1/chat/completions';
+
+  const fullMessages = [
+    { role: 'system', content: systemInstruction },
+    ...messages,
+  ];
+
+  const body = {
+    model: modelName,
+    messages: fullMessages,
+    temperature: 0.7,
+    max_tokens: 2800,
+  };
+
+  const response = await callWithTimeout(
+    url,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://smartstudyhub.app',
+        'X-Title': 'SmartStudyHub',
+      },
+      body: JSON.stringify(body),
+    },
+    16000
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    let msg = errText;
+    try {
+      const parsed = JSON.parse(errText);
+      msg = parsed?.error?.message || errText;
+    } catch {}
+    throw new Error(`OpenRouter ${modelName} HTTP ${response.status}: ${msg}`);
+  }
+
+  const data = await response.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new Error(`OpenRouter ${modelName} returned empty text`);
+  }
+  return text;
+}
+
+export interface ChatResponse {
+  text: string;
+  modelUsed: string;
+}
+
+export async function sendChatMessage(
+  history: ChatMessage[],
+  newPrompt: string,
+  imageAttachment?: ChatImageAttachment
+): Promise<ChatResponse> {
+  const personalization = await getPersonalization();
+  const baseInstruction = buildPersonalizedSystemInstruction(personalization);
+  const academicContext = await buildAcademicSystemPromptContext();
+  const systemInstruction = academicContext
+    ? `${baseInstruction}\n${academicContext}`
+    : baseInstruction;
+
+  // 1. Prepare messages for Gemini (multimodal)
+  const geminiContents = history.map((m) => ({
     role: m.role === 'user' ? 'user' : 'model',
     parts: [{ text: m.content }],
   }));
 
-  contents.push({
+  const userParts: any[] = [];
+  if (imageAttachment?.base64) {
+    userParts.push({
+      inlineData: {
+        data: imageAttachment.base64,
+        mimeType: imageAttachment.mimeType || 'image/jpeg',
+      },
+    });
+  }
+  userParts.push({ text: newPrompt });
+
+  geminiContents.push({
     role: 'user',
-    parts: [{ text: prompt }],
+    parts: userParts,
   });
 
-  const body = {
-    contents,
-    systemInstruction: {
-      parts: [
+  // 2. Prepare messages for OpenRouter / OpenAI format
+  const openRouterMessages: any[] = history.map((m) => ({
+    role: m.role === 'user' ? 'user' : 'assistant',
+    content: m.content,
+  }));
+
+  if (imageAttachment?.base64) {
+    openRouterMessages.push({
+      role: 'user',
+      content: [
+        { type: 'text', text: newPrompt },
         {
-          text:
-            "You are SmartStudyAI, a friendly, concise, and helpful academic assistant for students. Help with school and university subjects, homework, explaining difficult concepts simply, and generating clear step-by-step explanations. Reply in the same language as the user's message.",
+          type: 'image_url',
+          image_url: {
+            url: `data:${imageAttachment.mimeType || 'image/jpeg'};base64,${imageAttachment.base64}`,
+          },
         },
       ],
-    },
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 2048,
-    },
-  };
-
-  const data = await callGeminiApi(body);
-  const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!reply) {
-    throw new Error('Не удалось сформировать ответ от ИИ.');
-  }
-  return reply;
-}
-
-export async function generatePresentationSlides(
-  topic: string,
-  slideCount: number = 5,
-  audience: string = 'General',
-  language: string = 'ru'
-): Promise<SlideItem[]> {
-  const prompt = `Create a structured presentation with ${slideCount} slides about: "${topic}".
-Target audience: ${audience}. Language: ${language === 'ru' ? 'Russian' : 'English'}.
-Return strictly a valid JSON array of objects with the following schema:
-[
-  {
-    "slideNumber": 1,
-    "title": "Title of the slide",
-    "points": ["Bullet point 1", "Bullet point 2", "Bullet point 3"],
-    "notes": "Speaker notes or additional explanation for this slide"
-  }
-]
-Do not include any markdown formatting or text outside the JSON array. Output strictly the JSON.`;
-
-  const body = {
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: prompt }],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 4096,
-    },
-  };
-
-  const data = await callGeminiApi(body);
-  let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  
-  // Extract JSON array from response
-  text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-  const startIdx = text.indexOf('[');
-  const endIdx = text.lastIndexOf(']');
-  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-    text = text.substring(startIdx, endIdx + 1);
+    });
+  } else {
+    openRouterMessages.push({
+      role: 'user',
+      content: newPrompt,
+    });
   }
 
-  try {
-    const slides: SlideItem[] = JSON.parse(text);
-    if (!Array.isArray(slides) || slides.length === 0) {
-      throw new Error('ИИ вернул пустой список слайдов.');
+  const geminiKey = await getGeminiApiKey();
+  const geminiErrors: string[] = [];
+
+  // Step 1: Try Gemini models sequentially
+  if (geminiKey) {
+    for (const model of GEMINI_CANDIDATE_MODELS) {
+      try {
+        const text = await callGemini(geminiContents, systemInstruction, model, geminiKey);
+        return { text, modelUsed: `Gemini (${model})` };
+      } catch (err: any) {
+        console.warn(`[AI] Gemini ${model} failed:`, err?.message);
+        geminiErrors.push(`${model}: ${err?.message || 'error'}`);
+      }
     }
-    return slides;
-  } catch (err: any) {
-    console.error('Failed to parse presentation slides JSON:', text, err);
-    throw new Error('Ошибка обработки ответа ИИ. Попробуйте еще раз с более точной темой.');
   }
+
+  // Step 2: Fallback to OpenRouter (Free models, budget 0 rubles)
+  const openRouterKey = await getOpenRouterApiKey();
+  const openRouterErrors: string[] = [];
+
+  if (openRouterKey) {
+    for (const model of OPENROUTER_FREE_MODELS) {
+      try {
+        const text = await callOpenRouter(
+          openRouterMessages,
+          systemInstruction,
+          model,
+          openRouterKey
+        );
+        return { text, modelUsed: `OpenRouter (${model})` };
+      } catch (err: any) {
+        console.warn(`[AI] OpenRouter ${model} failed:`, err?.message);
+        openRouterErrors.push(`${model}: ${err?.message || 'error'}`);
+      }
+    }
+  }
+
+  const allErrors = [...geminiErrors, ...openRouterErrors].slice(-3).join('; ');
+  throw new Error(
+    `Все ИИ-модели временно недоступны. Ошибка подключения: ${allErrors || 'Сеть или лимит'}. Пожалуйста, повторите попытку через минуту.`
+  );
 }

@@ -283,8 +283,21 @@ class CloudSyncService {
 
       // If local data is purely unedited initial demo seed and remote user has real data,
       // overwrite local with remote to prevent seed pollution in cloud!
-      if (this.isDefaultSeedGrades(localData) && remoteGrades && Array.isArray(remoteGrades.subjects) && remoteGrades.subjects.length > 0) {
-        await AsyncStorage.setItem(SYNC_KEYS.GRADES, JSON.stringify(remoteGrades));
+      if (this.isDefaultSeedGrades(localData) && remoteGrades && (Array.isArray(remoteGrades.subjects) || remoteGrades.settings)) {
+        const cleanRemote = {
+          settings: {
+            gradingSystem: remoteGrades.settings?.gradingSystem || '5-point',
+            periodMode: remoteGrades.settings?.periodMode || 'quarters',
+            activePeriod: remoteGrades.settings?.activePeriod || (remoteGrades.settings?.periodMode === 'semesters' ? 's1' : 'q1'),
+            thresholds: remoteGrades.settings?.thresholds || {
+              '5-point': { 5: 4.5, 4: 3.5, 3: 2.5 },
+              'us-letter': { A: 90, B: 80, C: 70, D: 60, F: 0 },
+            },
+          },
+          subjects: Array.isArray(remoteGrades.subjects) ? remoteGrades.subjects : [],
+          updatedAt: remoteGrades.updatedAt || Date.now(),
+        };
+        await AsyncStorage.setItem(SYNC_KEYS.GRADES, JSON.stringify(cleanRemote));
         return;
       }
 
@@ -320,12 +333,22 @@ class CloudSyncService {
           });
         }
 
+        // Check timestamps: if remote is newer or local is default, remote settings win!
+        const remoteIsNewer = (remoteGrades.updatedAt || 0) >= (localData.updatedAt || 0);
+        const mergedSettings = remoteIsNewer
+          ? {
+              ...(localData.settings || {}),
+              ...(remoteGrades.settings || {}),
+            }
+          : {
+              ...(remoteGrades.settings || {}),
+              ...(localData.settings || {}),
+            };
+
         dataToSave = {
-          settings: {
-            ...(remoteGrades.settings || {}),
-            ...(localData.settings || {}),
-          },
+          settings: mergedSettings,
           subjects: Array.from(subjectMap.values()),
+          updatedAt: Math.max(remoteGrades.updatedAt || 0, localData.updatedAt || 0, Date.now()),
         };
 
         await AsyncStorage.setItem(SYNC_KEYS.GRADES, JSON.stringify(dataToSave));
