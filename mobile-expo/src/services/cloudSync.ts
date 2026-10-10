@@ -15,6 +15,7 @@ const SYNC_KEYS = {
   GRADES: '@smartstudy_grades_data',
   NOTES: '@smartstudy_notes_data',
   VAULT: '@ssh_password_vault',
+  AI_CHATS: '@smartstudy_ai_chats_data',
   SETTINGS: '@ssh_user_settings',
   LAST_SYNC: '@ssh_last_sync_timestamp',
 };
@@ -224,6 +225,9 @@ class CloudSyncService {
 
       // 4. Password Vault Data
       await this.syncPasswordVault(uid, remoteData.passwordVault || remoteData.passwords);
+
+      // 5. AI Chat Sessions History
+      await this.syncAiChats(uid, remoteData.ai_chats || remoteData.aiChats);
 
       this.lastSyncedAt = Date.now();
       await AsyncStorage.setItem(SYNC_KEYS.LAST_SYNC, String(this.lastSyncedAt));
@@ -450,6 +454,63 @@ class CloudSyncService {
       }
     } catch (e) {
       console.warn('[CloudSync] syncPasswordVault error:', e);
+    }
+  }
+
+  public async syncAiChatsDirect(uid: string, localSessions: any[]) {
+    if (!uid || !Array.isArray(localSessions)) return;
+    try {
+      await set(ref(database, `users/${uid}/ai_chats`), localSessions);
+    } catch (e) {
+      console.warn('[CloudSync] RTDB ai_chats direct write error:', e);
+    }
+    try {
+      if (firestore) {
+        await setDoc(doc(firestore, 'users', uid), { ai_chats: localSessions }, { merge: true });
+      }
+    } catch (e) {
+      console.warn('[CloudSync] Firestore ai_chats direct write error:', e);
+    }
+  }
+
+  private async syncAiChats(uid: string, remoteChats: any[]) {
+    try {
+      const localStr = await AsyncStorage.getItem(SYNC_KEYS.AI_CHATS);
+      const localSessions: any[] = localStr ? JSON.parse(localStr) : [];
+
+      const map = new Map<string, any>();
+      if (Array.isArray(remoteChats)) {
+        remoteChats.forEach((c) => c?.id && map.set(c.id, c));
+      }
+
+      localSessions.forEach((c) => {
+        if (!c?.id) return;
+        const existing = map.get(c.id);
+        if (!existing || (c.updatedAt || 0) >= (existing.updatedAt || 0)) {
+          map.set(c.id, c);
+        }
+      });
+
+      const merged = Array.from(map.values()).sort(
+        (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)
+      );
+
+      await AsyncStorage.setItem(SYNC_KEYS.AI_CHATS, JSON.stringify(merged));
+
+      try {
+        await set(ref(database, `users/${uid}/ai_chats`), merged);
+      } catch (e) {
+        console.warn('[CloudSync] RTDB ai_chats write error:', e);
+      }
+      try {
+        if (firestore) {
+          await setDoc(doc(firestore, 'users', uid), { ai_chats: merged }, { merge: true });
+        }
+      } catch (e) {
+        console.warn('[CloudSync] Firestore ai_chats write error:', e);
+      }
+    } catch (e) {
+      console.warn('[CloudSync] syncAiChats error:', e);
     }
   }
 }

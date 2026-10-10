@@ -18,7 +18,6 @@ import {
   getPersonalization,
   savePersonalization,
   DEFAULT_PERSONALIZATION,
-  PRESET_INSTRUCTION_SNIPPETS,
 } from '../../../services/aiPersonalizationService';
 
 interface PersonalizationModalProps {
@@ -55,19 +54,6 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
       onSaved(settings);
     }
     onClose();
-  };
-
-  const handleAddPreset = (snippet: string) => {
-    setSettings((prev) => {
-      const current = prev.instructions.trim();
-      if (!current) {
-        return { ...prev, instructions: snippet };
-      }
-      if (current.includes(snippet)) {
-        return prev;
-      }
-      return { ...prev, instructions: `${current}\n${snippet}` };
-    });
   };
 
   return (
@@ -147,42 +133,14 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
                     color: colors.textColor,
                   },
                 ]}
-                placeholder="Например: Я студент 2 курса физфака. Всегда пиши формулы в LaTeX, отвечай строго по делу с доказательствами и поясняй сложные термины..."
+                placeholder="Например: Отвечай кратко и структурированно, объясняй сложные темы простыми аналогиями, разбивай длинные решения на понятные шаги и приводи примеры из практики."
                 placeholderTextColor={colors.textColorSecondary}
                 value={settings.instructions}
                 onChangeText={(text) => setSettings((s) => ({ ...s, instructions: text }))}
                 multiline
-                numberOfLines={6}
+                numberOfLines={7}
                 maxLength={1500}
               />
-            </View>
-
-            {/* Preset Helper Chips */}
-            <View style={styles.presetsBlock}>
-              <Text style={[styles.presetsTitle, { color: colors.textColorSecondary }]}>
-                Быстрые шаблоны (нажмите для добавления):
-              </Text>
-              <View style={styles.chipsRow}>
-                {PRESET_INSTRUCTION_SNIPPETS.map((snippet, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: colors.background,
-                        borderColor: colors.borderColor,
-                      },
-                    ]}
-                    onPress={() => handleAddPreset(snippet)}
-                    activeOpacity={0.7}
-                  >
-                    <Feather name="plus" size={12} color={colors.primaryAccent} style={styles.plusIcon} />
-                    <Text style={[styles.chipText, { color: colors.textColor }]}>
-                      {snippet}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
             </View>
           </ScrollView>
 
@@ -295,34 +253,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     textAlignVertical: 'top',
-  },
-  presetsBlock: {
-    gap: 10,
-  },
-  presetsTitle: {
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 12,
-  },
-  chipsRow: {
-    gap: 8,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 6,
-  },
-  plusIcon: {
-    marginTop: 1,
-  },
-  chipText: {
-    flex: 1,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    lineHeight: 17,
   },
   footer: {
     padding: 16,

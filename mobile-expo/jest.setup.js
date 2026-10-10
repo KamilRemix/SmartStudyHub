@@ -35,7 +35,64 @@ const asyncStorageMock = (() => {
 
 jest.mock('@react-native-async-storage/async-storage', () => asyncStorageMock);
 
-// Expo Crypto Mock
+// React Native Core Mock
+jest.mock('react-native', () => ({
+  Platform: {
+    OS: 'android',
+    select: jest.fn((obj) => obj.android ?? obj.default),
+  },
+  StyleSheet: {
+    create: (styles) => styles,
+    flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles) : styles || {}),
+  },
+  View: 'View',
+  Text: 'Text',
+  TouchableOpacity: 'TouchableOpacity',
+  ScrollView: 'ScrollView',
+  FlatList: 'FlatList',
+  TextInput: 'TextInput',
+  ActivityIndicator: 'ActivityIndicator',
+  Modal: 'Modal',
+  Switch: 'Switch',
+  Image: 'Image',
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
+}));
+
+// Firebase Mock
+jest.mock('./src/services/firebase', () => ({
+  auth: { currentUser: null },
+  database: {},
+  firestore: null,
+}));
+
+// Expo Network Mock
+jest.mock('expo-network', () => ({
+  getNetworkStateAsync: jest.fn(async () => ({
+    isConnected: true,
+    isInternetReachable: true,
+  })),
+  NetworkStateType: {
+    WIFI: 'WIFI',
+  },
+}));
+
+// Expo StatusBar Mock
+jest.mock('expo-status-bar', () => ({
+  StatusBar: 'StatusBar',
+}));
+
+// Google Fonts Mocks
+jest.mock('@expo-google-fonts/poppins', () => ({}));
+jest.mock('@expo-google-fonts/inter', () => ({}));
+
+// React Navigation Mock
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => ({
+    navigate: jest.fn(),
+    goBack: jest.fn(),
+  }),
+  useRoute: () => ({ params: {} }),
+}));
 jest.mock('expo-crypto', () => ({
   CryptoDigestAlgorithm: {
     SHA1: 'SHA-1',

@@ -27,10 +27,6 @@ export const BottomTabNavigator: React.FC = () => {
     ? 72
     : 66 + (insets.bottom > 0 ? insets.bottom : 0);
 
-  const activePillBg = isDark
-    ? 'rgba(0, 229, 255, 0.16)'
-    : 'rgba(0, 122, 255, 0.12)';
-
   const dividerColor = isDark
     ? 'rgba(255, 255, 255, 0.08)'
     : '#e2e8f0';
@@ -44,12 +40,7 @@ export const BottomTabNavigator: React.FC = () => {
           const iconName = TAB_ICONS[route.name];
           const iconColor = focused ? colors.primaryAccent : '#64748b';
           return (
-            <View
-              style={[
-                styles.iconContainer,
-                focused && [styles.iconPill, { backgroundColor: activePillBg }],
-              ]}
-            >
+            <View style={styles.iconContainer}>
               <Feather name={iconName} size={focused ? 20 : 19} color={iconColor} />
             </View>
           );
@@ -126,13 +117,8 @@ export const BottomTabNavigator: React.FC = () => {
 
 const styles = StyleSheet.create({
   iconContainer: {
-    height: 26,
-    minWidth: 38,
-    borderRadius: 13,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  iconPill: {
-    paddingHorizontal: 6,
   },
 });

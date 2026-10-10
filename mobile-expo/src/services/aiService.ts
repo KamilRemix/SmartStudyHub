@@ -207,11 +207,31 @@ export async function sendChatMessage(
     ? `${baseInstruction}\n${academicContext}`
     : baseInstruction;
 
-  // 1. Prepare messages for Gemini (multimodal)
-  const geminiContents = history.map((m) => ({
-    role: m.role === 'user' ? 'user' : 'model',
-    parts: [{ text: m.content }],
-  }));
+  // 1. Clean history: filter out welcome message and ensure valid starting turn
+  const validHistory = history
+    .filter((m) => m && m.id !== 'welcome' && typeof m.content === 'string' && m.content.trim().length > 0)
+    .slice(-20);
+
+  // Gemini requires the conversation to start with 'user'
+  const geminiHistory = [...validHistory];
+  while (geminiHistory.length > 0 && geminiHistory[0].role !== 'user') {
+    geminiHistory.shift();
+  }
+
+  const geminiContents: any[] = [];
+  let lastRole: string | null = null;
+  for (const m of geminiHistory) {
+    const role = m.role === 'user' ? 'user' : 'model';
+    if (role === lastRole && geminiContents.length > 0) {
+      geminiContents[geminiContents.length - 1].parts[0].text += `\n${m.content}`;
+    } else {
+      geminiContents.push({
+        role,
+        parts: [{ text: m.content }],
+      });
+      lastRole = role;
+    }
+  }
 
   const userParts: any[] = [];
   if (imageAttachment?.base64) {
@@ -230,7 +250,7 @@ export async function sendChatMessage(
   });
 
   // 2. Prepare messages for OpenRouter / OpenAI format
-  const openRouterMessages: any[] = history.map((m) => ({
+  const openRouterMessages: any[] = validHistory.map((m) => ({
     role: m.role === 'user' ? 'user' : 'assistant',
     content: m.content,
   }));

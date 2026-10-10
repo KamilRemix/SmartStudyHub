@@ -25,8 +25,17 @@ import {
   AIPersonalization,
   DEFAULT_PERSONALIZATION,
 } from '../../../services/aiPersonalizationService';
+import {
+  ChatSession,
+  loadAllChatSessions,
+  createNewChatSession,
+  updateSessionMessages,
+  deleteChatSession,
+  getActiveSessionId,
+  setActiveSessionId,
+} from '../../../services/aiChatStorageService';
 import { ChatMessageRenderer } from '../components/ChatMessageRenderer';
-import { FormulaInsertToolbar } from '../components/FormulaInsertToolbar';
+import { ChatHistoryModal } from '../components/ChatHistoryModal';
 import { PersonalizationModal } from '../components/PersonalizationModal';
 import { ToolsStackParamList } from '../../../navigation/types';
 
@@ -38,10 +47,12 @@ export const AIAssistantScreen: React.FC = () => {
   const { t } = useI18n();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionIdState] = useState<string>('');
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showFormulaBar, setShowFormulaBar] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showPersonalizationModal, setShowPersonalizationModal] = useState(false);
   const [personalization, setPersonalization] = useState<AIPersonalization>(DEFAULT_PERSONALIZATION);
   const [attachedImage, setAttachedImage] = useState<ChatImageAttachment | null>(null);
@@ -49,19 +60,19 @@ export const AIAssistantScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    // Initial welcome message
-    setMessages([
-      {
-        id: 'welcome',
-        role: 'model',
-        content: t('aiWelcome'),
-        timestamp: Date.now(),
-        modelUsed: 'SmartStudyAI',
-      },
-    ]);
-
-    // Load active personalization
-    getPersonalization().then(setPersonalization);
+    async function init() {
+      const allSessions = await loadAllChatSessions();
+      setSessions(allSessions);
+      const savedActiveId = await getActiveSessionId();
+      const current = allSessions.find((s) => s.id === savedActiveId) || allSessions[0];
+      if (current) {
+        setActiveSessionIdState(current.id);
+        setMessages(current.messages || []);
+      }
+      const p = await getPersonalization();
+      setPersonalization(p);
+    }
+    init();
   }, []);
 
   const handlePickFromGallery = async () => {
@@ -107,6 +118,31 @@ export const AIAssistantScreen: React.FC = () => {
     }
   };
 
+  const handleNewChat = async () => {
+    const newSession = await createNewChatSession();
+    const updated = await loadAllChatSessions();
+    setSessions(updated);
+    setActiveSessionIdState(newSession.id);
+    setMessages(newSession.messages);
+    setShowHistoryModal(false);
+  };
+
+  const handleSelectSession = async (session: ChatSession) => {
+    await setActiveSessionId(session.id);
+    setActiveSessionIdState(session.id);
+    setMessages(session.messages || []);
+    setShowHistoryModal(false);
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    const updated = await deleteChatSession(sessionId);
+    setSessions(updated);
+    if (activeSessionId === sessionId && updated.length > 0) {
+      setActiveSessionIdState(updated[0].id);
+      setMessages(updated[0].messages || []);
+    }
+  };
+
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
     if ((!text && !attachedImage) || isLoading) return;
@@ -120,12 +156,16 @@ export const AIAssistantScreen: React.FC = () => {
     };
 
     const imageToSend = attachedImage;
+    const nextMessages = [...messages, userMessage];
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages(nextMessages);
     setInputText('');
     setAttachedImage(null);
-    setShowFormulaBar(false);
     setIsLoading(true);
+
+    if (activeSessionId) {
+      updateSessionMessages(activeSessionId, nextMessages).then(setSessions);
+    }
 
     try {
       const response = await sendChatMessage(messages, userMessage.content, imageToSend || undefined);
@@ -136,7 +176,11 @@ export const AIAssistantScreen: React.FC = () => {
         timestamp: Date.now(),
         modelUsed: response.modelUsed,
       };
-      setMessages((prev) => [...prev, assistantMessage]);
+      const finalMessages = [...nextMessages, assistantMessage];
+      setMessages(finalMessages);
+      if (activeSessionId) {
+        updateSessionMessages(activeSessionId, finalMessages).then(setSessions);
+      }
     } catch (err: any) {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -144,7 +188,11 @@ export const AIAssistantScreen: React.FC = () => {
         content: err?.message || t('aiEmptyResponse'),
         timestamp: Date.now(),
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      const finalMessages = [...nextMessages, errorMessage];
+      setMessages(finalMessages);
+      if (activeSessionId) {
+        updateSessionMessages(activeSessionId, finalMessages).then(setSessions);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -157,7 +205,7 @@ export const AIAssistantScreen: React.FC = () => {
   };
 
   const handleClear = () => {
-    setMessages([
+    const cleared: ChatMessage[] = [
       {
         id: 'welcome',
         role: 'model',
@@ -165,19 +213,19 @@ export const AIAssistantScreen: React.FC = () => {
         timestamp: Date.now(),
         modelUsed: 'SmartStudyAI',
       },
-    ]);
+    ];
+    setMessages(cleared);
     setAttachedImage(null);
-  };
-
-  const handleInsertFormula = (snippet: string) => {
-    setInputText((prev) => (prev ? `${prev} ${snippet}` : snippet));
+    if (activeSessionId) {
+      updateSessionMessages(activeSessionId, cleared).then(setSessions);
+    }
   };
 
   const suggestions = [
     'Проанализируй мою успеваемость',
     'Объясни тему простыми словами',
     'Помоги решить задачу',
-    'Формулы и примеры LaTeX',
+    'Помоги подготовиться к контрольной',
     'Сгенерировать тест по теме',
   ];
 
@@ -269,14 +317,14 @@ export const AIAssistantScreen: React.FC = () => {
           accessibilityLabel: 'Back',
         }}
         rightActionSecondary={{
-          icon: 'sliders',
-          onPress: () => setShowPersonalizationModal(true),
-          accessibilityLabel: 'AI Personalization',
+          icon: 'clock',
+          onPress: () => setShowHistoryModal(true),
+          accessibilityLabel: 'Chat History',
         }}
         rightAction={{
-          icon: 'trash-2',
-          onPress: handleClear,
-          accessibilityLabel: 'Clear Chat',
+          icon: 'plus',
+          onPress: handleNewChat,
+          accessibilityLabel: 'New Chat',
         }}
       />
 
@@ -355,14 +403,6 @@ export const AIAssistantScreen: React.FC = () => {
         }
       />
 
-      {/* Formula insertion toolbar when toggled */}
-      {showFormulaBar && (
-        <FormulaInsertToolbar
-          onInsert={handleInsertFormula}
-          onClose={() => setShowFormulaBar(false)}
-        />
-      )}
-
       {/* Image attachment preview pill */}
       {attachedImage && (
         <View
@@ -425,36 +465,6 @@ export const AIAssistantScreen: React.FC = () => {
           />
         </TouchableOpacity>
 
-        {/* Toggle LaTeX formula toolbar */}
-        <TouchableOpacity
-          style={[
-            styles.toolbarBtn,
-            {
-              backgroundColor: showFormulaBar
-                ? colors.primaryAccent + '22'
-                : colors.background,
-              borderColor: showFormulaBar
-                ? colors.primaryAccent
-                : colors.borderColor,
-            },
-          ]}
-          onPress={() => setShowFormulaBar((prev) => !prev)}
-          accessibilityLabel="Toggle LaTeX formulas"
-        >
-          <Text
-            style={[
-              styles.toolbarBtnText,
-              {
-                color: showFormulaBar
-                  ? colors.primaryAccent
-                  : colors.textColorSecondary,
-              },
-            ]}
-          >
-            ∑x
-          </Text>
-        </TouchableOpacity>
-
         <TextInput
           style={[
             styles.input,
@@ -489,6 +499,17 @@ export const AIAssistantScreen: React.FC = () => {
           <Feather name="send" size={18} color="#ffffff" />
         </TouchableOpacity>
       </View>
+
+      {/* Chat History Modal */}
+      <ChatHistoryModal
+        visible={showHistoryModal}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSelectSession={handleSelectSession}
+        onNewChat={handleNewChat}
+        onDeleteSession={handleDeleteSession}
+        onClose={() => setShowHistoryModal(false)}
+      />
 
       {/* Personalization Modal */}
       <PersonalizationModal
