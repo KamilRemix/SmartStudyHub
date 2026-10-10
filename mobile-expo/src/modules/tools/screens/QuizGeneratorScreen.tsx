@@ -24,6 +24,7 @@ import {
   generateQuizFromAI,
   evaluateQuiz,
   formatQuizForExport,
+  formatQuizToHtmlPrintable,
 } from '../../../services/quizService';
 import { formatLatexToReadable } from '../utils/latexFormatter';
 
@@ -43,6 +44,7 @@ export const QuizGeneratorScreen: React.FC = () => {
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [attachedImage, setAttachedImage] = useState<{ uri: string; base64: string } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [genStep, setGenStep] = useState(0);
   const [genError, setGenError] = useState<string | null>(null);
 
   // Playing state
@@ -109,6 +111,11 @@ export const QuizGeneratorScreen: React.FC = () => {
 
     setGenError(null);
     setIsGenerating(true);
+    setGenStep(0);
+
+    const stepTimer = setInterval(() => {
+      setGenStep((prev) => (prev < 3 ? prev + 1 : prev));
+    }, 1800);
 
     try {
       const generated = await generateQuizFromAI({
@@ -119,6 +126,7 @@ export const QuizGeneratorScreen: React.FC = () => {
         imageBase64: attachedImage?.base64,
       });
 
+      clearInterval(stepTimer);
       setQuiz(generated);
       setCurrentIndex(0);
       setUserAnswers({});
@@ -127,6 +135,7 @@ export const QuizGeneratorScreen: React.FC = () => {
       setShowExplanation(false);
       setPhase('playing');
     } catch (err: any) {
+      clearInterval(stepTimer);
       setGenError(err?.message || 'Ошибка генерации теста. Попробуйте еще раз.');
     } finally {
       setIsGenerating(false);
@@ -189,6 +198,19 @@ export const QuizGeneratorScreen: React.FC = () => {
     await Clipboard.setStringAsync(text);
     setCopiedExport(true);
     setTimeout(() => setCopiedExport(false), 2000);
+  };
+
+  const handleShareHtmlExport = async (mode: 'teacher' | 'student') => {
+    if (!quiz) return;
+    const html = formatQuizToHtmlPrintable(quiz, mode);
+    try {
+      await Share.share({
+        message: html,
+        title: `${quiz.title} (Бланк печати / PDF)`,
+      });
+    } catch (err) {
+      console.warn('Share HTML error:', err);
+    }
   };
 
   // Navigate to AI Assistant to discuss missed questions
@@ -460,22 +482,114 @@ export const QuizGeneratorScreen: React.FC = () => {
             </View>
           )}
 
-          {/* Generate Button */}
-          <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: colors.primaryAccent }]}
-            onPress={handleGenerate}
-            disabled={isGenerating}
-            activeOpacity={0.8}
-          >
-            {isGenerating ? (
-              <ActivityIndicator color="#ffffff" size="small" />
-            ) : (
-              <>
-                <Feather name="zap" size={18} color="#ffffff" />
-                <Text style={styles.primaryBtnText}>Сгенерировать тест с ИИ</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {/* Generate Button or Active Generation Progress Card */}
+          {isGenerating ? (
+            <View
+              style={[
+                styles.generatingCard,
+                {
+                  backgroundColor: colors.componentBackground,
+                  borderColor: colors.borderColor,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.generatingIconCircle,
+                  { backgroundColor: colors.primaryAccent + '18' },
+                ]}
+              >
+                <ActivityIndicator size="large" color={colors.primaryAccent} />
+              </View>
+
+              <Text style={[styles.generatingTitle, { color: colors.textColor }]}>
+                ИИ составляет тест...
+              </Text>
+              <Text style={[styles.generatingSubtitle, { color: colors.textColorSecondary }]}>
+                Тема: «{topic.trim() || 'По материалам фото'}»
+              </Text>
+
+              {/* Step by step checklist */}
+              <View style={styles.stepsList}>
+                {[
+                  'Анализ темы и академических параметров',
+                  'Генерация уникальных вопросов и вариантов ответов',
+                  'Проверка ключей и составление пояснений',
+                  'Финализация интерактивного теста',
+                ].map((stepText, idx) => {
+                  const isDone = genStep > idx;
+                  const isCurrent = genStep === idx;
+                  return (
+                    <View key={idx} style={styles.stepItem}>
+                      <View
+                        style={[
+                          styles.stepDot,
+                          {
+                            backgroundColor: isDone
+                              ? '#22c55e'
+                              : isCurrent
+                              ? colors.primaryAccent
+                              : colors.borderColor,
+                          },
+                        ]}
+                      >
+                        {isDone ? (
+                          <Feather name="check" size={10} color="#ffffff" />
+                        ) : isCurrent ? (
+                          <ActivityIndicator
+                            size="small"
+                            color="#ffffff"
+                            style={{ transform: [{ scale: 0.6 }] }}
+                          />
+                        ) : (
+                          <Text style={styles.stepNum}>{idx + 1}</Text>
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.stepText,
+                          {
+                            color: isDone
+                              ? colors.textColor
+                              : isCurrent
+                              ? colors.primaryAccent
+                              : colors.textColorSecondary,
+                            fontWeight: isCurrent ? '600' : '400',
+                          },
+                        ]}
+                      >
+                        {stepText}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+
+              <View
+                style={[
+                  styles.generatingNote,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.borderColor,
+                  },
+                ]}
+              >
+                <Feather name="info" size={13} color={colors.primaryAccent} />
+                <Text style={[styles.generatingNoteText, { color: colors.textColorSecondary }]}>
+                  ИИ создаёт тест с нуля с поддержкой формул. Это обычно занимает от 3 до 8 секунд.
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: colors.primaryAccent }]}
+              onPress={handleGenerate}
+              activeOpacity={0.8}
+            >
+              <Feather name="zap" size={18} color="#ffffff" />
+              <Text style={styles.primaryBtnText}>Сгенерировать тест с ИИ</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       )}
 
@@ -883,59 +997,85 @@ export const QuizGeneratorScreen: React.FC = () => {
             </Text>
 
             {/* Teacher Mode */}
-            <View style={styles.exportOption}>
+            <View style={[styles.exportOption, { borderColor: colors.borderColor }]}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.exportOptionName, { color: colors.textColor }]}>
                   Вариант для учителя
                 </Text>
                 <Text style={[styles.exportOptionSub, { color: colors.textColorSecondary }]}>
-                  Вопросы + ключи ответов и пояснения в конце
+                  Вопросы + ключи ответов, темы и подробные пояснения
                 </Text>
               </View>
               <View style={styles.exportBtnGroup}>
                 <TouchableOpacity
                   style={[styles.smallBtn, { backgroundColor: colors.background }]}
                   onPress={() => handleCopyExport('teacher')}
+                  accessibilityLabel="Скопировать для Word / Docs"
                 >
                   <Feather name="copy" size={13} color={colors.textColor} />
                 </TouchableOpacity>
                 <TouchableOpacity
+                  style={[styles.smallBtn, { backgroundColor: colors.background }]}
+                  onPress={() => handleShareHtmlExport('teacher')}
+                  accessibilityLabel="Печать / Сохранить в PDF"
+                >
+                  <Feather name="printer" size={13} color={colors.primaryAccent} />
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={[styles.smallBtn, { backgroundColor: colors.primaryAccent }]}
                   onPress={() => handleShareExport('teacher')}
+                  accessibilityLabel="Поделиться в файл"
                 >
-                  <Feather name="share" size={13} color="#ffffff" />
+                  <Feather name="share-2" size={13} color="#ffffff" />
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* Student Mode */}
-            <View style={styles.exportOption}>
+            <View style={[styles.exportOption, { borderColor: colors.borderColor }]}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.exportOptionName, { color: colors.textColor }]}>
                   Бланк для учеников
                 </Text>
                 <Text style={[styles.exportOptionSub, { color: colors.textColorSecondary }]}>
-                  Только задания и варианты без ответов
+                  Чистые задания для самостоятельного решения или контрольной
                 </Text>
               </View>
               <View style={styles.exportBtnGroup}>
                 <TouchableOpacity
                   style={[styles.smallBtn, { backgroundColor: colors.background }]}
                   onPress={() => handleCopyExport('student')}
+                  accessibilityLabel="Скопировать для Word / Docs"
                 >
                   <Feather name="copy" size={13} color={colors.textColor} />
                 </TouchableOpacity>
                 <TouchableOpacity
+                  style={[styles.smallBtn, { backgroundColor: colors.background }]}
+                  onPress={() => handleShareHtmlExport('student')}
+                  accessibilityLabel="Печать / Сохранить в PDF"
+                >
+                  <Feather name="printer" size={13} color={colors.primaryAccent} />
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={[styles.smallBtn, { backgroundColor: colors.primaryAccent }]}
                   onPress={() => handleShareExport('student')}
+                  accessibilityLabel="Поделиться в файл"
                 >
-                  <Feather name="share" size={13} color="#ffffff" />
+                  <Feather name="share-2" size={13} color="#ffffff" />
                 </TouchableOpacity>
               </View>
             </View>
 
+            {/* Export formats explanation */}
+            <View style={[styles.exportHintBox, { backgroundColor: colors.background }]}>
+              <Feather name="info" size={12} color={colors.primaryAccent} />
+              <Text style={[styles.exportHintText, { color: colors.textColorSecondary }]}>
+                Иконка принтера формирует HTML/PDF бланк для распечатки. Иконка «Поделиться» отправляет файл в Google Docs, Word или Telegram.
+              </Text>
+            </View>
+
             {copiedExport && (
-              <Text style={styles.copiedBanner}>Тест успешно скопирован в буфер обмена!</Text>
+              <Text style={styles.copiedBanner}>Тест успешно скопирован в буфер обмена для Word / Docs!</Text>
             )}
           </View>
         </View>
@@ -1333,5 +1473,90 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
     textAlign: 'center',
+  },
+  exportHintBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  exportHintText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    flex: 1,
+    lineHeight: 15,
+  },
+  generatingCard: {
+    padding: 24,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: 12,
+  },
+  generatingIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  generatingTitle: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  generatingSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  stepsList: {
+    width: '100%',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  stepDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepNum: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontFamily: 'Poppins_600SemiBold',
+    fontWeight: '700',
+  },
+  stepText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    flex: 1,
+  },
+  generatingNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 6,
+    width: '100%',
+  },
+  generatingNoteText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    lineHeight: 15,
+    flex: 1,
   },
 });

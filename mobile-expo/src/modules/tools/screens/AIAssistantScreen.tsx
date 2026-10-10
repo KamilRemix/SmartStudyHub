@@ -65,6 +65,8 @@ export const AIAssistantScreen: React.FC = () => {
   const [showPersonalizationModal, setShowPersonalizationModal] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
   const [selectedProvider, setSelectedProviderState] = useState<AIProviderId>('auto');
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [searchQueryStatus, setSearchQueryStatus] = useState<string | null>(null);
   const [personalization, setPersonalization] = useState<AIPersonalization>(DEFAULT_PERSONALIZATION);
   const [attachedImage, setAttachedImage] = useState<ChatImageAttachment | null>(null);
 
@@ -190,7 +192,9 @@ export const AIAssistantScreen: React.FC = () => {
         messages,
         userMessage.content,
         imageToSend || undefined,
-        selectedProvider
+        selectedProvider,
+        webSearchEnabled,
+        (q) => setSearchQueryStatus(q)
       );
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -198,6 +202,7 @@ export const AIAssistantScreen: React.FC = () => {
         content: response.text,
         timestamp: Date.now(),
         modelUsed: response.modelUsed,
+        webSources: response.webSources,
       };
       const finalMessages = [...nextMessages, assistantMessage];
       setMessages(finalMessages);
@@ -218,6 +223,7 @@ export const AIAssistantScreen: React.FC = () => {
       }
     } finally {
       setIsLoading(false);
+      setSearchQueryStatus(null);
     }
   };
 
@@ -298,8 +304,12 @@ export const AIAssistantScreen: React.FC = () => {
             <Image source={{ uri: item.imageUri }} style={styles.bubbleAttachedImage} />
           )}
 
-          {/* Render parsed text, code blocks, and math formulas */}
-          <ChatMessageRenderer content={item.content} isUser={isUser} />
+          {/* Render parsed text, code blocks, math formulas, and web sources */}
+          <ChatMessageRenderer
+            content={item.content}
+            isUser={isUser}
+            webSources={item.webSources}
+          />
 
           {/* Bottom Actions for Model messages */}
           {!isUser && item.id !== 'welcome' && (
@@ -498,6 +508,52 @@ export const AIAssistantScreen: React.FC = () => {
         </View>
       )}
 
+      {/* Search Status Banner or Web Search Active Badge */}
+      {searchQueryStatus ? (
+        <View
+          style={[
+            styles.searchStatusStrip,
+            {
+              backgroundColor: colors.componentBackground,
+              borderTopColor: colors.borderColor,
+            },
+          ]}
+        >
+          <ActivityIndicator size="small" color={colors.primaryAccent} />
+          <Text
+            style={[styles.searchStatusText, { color: colors.textColor }]}
+            numberOfLines={1}
+          >
+            Ищем в интернете: «{searchQueryStatus}»
+          </Text>
+        </View>
+      ) : webSearchEnabled ? (
+        <View
+          style={[
+            styles.webSearchNoticeStrip,
+            {
+              backgroundColor: colors.componentBackground,
+              borderTopColor: colors.borderColor,
+            },
+          ]}
+        >
+          <View style={styles.webSearchNoticeLeft}>
+            <Feather name="globe" size={13} color={colors.primaryAccent} />
+            <Text
+              style={[styles.webSearchNoticeText, { color: colors.textColorSecondary }]}
+            >
+              Веб-поиск активен (поиск актуальных данных в сети)
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setWebSearchEnabled(false)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="x" size={14} color={colors.textColorSecondary} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {/* Input container */}
       <View
         style={[
@@ -528,6 +584,29 @@ export const AIAssistantScreen: React.FC = () => {
             name="camera"
             size={18}
             color={attachedImage ? colors.primaryAccent : colors.textColorSecondary}
+          />
+        </TouchableOpacity>
+
+        {/* Web Search Button (ChatGPT style) */}
+        <TouchableOpacity
+          style={[
+            styles.toolbarBtn,
+            {
+              backgroundColor: webSearchEnabled
+                ? colors.primaryAccent + '22'
+                : colors.background,
+              borderColor: webSearchEnabled
+                ? colors.primaryAccent
+                : colors.borderColor,
+            },
+          ]}
+          onPress={() => setWebSearchEnabled((prev) => !prev)}
+          accessibilityLabel="Веб-поиск в интернете"
+        >
+          <Feather
+            name="globe"
+            size={18}
+            color={webSearchEnabled ? colors.primaryAccent : colors.textColorSecondary}
           />
         </TouchableOpacity>
 
@@ -803,5 +882,36 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  searchStatusStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  searchStatusText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    flex: 1,
+  },
+  webSearchNoticeStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  webSearchNoticeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  webSearchNoticeText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
   },
 });

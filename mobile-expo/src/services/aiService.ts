@@ -50,6 +50,15 @@ export const GEMINI_CANDIDATE_MODELS = [
   'gemini-2.5-pro',
 ];
 
+import {
+  searchWeb,
+  shouldPerformWebSearch,
+  buildWebSearchPromptContext,
+  WebSearchResult,
+} from './webSearchService';
+
+export { WebSearchResult };
+
 export interface ChatImageAttachment {
   base64: string;
   mimeType: string;
@@ -63,6 +72,7 @@ export interface ChatMessage {
   timestamp: number;
   modelUsed?: string;
   imageUri?: string;
+  webSources?: WebSearchResult[];
 }
 
 export async function getGeminiApiKey(): Promise<string> {
@@ -209,20 +219,39 @@ export async function callOpenRouter(
 export interface ChatResponse {
   text: string;
   modelUsed: string;
+  webSources?: WebSearchResult[];
 }
 
 export async function sendChatMessage(
   history: ChatMessage[],
   newPrompt: string,
   imageAttachment?: ChatImageAttachment,
-  preferredProvider?: AIProviderId
+  preferredProvider?: AIProviderId,
+  webSearchEnabled?: boolean,
+  onSearchStatus?: (query: string) => void
 ): Promise<ChatResponse> {
   const personalization = await getPersonalization();
   const baseInstruction = buildPersonalizedSystemInstruction(personalization);
   const academicContext = await buildAcademicSystemPromptContext();
-  const systemInstruction = academicContext
+  let systemInstruction = academicContext
     ? `${baseInstruction}\n${academicContext}`
     : baseInstruction;
+
+  // Real-time Web Search Integration
+  let foundSources: WebSearchResult[] = [];
+  const doSearch = shouldPerformWebSearch(newPrompt, !!webSearchEnabled);
+  if (doSearch && !imageAttachment?.base64) {
+    try {
+      onSearchStatus?.(newPrompt);
+      foundSources = await searchWeb(newPrompt, 4);
+      if (foundSources.length > 0) {
+        const webContext = buildWebSearchPromptContext(newPrompt, foundSources);
+        systemInstruction = `${systemInstruction}\n${webContext}`;
+      }
+    } catch (err: any) {
+      console.warn('[AI] Web search skipped:', err?.message);
+    }
+  }
 
   // 1. Clean history: filter out welcome message and ensure valid starting turn
   const validHistory = history
@@ -276,7 +305,7 @@ export async function sendChatMessage(
 
   const selectedProvider = preferredProvider || (await getSelectedProvider());
 
-  return executeMultiProviderCascade({
+  const response = await executeMultiProviderCascade({
     history,
     newPrompt,
     systemInstruction,
@@ -284,4 +313,9 @@ export async function sendChatMessage(
     preferredProvider: selectedProvider,
     callGeminiFn,
   });
+
+  return {
+    ...response,
+    webSources: foundSources.length > 0 ? foundSources : undefined,
+  };
 }

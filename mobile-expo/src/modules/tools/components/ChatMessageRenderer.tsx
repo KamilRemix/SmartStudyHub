@@ -1,14 +1,17 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme/useTheme';
 import { CodeBlock } from './CodeBlock';
 import { MathFormulaBlock } from './MathFormulaBlock';
 import { ChatQuizCard } from './ChatQuizCard';
 import { formatLatexToReadable } from '../utils/latexFormatter';
+import { WebSearchResult } from '../../../services/aiService';
 
 interface ChatMessageRendererProps {
   content: string;
   isUser: boolean;
+  webSources?: WebSearchResult[];
 }
 
 type BlockType =
@@ -330,8 +333,10 @@ export const MarkdownTextRenderer: React.FC<MarkdownTextRendererProps> = ({
 export const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({
   content,
   isUser,
+  webSources,
 }) => {
   const { colors } = useTheme();
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
 
   if (isUser) {
     return (
@@ -347,6 +352,76 @@ export const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({
 
   return (
     <View style={styles.container}>
+      {/* Optional Web Sources Header Badge */}
+      {webSources && webSources.length > 0 && (
+        <View style={styles.webSourcesContainer}>
+          <TouchableOpacity
+            style={[
+              styles.webSourcesToggle,
+              {
+                backgroundColor: colors.componentBackground,
+                borderColor: colors.borderColor,
+              },
+            ]}
+            onPress={() => setSourcesExpanded((prev) => !prev)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.webSourcesLeft}>
+              <Feather name="globe" size={13} color={colors.primaryAccent} />
+              <Text style={[styles.webSourcesTitle, { color: colors.textColorSecondary }]}>
+                Источники из интернета ({webSources.length})
+              </Text>
+            </View>
+            <Feather
+              name={sourcesExpanded ? 'chevron-up' : 'chevron-down'}
+              size={13}
+              color={colors.textColorSecondary}
+            />
+          </TouchableOpacity>
+
+          {sourcesExpanded && (
+            <View style={styles.sourcesList}>
+              {webSources.map((source, sIdx) => (
+                <TouchableOpacity
+                  key={`source-${sIdx}`}
+                  style={[
+                    styles.sourceCard,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.borderColor,
+                    },
+                  ]}
+                  onPress={() => {
+                    if (source.url) {
+                      Linking.openURL(source.url).catch(() => {});
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.sourceTopRow}>
+                    <Text
+                      style={[styles.sourceItemTitle, { color: colors.textColor }]}
+                      numberOfLines={1}
+                    >
+                      {source.title}
+                    </Text>
+                    <Feather name="external-link" size={11} color={colors.primaryAccent} />
+                  </View>
+                  {source.snippet ? (
+                    <Text
+                      style={[styles.sourceSnippet, { color: colors.textColorSecondary }]}
+                      numberOfLines={2}
+                    >
+                      {source.snippet}
+                    </Text>
+                  ) : null}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
       {blocks.map((block, index) => {
         if (block.type === 'code') {
           return (
@@ -529,5 +604,52 @@ const styles = StyleSheet.create({
     height: 1,
     marginVertical: 8,
     opacity: 0.5,
+  },
+  webSourcesContainer: {
+    marginBottom: 8,
+  },
+  webSourcesToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  webSourcesLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  webSourcesTitle: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+  },
+  sourcesList: {
+    marginTop: 6,
+    gap: 6,
+  },
+  sourceCard: {
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 2,
+  },
+  sourceTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  sourceItemTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    flex: 1,
+  },
+  sourceSnippet: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 10,
+    lineHeight: 14,
   },
 });

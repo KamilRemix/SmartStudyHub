@@ -6,6 +6,11 @@ import {
   GEMINI_CANDIDATE_MODELS,
   OPENROUTER_FREE_MODELS,
 } from './aiService';
+import {
+  callGigaChat,
+  callGroq,
+  callSambaNova,
+} from './aiMultiProviderService';
 
 export interface QuizQuestion {
   id: string;
@@ -112,7 +117,47 @@ Ensure all questions are high quality, factual, educational, and unambiguous.`;
     }
   }
 
-  // Fallback to OpenRouter free models
+  // 2. Cascade: GigaChat (Sberbank, fast and reliable in RU)
+  if (!params.imageBase64) {
+    try {
+      const rawJson = await callGigaChat(
+        [{ role: 'user', content: userPrompt }],
+        systemPrompt
+      );
+      const parsed = parseQuizJson(rawJson);
+      if (parsed) return parsed;
+    } catch (err: any) {
+      console.warn('[Quiz] GigaChat failed:', err?.message);
+    }
+
+    // 3. Cascade: Groq (Ultra-fast Llama 3.3)
+    try {
+      const rawJson = await callGroq(
+        [{ role: 'user', content: userPrompt }],
+        systemPrompt,
+        'llama-3.3-70b-versatile'
+      );
+      const parsed = parseQuizJson(rawJson);
+      if (parsed) return parsed;
+    } catch (err: any) {
+      console.warn('[Quiz] Groq failed:', err?.message);
+    }
+
+    // 4. Cascade: SambaNova (Llama 3.3 70B)
+    try {
+      const rawJson = await callSambaNova(
+        [{ role: 'user', content: userPrompt }],
+        systemPrompt,
+        'Meta-Llama-3.3-70B-Instruct'
+      );
+      const parsed = parseQuizJson(rawJson);
+      if (parsed) return parsed;
+    } catch (err: any) {
+      console.warn('[Quiz] SambaNova failed:', err?.message);
+    }
+  }
+
+  // 5. Fallback to OpenRouter free models
   const openRouterKey = await getOpenRouterApiKey();
   if (openRouterKey) {
     const messages = [
@@ -281,4 +326,64 @@ export function formatQuizForExport(quiz: Quiz, mode: 'teacher' | 'student'): st
 
   lines.push(`\nСгенерировано в SmartStudyHub`);
   return lines.join('\n');
+}
+
+/**
+ * Format quiz to a beautifully styled, printable HTML document.
+ * Can be saved as PDF or printed directly from browser / viewer.
+ */
+export function formatQuizToHtmlPrintable(quiz: Quiz, mode: 'teacher' | 'student'): string {
+  const isTeacher = mode === 'teacher';
+  const diffLabel =
+    quiz.difficulty === 'easy'
+      ? 'Базовый'
+      : quiz.difficulty === 'hard'
+      ? 'Олимпиадный / Экзамен'
+      : 'Средний';
+
+  return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>${quiz.title}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 36px; color: #1e293b; max-width: 820px; margin: 0 auto; line-height: 1.5; background: #ffffff; }
+    h1 { font-size: 22px; margin-bottom: 6px; color: #0f172a; }
+    .meta { font-size: 13px; color: #64748b; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 2px solid #e2e8f0; }
+    .question { margin-bottom: 22px; page-break-inside: avoid; }
+    .q-title { font-weight: 600; font-size: 15px; margin-bottom: 8px; color: #0f172a; }
+    .options { margin-left: 18px; margin-top: 6px; }
+    .opt { margin-bottom: 6px; font-size: 14px; }
+    .answer-line { margin-top: 10px; border-bottom: 1px dotted #94a3b8; height: 26px; width: 340px; }
+    .teacher-badge { background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; margin-top: 6px; }
+    .teacher-exp { font-size: 13px; color: #475569; margin-top: 3px; font-style: italic; }
+    .footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
+    @media print { body { padding: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>${quiz.title}</h1>
+  <div class="meta">
+    Сложность: ${diffLabel} | Вопросов: ${quiz.questions.length} | 
+    ${isTeacher ? 'Версия для учителя (с ключами ответов)' : 'Бланк для ученика'}
+  </div>
+  ${quiz.questions.map((q, idx) => `
+    <div class="question">
+      <div class="q-title">${idx + 1}. ${q.question}</div>
+      ${q.type === 'multiple_choice' && q.options ? `
+        <div class="options">
+          ${q.options.map((opt, oIdx) => `<div class="opt">&#9634; ${String.fromCharCode(65 + oIdx)}) ${opt}</div>`).join('')}
+        </div>
+      ` : `
+        <div class="answer-line"></div>
+      `}
+      ${isTeacher ? `
+        <div><span class="teacher-badge">Правильный ответ: ${q.correctAnswer}</span></div>
+        <div class="teacher-exp">Пояснение: ${q.explanation} (Тема: ${q.topic})</div>
+      ` : ''}
+    </div>
+  `).join('')}
+  <div class="footer">Сгенерировано в SmartStudyHub AI</div>
+</body>
+</html>`;
 }
