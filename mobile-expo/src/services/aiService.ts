@@ -4,6 +4,22 @@ import {
   buildPersonalizedSystemInstruction,
 } from './aiPersonalizationService';
 import { buildAcademicSystemPromptContext } from './aiAcademicContextService';
+import {
+  executeMultiProviderCascade,
+  getSelectedProvider,
+  setSelectedProvider,
+  AIProviderId,
+  AIProviderInfo,
+  AI_PROVIDERS,
+} from './aiMultiProviderService';
+
+export {
+  AIProviderId,
+  AIProviderInfo,
+  AI_PROVIDERS,
+  getSelectedProvider,
+  setSelectedProvider,
+};
 
 // Safe runtime key assembly for Gemini
 const BUILTIN_GEMINI_KEY = ['AQ', 'Ab8RN6KG6_BmmFYe57Tl6muRF8ikbk00_1XUMCP8RNpD5aYM3g'].join('.');
@@ -198,7 +214,8 @@ export interface ChatResponse {
 export async function sendChatMessage(
   history: ChatMessage[],
   newPrompt: string,
-  imageAttachment?: ChatImageAttachment
+  imageAttachment?: ChatImageAttachment,
+  preferredProvider?: AIProviderId
 ): Promise<ChatResponse> {
   const personalization = await getPersonalization();
   const baseInstruction = buildPersonalizedSystemInstruction(personalization);
@@ -249,71 +266,22 @@ export async function sendChatMessage(
     parts: userParts,
   });
 
-  // 2. Prepare messages for OpenRouter / OpenAI format
-  const openRouterMessages: any[] = validHistory.map((m) => ({
-    role: m.role === 'user' ? 'user' : 'assistant',
-    content: m.content,
-  }));
-
-  if (imageAttachment?.base64) {
-    openRouterMessages.push({
-      role: 'user',
-      content: [
-        { type: 'text', text: newPrompt },
-        {
-          type: 'image_url',
-          image_url: {
-            url: `data:${imageAttachment.mimeType || 'image/jpeg'};base64,${imageAttachment.base64}`,
-          },
-        },
-      ],
-    });
-  } else {
-    openRouterMessages.push({
-      role: 'user',
-      content: newPrompt,
-    });
-  }
-
-  const geminiKey = await getGeminiApiKey();
-  const geminiErrors: string[] = [];
-
-  // Step 1: Try Gemini models sequentially
-  if (geminiKey) {
-    for (const model of GEMINI_CANDIDATE_MODELS) {
-      try {
-        const text = await callGemini(geminiContents, systemInstruction, model, geminiKey);
-        return { text, modelUsed: `Gemini (${model})` };
-      } catch (err: any) {
-        console.warn(`[AI] Gemini ${model} failed:`, err?.message);
-        geminiErrors.push(`${model}: ${err?.message || 'error'}`);
-      }
+  const callGeminiFn = async (model: string): Promise<string> => {
+    const geminiKey = await getGeminiApiKey();
+    if (!geminiKey) {
+      throw new Error('Gemini API key is not configured');
     }
-  }
+    return callGemini(geminiContents, systemInstruction, model, geminiKey);
+  };
 
-  // Step 2: Fallback to OpenRouter (Free models, budget 0 rubles)
-  const openRouterKey = await getOpenRouterApiKey();
-  const openRouterErrors: string[] = [];
+  const selectedProvider = preferredProvider || (await getSelectedProvider());
 
-  if (openRouterKey) {
-    for (const model of OPENROUTER_FREE_MODELS) {
-      try {
-        const text = await callOpenRouter(
-          openRouterMessages,
-          systemInstruction,
-          model,
-          openRouterKey
-        );
-        return { text, modelUsed: `OpenRouter (${model})` };
-      } catch (err: any) {
-        console.warn(`[AI] OpenRouter ${model} failed:`, err?.message);
-        openRouterErrors.push(`${model}: ${err?.message || 'error'}`);
-      }
-    }
-  }
-
-  const allErrors = [...geminiErrors, ...openRouterErrors].slice(-3).join('; ');
-  throw new Error(
-    `Все ИИ-модели временно недоступны. Ошибка подключения: ${allErrors || 'Сеть или лимит'}. Пожалуйста, повторите попытку через минуту.`
-  );
+  return executeMultiProviderCascade({
+    history,
+    newPrompt,
+    systemInstruction,
+    imageAttachment,
+    preferredProvider: selectedProvider,
+    callGeminiFn,
+  });
 }

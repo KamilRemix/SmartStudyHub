@@ -19,7 +19,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../../theme';
 import { useI18n } from '../../../i18n';
 import { AppHeader } from '../../../components/common/AppHeader';
-import { sendChatMessage, ChatMessage, ChatImageAttachment } from '../../../services/aiService';
+import {
+  sendChatMessage,
+  ChatMessage,
+  ChatImageAttachment,
+  AIProviderId,
+  getSelectedProvider,
+  setSelectedProvider,
+  AI_PROVIDERS,
+} from '../../../services/aiService';
 import {
   getPersonalization,
   AIPersonalization,
@@ -37,6 +45,7 @@ import {
 import { ChatMessageRenderer } from '../components/ChatMessageRenderer';
 import { ChatHistoryModal } from '../components/ChatHistoryModal';
 import { PersonalizationModal } from '../components/PersonalizationModal';
+import { ModelSelectorModal } from '../components/ModelSelectorModal';
 import { ToolsStackParamList } from '../../../navigation/types';
 
 type NavProp = NativeStackNavigationProp<ToolsStackParamList>;
@@ -54,6 +63,8 @@ export const AIAssistantScreen: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showPersonalizationModal, setShowPersonalizationModal] = useState(false);
+  const [showModelModal, setShowModelModal] = useState(false);
+  const [selectedProvider, setSelectedProviderState] = useState<AIProviderId>('auto');
   const [personalization, setPersonalization] = useState<AIPersonalization>(DEFAULT_PERSONALIZATION);
   const [attachedImage, setAttachedImage] = useState<ChatImageAttachment | null>(null);
 
@@ -71,9 +82,16 @@ export const AIAssistantScreen: React.FC = () => {
       }
       const p = await getPersonalization();
       setPersonalization(p);
+      const prov = await getSelectedProvider();
+      setSelectedProviderState(prov);
     }
     init();
   }, []);
+
+  const handleSelectProvider = async (providerId: AIProviderId) => {
+    setSelectedProviderState(providerId);
+    await setSelectedProvider(providerId);
+  };
 
   const handlePickFromGallery = async () => {
     try {
@@ -168,7 +186,12 @@ export const AIAssistantScreen: React.FC = () => {
     }
 
     try {
-      const response = await sendChatMessage(messages, userMessage.content, imageToSend || undefined);
+      const response = await sendChatMessage(
+        messages,
+        userMessage.content,
+        imageToSend || undefined,
+        selectedProvider
+      );
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'model',
@@ -302,6 +325,9 @@ export const AIAssistantScreen: React.FC = () => {
     );
   };
 
+  const selectedProviderInfo =
+    AI_PROVIDERS.find((p) => p.id === selectedProvider) || AI_PROVIDERS[0];
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -328,36 +354,76 @@ export const AIAssistantScreen: React.FC = () => {
         }}
       />
 
-      {/* Quick Personalization Status Strip */}
-      <TouchableOpacity
+      {/* Top Controls Bar: Model Selector & Personalization */}
+      <View
         style={[
-          styles.personalizationStrip,
+          styles.topControlsBar,
           {
             backgroundColor: colors.componentBackground,
             borderBottomColor: colors.borderColor,
           },
         ]}
-        onPress={() => setShowPersonalizationModal(true)}
-        activeOpacity={0.7}
       >
-        <Feather
-          name="sliders"
-          size={13}
-          color={personalization.enabled && personalization.instructions ? colors.primaryAccent : colors.textColorSecondary}
-        />
-        <Text
+        {/* Model Selector Chip */}
+        <TouchableOpacity
           style={[
-            styles.personalizationStripText,
-            { color: colors.textColorSecondary },
+            styles.controlChip,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.borderColor,
+            },
           ]}
-          numberOfLines={1}
+          onPress={() => setShowModelModal(true)}
+          activeOpacity={0.7}
+          accessibilityLabel="Выбрать модель ИИ"
         >
-          {personalization.enabled && personalization.instructions.trim()
-            ? `Контекст: ${personalization.instructions.trim().slice(0, 50)}...`
-            : 'Персонализация (нажмите для добавления контекста о себе)'}
-        </Text>
-        <Feather name="chevron-right" size={13} color={colors.textColorSecondary} />
-      </TouchableOpacity>
+          <Feather
+            name={selectedProviderInfo.icon as any}
+            size={13}
+            color={colors.primaryAccent}
+          />
+          <Text
+            style={[styles.controlChipText, { color: colors.textColor }]}
+            numberOfLines={1}
+          >
+            {selectedProviderInfo.name}
+          </Text>
+          <Feather name="chevron-down" size={12} color={colors.textColorSecondary} />
+        </TouchableOpacity>
+
+        {/* Quick Personalization Status */}
+        <TouchableOpacity
+          style={[
+            styles.controlChip,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.borderColor,
+            },
+          ]}
+          onPress={() => setShowPersonalizationModal(true)}
+          activeOpacity={0.7}
+          accessibilityLabel="Персонализация"
+        >
+          <Feather
+            name="sliders"
+            size={13}
+            color={
+              personalization.enabled && personalization.instructions
+                ? colors.primaryAccent
+                : colors.textColorSecondary
+            }
+          />
+          <Text
+            style={[styles.controlChipText, { color: colors.textColorSecondary }]}
+            numberOfLines={1}
+          >
+            {personalization.enabled && personalization.instructions.trim()
+              ? 'Контекст: Вкл'
+              : 'Контекст'}
+          </Text>
+          <Feather name="chevron-right" size={12} color={colors.textColorSecondary} />
+        </TouchableOpacity>
+      </View>
 
       <FlatList
         ref={flatListRef}
@@ -517,6 +583,14 @@ export const AIAssistantScreen: React.FC = () => {
         onClose={() => setShowPersonalizationModal(false)}
         onSaved={(updated) => setPersonalization(updated)}
       />
+
+      {/* Model Selector Modal */}
+      <ModelSelectorModal
+        visible={showModelModal}
+        selectedProvider={selectedProvider}
+        onSelectProvider={handleSelectProvider}
+        onClose={() => setShowModelModal(false)}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -524,6 +598,30 @@ export const AIAssistantScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  topControlsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+  },
+  controlChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexShrink: 1,
+  },
+  controlChipText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+    maxWidth: 160,
   },
   personalizationStrip: {
     flexDirection: 'row',
