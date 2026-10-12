@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
 echo ====================================================
 echo   SmartStudyHub - One-Click Android ADB Installer
@@ -22,7 +22,9 @@ echo.
 echo [3/3] Installing SmartStudyHub.apk...
 cd /d %~dp0
 if not exist SmartStudyHub.apk (
-    if exist android\app\build\outputs\apk\debug\app-debug.apk (
+    if exist build_artifacts\SmartStudyHub.apk (
+        copy /y build_artifacts\SmartStudyHub.apk SmartStudyHub.apk >nul
+    ) else if exist android\app\build\outputs\apk\debug\app-debug.apk (
         copy /y android\app\build\outputs\apk\debug\app-debug.apk SmartStudyHub.apk >nul
     ) else (
         echo [ERROR] SmartStudyHub.apk not found. Please run build_apk.bat first.
