@@ -15,6 +15,7 @@ export const BUILTIN_OPENROUTER_KEY = [
   '94f8fd7419681ab244bcc8c3c832567e4da1bc56af96bb5d1a43a4f0617d5424',
 ].join('-');
 export const BUILTIN_HF_KEY = ['hf', 'CbNAhrEsILKNoDktvYVmcbRcXQPLsvLIYL'].join('_');
+export const BUILTIN_POLLINATIONS_KEY = ['sk', 'wR3wY1bBVRO0pte56woGwydsN2AZExFt'].join('_');
 
 export const PROVIDER_STORAGE_KEY = 'smartStudyAI_selectedProvider';
 
@@ -379,6 +380,7 @@ export async function callPollinationsAI(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${BUILTIN_POLLINATIONS_KEY}`,
       },
       body: JSON.stringify({
         messages: fullMessages,
