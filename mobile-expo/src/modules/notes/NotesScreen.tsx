@@ -21,7 +21,15 @@ import { cloudSyncService } from '../../services/cloudSync';
 import { useAuth } from '../../context/AuthContext';
 import { useI18n } from '../../i18n';
 
-export const NotesScreen: React.FC = () => {
+interface NotesScreenProps {
+  route?: {
+    params?: {
+      openNoteId?: string;
+    };
+  };
+}
+
+export const NotesScreen: React.FC<NotesScreenProps> = ({ route }) => {
   const { colors } = useTheme();
   const { user } = useAuth();
   const { t } = useI18n();
@@ -33,6 +41,18 @@ export const NotesScreen: React.FC = () => {
 
   const [activeNoteForEdit, setActiveNoteForEdit] = useState<NoteItem | null>(null);
   const [isEditorVisible, setIsEditorVisible] = useState(false);
+
+  // Deep-link auto-open note from notification tap
+  useEffect(() => {
+    const noteIdToOpen = route?.params?.openNoteId;
+    if (noteIdToOpen && notes.length > 0) {
+      const target = notes.find((n) => n.id === noteIdToOpen);
+      if (target) {
+        setActiveNoteForEdit(target);
+        setIsEditorVisible(true);
+      }
+    }
+  }, [route?.params?.openNoteId, notes]);
 
   useEffect(() => {
     const refreshNotes = () => {
@@ -56,7 +76,7 @@ export const NotesScreen: React.FC = () => {
     return unsubscribe;
   }, [user?.uid]);
 
-  const persistNotes = async (updated: NoteItem[]) => {
+  const persistNotes = async (updated: NoteItem[], deletedNoteId?: string) => {
     const sorted = [...updated].sort(
       (a, b) =>
         (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0)
@@ -64,7 +84,7 @@ export const NotesScreen: React.FC = () => {
     setNotes(sorted);
     await saveNotes(sorted);
     if (user?.uid) {
-      cloudSyncService.syncAll(user.uid).catch(() => {});
+      cloudSyncService.syncNotesDirect(user.uid, sorted, deletedNoteId).catch(() => {});
     }
   };
 
@@ -137,7 +157,7 @@ export const NotesScreen: React.FC = () => {
             notificationService.cancelReminder(toDelete.notificationId);
           }
           const updated = notes.filter((n) => n.id !== noteId);
-          persistNotes(updated);
+          persistNotes(updated, noteId);
         },
       },
     ]);

@@ -14,6 +14,7 @@ const SYNC_KEYS = {
   CALC_HISTORY: '@smartstudy_calc_history',
   GRADES: '@smartstudy_grades_data',
   NOTES: '@smartstudy_notes_data',
+  DELETED_NOTES: '@smartstudy_deleted_note_ids',
   VAULT: '@ssh_password_vault',
   AI_CHATS: '@smartstudy_ai_chats_data',
   SETTINGS: '@ssh_user_settings',
@@ -377,24 +378,72 @@ class CloudSyncService {
     }
   }
 
+  public async markNoteDeleted(noteId: string): Promise<void> {
+    try {
+      const raw = await AsyncStorage.getItem(SYNC_KEYS.DELETED_NOTES);
+      const ids: string[] = raw ? JSON.parse(raw) : [];
+      if (!ids.includes(noteId)) {
+        ids.push(noteId);
+        const trimmed = ids.slice(-100);
+        await AsyncStorage.setItem(SYNC_KEYS.DELETED_NOTES, JSON.stringify(trimmed));
+      }
+    } catch (e) {
+      console.warn('[CloudSync] markNoteDeleted error:', e);
+    }
+  }
+
+  public async getDeletedNoteIds(): Promise<Set<string>> {
+    try {
+      const raw = await AsyncStorage.getItem(SYNC_KEYS.DELETED_NOTES);
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  public async syncNotesDirect(uid: string, localNotes: any[], deletedNoteId?: string): Promise<void> {
+    if (!uid || !Array.isArray(localNotes)) return;
+    if (deletedNoteId) {
+      await this.markNoteDeleted(deletedNoteId);
+    }
+    try {
+      await set(ref(database, `users/${uid}/notes`), localNotes);
+    } catch (e) {
+      console.warn('[CloudSync] RTDB notes direct write error:', e);
+    }
+    try {
+      if (firestore) {
+        await setDoc(doc(firestore, 'users', uid), { notes: localNotes }, { merge: true });
+      }
+    } catch (e) {
+      console.warn('[CloudSync] Firestore notes direct write error:', e);
+    }
+  }
+
   private async syncNotes(uid: string, remoteNotes: any[]) {
     try {
       const localStr = await getStoredItemWithFallback(SYNC_KEYS.NOTES, LEGACY_KEYS.NOTES);
       const localNotes: any[] = localStr ? JSON.parse(localStr) : [];
+      const deletedIds = await this.getDeletedNoteIds();
 
       // If local data is purely unedited initial demo seed and remote user has real data,
       // overwrite local with remote to prevent seed pollution in cloud!
       if (this.isDefaultSeedNotes(localNotes) && Array.isArray(remoteNotes) && remoteNotes.length > 0) {
-        await AsyncStorage.setItem(SYNC_KEYS.NOTES, JSON.stringify(remoteNotes));
+        const filteredRemote = remoteNotes.filter((n) => !deletedIds.has(n?.id));
+        await AsyncStorage.setItem(SYNC_KEYS.NOTES, JSON.stringify(filteredRemote));
         return;
       }
 
       const map = new Map<string, any>();
       if (Array.isArray(remoteNotes)) {
-        remoteNotes.forEach((n) => n?.id && map.set(n.id, n));
+        remoteNotes.forEach((n) => {
+          if (n?.id && !deletedIds.has(n.id)) {
+            map.set(n.id, n);
+          }
+        });
       }
       localNotes.forEach((n) => {
-        if (!n?.id) return;
+        if (!n?.id || deletedIds.has(n.id)) return;
         const existing = map.get(n.id);
         if (!existing || (n.updatedAt || 0) >= (existing.updatedAt || 0)) {
           map.set(n.id, n);

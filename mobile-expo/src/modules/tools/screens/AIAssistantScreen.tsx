@@ -37,6 +37,7 @@ import {
   AIPersonalization,
   DEFAULT_PERSONALIZATION,
 } from '../../../services/aiPersonalizationService';
+import { pingAllProviders } from '../../../services/aiProviderHealthService';
 import {
   ChatSession,
   loadAllChatSessions,
@@ -91,6 +92,8 @@ export const AIAssistantScreen: React.FC = () => {
       setPersonalization(p);
       const prov = await getSelectedProvider();
       setSelectedProviderState(prov);
+      // Background health check & ping of all AI models
+      pingAllProviders(false).catch(() => {});
     }
     init();
   }, []);

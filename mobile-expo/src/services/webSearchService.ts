@@ -1,6 +1,6 @@
 /**
  * Web Search Service
- * Real-time web search integration using DuckDuckGo and Wikipedia
+ * Real-time web search integration using DuckDuckGo Lite and Wikipedia
  * Provides live internet knowledge for AI models with zero API key requirement.
  */
 
@@ -42,6 +42,32 @@ const TIME_SENSITIVE_KEYWORDS = [
   'recent',
 ];
 
+// Patterns where the user is only asking about the clock/calendar
+const PURE_CLOCK_PATTERNS = [
+  /^какой (сейчас|сегодня) (год|день|день недели)\??$/i,
+  /^какое сегодня число\??$/i,
+  /^сколько (сейчас )?времени\??$/i,
+  /^what (year|day|time) is it\??$/i,
+];
+
+/**
+ * Strips conversational fluff and prefixes so the search engine gets clean keywords
+ */
+export function sanitizeSearchQuery(rawQuery: string): string {
+  if (!rawQuery || typeof rawQuery !== 'string') return '';
+  let cleaned = rawQuery.trim();
+
+  // Remove conversational greetings and question starters
+  cleaned = cleaned.replace(
+    /^(пожалуйста|скажи( мне)?|подскажи|найди в интернете|поиск в сети|погугли|что такое|кто такой|расскажи о|расскажи про|что ты думаешь о)\s+/i,
+    ''
+  );
+  // Remove punctuation at the end
+  cleaned = cleaned.replace(/[?!.:]+$/g, '').trim();
+
+  return cleaned || rawQuery.trim();
+}
+
 /**
  * Determines whether a query should trigger web search.
  * Triggers if manually enabled or if query contains time-sensitive keywords.
@@ -50,7 +76,13 @@ export function shouldPerformWebSearch(prompt: string, manualToggle: boolean): b
   if (manualToggle) return true;
   if (!prompt || typeof prompt !== 'string') return false;
 
-  const lower = prompt.toLowerCase();
+  const trimmed = prompt.trim();
+  // If the query is just asking for the clock/year, system prompt already knows this with 100% precision
+  if (PURE_CLOCK_PATTERNS.some((p) => p.test(trimmed))) {
+    return false;
+  }
+
+  const lower = trimmed.toLowerCase();
   return TIME_SENSITIVE_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
@@ -68,48 +100,51 @@ function cleanDuckDuckGoUrl(rawUrl: string): string {
 }
 
 /**
- * Perform web search using DuckDuckGo HTML and Wikipedia APIs
+ * Perform web search using DuckDuckGo Lite and Wikipedia APIs
  */
 export async function searchWeb(query: string, maxResults: number = 4): Promise<WebSearchResult[]> {
-  const trimmed = query.trim();
-  if (!trimmed) return [];
+  const sanitized = sanitizeSearchQuery(query);
+  if (!sanitized) return [];
 
   const results: WebSearchResult[] = [];
 
-  // 1. DuckDuckGo Search (Real-time organic web results)
+  // 1. DuckDuckGo Lite Search (Fast, organic, unblocked web-wide results)
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 7000);
+    const timer = setTimeout(() => controller.abort(), 6000);
 
-    const ddgResponse = await fetch('https://html.duckduckgo.com/html/', {
+    const ddgResponse = await fetch('https://lite.duckduckgo.com/lite/', {
       method: 'POST',
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       },
-      body: `q=${encodeURIComponent(trimmed)}`,
+      body: `q=${encodeURIComponent(sanitized)}`,
       signal: controller.signal,
     });
     clearTimeout(timer);
 
     if (ddgResponse.ok) {
       const html = await ddgResponse.text();
-      const resultBlockRegex = /<div class="result__body">([\s\S]*?)<\/div>/gi;
-      let blockMatch;
+      const rows = html.split('<tr>');
 
-      while ((blockMatch = resultBlockRegex.exec(html)) !== null && results.length < maxResults) {
-        const block = blockMatch[1];
-        const titleMatch = /<a class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i.exec(block);
-        const snippetMatch = /<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/i.exec(block);
+      for (let i = 0; i < rows.length && results.length < maxResults; i++) {
+        const row = rows[i];
+        const linkMatch = row.match(
+          /<a[^>]*class=['"]result-link['"][^>]*href=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/a>/i
+        );
 
-        if (titleMatch) {
-          const rawUrl = titleMatch[1];
+        if (linkMatch) {
+          const rawUrl = linkMatch[1];
           const cleanUrl = cleanDuckDuckGoUrl(rawUrl);
-          const title = titleMatch[2].replace(/<[^>]+>/g, '').trim();
-          const snippet = snippetMatch
-            ? snippetMatch[1].replace(/<[^>]+>/g, '').trim()
-            : '';
+          const title = linkMatch[2].replace(/<[^>]+>/g, '').trim();
+
+          const nextRow = rows[i + 1] || '';
+          const snipMatch = nextRow.match(
+            /<td[^>]*class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/i
+          );
+          const snippet = snipMatch ? snipMatch[1].replace(/<[^>]+>/g, '').trim() : '';
 
           if (title && snippet && !cleanUrl.includes('duckduckgo.com')) {
             results.push({
@@ -123,20 +158,20 @@ export async function searchWeb(query: string, maxResults: number = 4): Promise<
       }
     }
   } catch (err: any) {
-    console.warn('[WebSearch] DuckDuckGo query error:', err?.message);
+    console.warn('[WebSearch] DuckDuckGo Lite query error:', err?.message);
   }
 
-  // 2. Wikipedia Search (High quality factual reference)
+  // 2. Wikipedia Search (High-quality fallback if organic results were insufficient)
   if (results.length < maxResults) {
     try {
-      const isRussian = /[а-яА-ЯёЁ]/.test(trimmed);
+      const isRussian = /[а-яА-ЯёЁ]/.test(sanitized);
       const wikiLang = isRussian ? 'ru' : 'en';
       const wikiUrl = `https://${wikiLang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
-        trimmed
+        sanitized
       )}&utf8=&format=json`;
 
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
+      const timer = setTimeout(() => controller.abort(), 4000);
 
       const wikiRes = await fetch(wikiUrl, {
         headers: { 'User-Agent': 'SmartStudyHub/1.4 (academic app)' },
@@ -150,8 +185,13 @@ export async function searchWeb(query: string, maxResults: number = 4): Promise<
 
         for (const item of items) {
           if (results.length >= maxResults) break;
+          // Skip disambiguation pages
+          if (item.title && (item.title.includes('(значения)') || item.title.includes('(disambiguation)'))) {
+            continue;
+          }
+
           const cleanSnippet = (item.snippet || '').replace(/<[^>]+>/g, '').trim();
-          if (cleanSnippet) {
+          if (cleanSnippet && !results.some((r) => r.title === item.title)) {
             results.push({
               title: item.title,
               snippet: cleanSnippet,
@@ -184,7 +224,7 @@ export function buildWebSearchPromptContext(query: string, results: WebSearchRes
 
   return `
 [АКТУАЛЬНЫЕ ДАННЫЕ ИЗ ВЕБ-ПОИСКА В СЕТИ]:
-Поисковый запрос: "${query}"
+Поисковый запрос: "${sanitizeSearchQuery(query)}"
 Найденные актуальные источники:
 ${formattedSources}
 

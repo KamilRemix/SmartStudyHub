@@ -42,6 +42,23 @@ export async function savePersonalization(settings: AIPersonalization): Promise<
   }
 }
 
+export function buildTemporalSystemContext(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const monthNames = [
+    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+  ];
+  const dayNames = [
+    'воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'
+  ];
+  const dayName = dayNames[now.getDay()];
+  const dateStr = `${now.getDate()} ${monthNames[now.getMonth()]} ${year} года (${dayName})`;
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  return `\n\n[РЕАЛЬНОЕ ВРЕМЯ И КАЛЕНДАРЬ]:\nТекущая дата: ${dateStr}.\nТекущее время: ${timeStr}.\nТекущий год: ${year}.\nВАЖНО: Реальный мир сейчас находится в ${year} году. Всегда используй эту дату при ответах на вопросы о сегодняшнем дне, текущем годе, месяце и времени.`;
+}
+
 export function buildPersonalizedSystemInstruction(
   personalization: AIPersonalization
 ): string {
@@ -52,9 +69,11 @@ export function buildPersonalizedSystemInstruction(
     "Always format mathematical equations, scientific variables, and calculations using clean LaTeX notation: use $$...$$ for display formulas and $...$ for inline formulas (e.g. $E = mc^2$, $$\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$). " +
     "Reply in the same language as the user's message.";
 
+  const withTemporal = `${baseInstruction}${buildTemporalSystemContext()}`;
+
   if (!personalization.enabled || !personalization.instructions.trim()) {
-    return baseInstruction;
+    return withTemporal;
   }
 
-  return `${baseInstruction}\n\n[USER CUSTOM INSTRUCTIONS & PERSISTENT CONTEXT]:\n${personalization.instructions.trim()}\nStrictly adhere to these user preferences throughout the conversation.`;
+  return `${withTemporal}\n\n[USER CUSTOM INSTRUCTIONS & PERSISTENT CONTEXT]:\n${personalization.instructions.trim()}\nStrictly adhere to these user preferences throughout the conversation.`;
 }

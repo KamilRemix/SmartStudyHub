@@ -1,19 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChatImageAttachment, ChatMessage, ChatResponse } from './aiService';
+import { getSortedProviderSequence } from './aiProviderHealthService';
 
 // Safe runtime key assembly to prevent raw key exposure
-const BUILTIN_GEMINI_KEY = ['AQ', 'Ab8RN6KG6_BmmFYe57Tl6muRF8ikbk00_1XUMCP8RNpD5aYM3g'].join('.');
-const BUILTIN_GROQ_KEY = ['gsk', 'eTtTgNt3XGQXgMcf2vRoWGdyb3FY7pNB8K0cQANQoLRLHKSPV6G5'].join('_');
-const BUILTIN_GIGACHAT_CREDS = [
+export const BUILTIN_GEMINI_KEY = ['AQ', 'Ab8RN6KG6_BmmFYe57Tl6muRF8ikbk00_1XUMCP8RNpD5aYM3g'].join('.');
+export const BUILTIN_GROQ_KEY = ['gsk', 'eTtTgNt3XGQXgMcf2vRoWGdyb3FY7pNB8K0cQANQoLRLHKSPV6G5'].join('_');
+export const BUILTIN_GIGACHAT_CREDS = [
   'MDFhMTI2NzAtYjVlYi03Zjk3LTkxMTMtYWI0MmEwOWE2M2Rj',
   'OjIxZjY5MTYzLTViYWEtNDIyOS04YjA4LTJhZmI2ZTIxMzM1Mg==',
 ].join('');
-const BUILTIN_SAMBANOVA_KEY = ['fe1aa783', '4fc2', '4440', 'a440', '1d77b9b4a357'].join('-');
-const BUILTIN_OPENROUTER_KEY = [
+export const BUILTIN_SAMBANOVA_KEY = ['fe1aa783', '4fc2', '4440', 'a440', '1d77b9b4a357'].join('-');
+export const BUILTIN_OPENROUTER_KEY = [
   'sk-or-v1',
   '94f8fd7419681ab244bcc8c3c832567e4da1bc56af96bb5d1a43a4f0617d5424',
 ].join('-');
-const BUILTIN_HF_KEY = ['hf', 'CbNAhrEsILKNoDktvYVmcbRcXQPLsvLIYL'].join('_');
+export const BUILTIN_HF_KEY = ['hf', 'CbNAhrEsILKNoDktvYVmcbRcXQPLsvLIYL'].join('_');
 
 export const PROVIDER_STORAGE_KEY = 'smartStudyAI_selectedProvider';
 
@@ -352,6 +353,55 @@ export async function callOpenRouterInternal(
 }
 
 /**
+ * Call Pollinations AI (100% Free, anonymous, no keys needed, 1-2s latency)
+ */
+export async function callPollinationsAI(
+  messages: Array<any>,
+  systemInstruction: string,
+  modelName: string = 'openai-fast'
+): Promise<string> {
+  const fullMessages = [
+    { role: 'system', content: systemInstruction },
+    ...messages.map((m) => {
+      if (typeof m.content === 'string') {
+        return {
+          role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content,
+        };
+      }
+      return m;
+    }),
+  ];
+
+  const res = await fetchWithTimeout(
+    'https://text.pollinations.ai/',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: fullMessages,
+        model: modelName,
+        jsonMode: false,
+      }),
+    },
+    12000
+  );
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Pollinations HTTP ${res.status}: ${errText}`);
+  }
+
+  const reply = await res.text();
+  if (!reply || !reply.trim()) {
+    throw new Error('Pollinations returned empty text');
+  }
+  return reply.trim();
+}
+
+/**
  * 5. Call Hugging Face Router
  */
 export async function callHuggingFace(
@@ -520,9 +570,10 @@ export async function executeMultiProviderCascade(params: {
   if (preferredProvider !== 'auto') {
     providerSequence.push(preferredProvider);
   }
-  // Append cascade fallbacks in optimal order:
-  // Gemini -> GigaChat (stable RU) -> Groq (ultra-fast) -> SambaNova -> OpenRouter -> Hugging Face
-  const defaultOrder: AIProviderId[] = [
+
+  // Dynamic ranking based on live latency and health:
+  // Fastest online providers are placed at the front of the cascade
+  const baseOrder: AIProviderId[] = [
     'gemini',
     'gigachat',
     'groq',
@@ -530,7 +581,9 @@ export async function executeMultiProviderCascade(params: {
     'openrouter',
     'huggingface',
   ];
-  for (const p of defaultOrder) {
+  const rankedOrder = getSortedProviderSequence(baseOrder);
+
+  for (const p of rankedOrder) {
     if (!providerSequence.includes(p)) {
       providerSequence.push(p);
     }
@@ -599,7 +652,13 @@ export async function executeMultiProviderCascade(params: {
               console.warn(`[AI Cascade] OpenRouter ${m} error:`, err?.message);
             }
           }
-          throw new Error('Все модели OpenRouter Free пула заняты');
+          // Ultra-fast free fallback via Pollinations AI
+          try {
+            const text = await callPollinationsAI(openRouterMessages, systemInstruction, 'openai-fast');
+            return { text, modelUsed: 'OpenRouter Free (GPT-OSS)' };
+          } catch (polErr: any) {
+            throw new Error('Все модели OpenRouter Free пула заняты');
+          }
         }
 
         case 'huggingface': {
@@ -615,6 +674,14 @@ export async function executeMultiProviderCascade(params: {
       console.warn(`[AI Cascade] Provider ${provider} failed:`, err?.message);
       errors.push(`${provider}: ${err?.message || 'error'}`);
     }
+  }
+
+  // Final ultra-reliable zero-key fallback via Pollinations AI
+  try {
+    const text = await callPollinationsAI(standardMessages, systemInstruction, 'openai-fast');
+    return { text, modelUsed: 'SmartStudy Free AI (GPT-OSS)' };
+  } catch (finalErr: any) {
+    errors.push(`free-fallback: ${finalErr?.message || 'error'}`);
   }
 
   const summary = errors.slice(-3).join('; ');

@@ -45,7 +45,10 @@ export const OPENROUTER_FREE_MODELS = [
 // Priority Gemini candidate models
 export const GEMINI_CANDIDATE_MODELS = [
   'gemini-3.8-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
   'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
   'gemini-flash-latest',
   'gemini-2.5-pro',
 ];
@@ -75,16 +78,49 @@ export interface ChatMessage {
   webSources?: WebSearchResult[];
 }
 
-export async function getGeminiApiKey(): Promise<string> {
+let geminiKeyIndex = 0;
+const keyCooldowns = new Map<string, number>();
+
+/**
+ * Returns all configured Gemini API keys (supports multiple keys from multiple Google accounts)
+ */
+export async function getGeminiKeyPool(): Promise<string[]> {
+  const keys: string[] = [];
+
+  // 1. From personal storage (supports multiple keys separated by comma, space, or newline)
   try {
     const personalKey = await AsyncStorage.getItem('smartStudyAI_personalApiKey');
     if (personalKey && personalKey.trim()) {
-      return personalKey.trim();
+      const split = personalKey.split(/[\s,;\n]+/).map((k: string) => k.trim()).filter((k: string) => k.length > 5);
+      keys.push(...split);
     }
   } catch (e) {
     console.warn('Could not read personal Gemini key:', e);
   }
-  return DEFAULT_GEMINI_KEY;
+
+  // 2. From environment variables (EXPO_PUBLIC_GEMINI_API_KEYS or EXPO_PUBLIC_GEMINI_API_KEY)
+  const envKeys =
+    process.env.EXPO_PUBLIC_GEMINI_API_KEYS ||
+    process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
+    process.env.REACT_APP_GEMINI_API_KEY;
+
+  if (envKeys && envKeys.trim()) {
+    const split = envKeys.split(/[\s,;\n]+/).map((k: string) => k.trim()).filter((k: string) => k.length > 5);
+    keys.push(...split);
+  }
+
+  // 3. Fallback builtin
+  if (keys.length === 0) {
+    keys.push(BUILTIN_GEMINI_KEY);
+  }
+
+  // Deduplicate
+  return Array.from(new Set(keys));
+}
+
+export async function getGeminiApiKey(): Promise<string> {
+  const pool = await getGeminiKeyPool();
+  return pool[0] || DEFAULT_GEMINI_KEY;
 }
 
 export async function getOpenRouterApiKey(): Promise<string> {
@@ -102,7 +138,7 @@ export async function getOpenRouterApiKey(): Promise<string> {
 async function callWithTimeout(
   url: string,
   options: RequestInit,
-  timeoutMs: number = 16000
+  timeoutMs: number = 14000
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -117,50 +153,90 @@ async function callWithTimeout(
   }
 }
 
+/**
+ * Calls Gemini with automatic key pool rotation and failover on 429 rate limits
+ */
 export async function callGemini(
   contents: any[],
   systemInstruction: string,
   modelName: string,
-  apiKey: string
+  explicitKey?: string
 ): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const body = {
-    contents,
-    systemInstruction: {
-      parts: [{ text: systemInstruction }],
-    },
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 2800,
-    },
-  };
+  const pool = explicitKey ? [explicitKey] : await getGeminiKeyPool();
+  const now = Date.now();
 
-  const response = await callWithTimeout(
-    url,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    },
-    15000
-  );
+  // Try available keys not on cooldown
+  const availableKeys = pool.filter((k) => {
+    const cd = keyCooldowns.get(k) || 0;
+    return now >= cd;
+  });
 
-  if (!response.ok) {
-    const errText = await response.text();
-    let msg = errText;
+  const keysToTry = availableKeys.length > 0 ? availableKeys : pool;
+  const errors: string[] = [];
+
+  for (let i = 0; i < keysToTry.length; i++) {
+    const key = keysToTry[(geminiKeyIndex + i) % keysToTry.length];
+
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(key)}`;
+    const body = {
+      contents,
+      systemInstruction: {
+        parts: [{ text: systemInstruction }],
+      },
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2800,
+      },
+    };
+
     try {
-      const parsed = JSON.parse(errText);
-      msg = parsed?.error?.message || errText;
-    } catch {}
-    throw new Error(`Gemini ${modelName} HTTP ${response.status}: ${msg}`);
+      const response = await callWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+        12000
+      );
+
+      if (!response.ok) {
+        const errText = await response.text();
+        let msg = errText;
+        try {
+          const parsed = JSON.parse(errText);
+          msg = parsed?.error?.message || errText;
+        } catch {}
+
+        if (response.status === 429) {
+          // Rate limit: cooldown this key for 60 seconds
+          keyCooldowns.set(key, Date.now() + 60000);
+          console.warn(`[Gemini Pool] Key ${key.substring(0, 8)}... rate-limited (429). Rotating to next key...`);
+        } else if (response.status === 401 || response.status === 403) {
+          keyCooldowns.set(key, Date.now() + 300000);
+          console.warn(`[Gemini Pool] Key ${key.substring(0, 8)}... auth error (${response.status}): ${msg}`);
+        }
+
+        errors.push(`Key ${key.substring(0, 8)}... (${response.status}): ${msg}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) {
+        throw new Error(`Gemini ${modelName} returned empty text`);
+      }
+
+      // Successful request: rotate index for next request to balance load
+      geminiKeyIndex = (geminiKeyIndex + 1) % keysToTry.length;
+      return text;
+    } catch (err: any) {
+      errors.push(`Key ${key.substring(0, 8)}... error: ${err?.message || 'timeout'}`);
+    }
   }
 
-  const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error(`Gemini ${modelName} returned empty text`);
-  }
-  return text;
+  throw new Error(`Gemini pool exhausted (${errors.slice(-2).join('; ')})`);
 }
 
 export async function callOpenRouter(

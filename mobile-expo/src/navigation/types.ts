@@ -16,7 +16,7 @@ export type ToolsStackParamList = {
 export type RootTabParamList = {
   Calculator: undefined;
   Grades: undefined;
-  Notes: undefined;
+  Notes: { openNoteId?: string } | undefined;
   Tools: NavigatorScreenParams<ToolsStackParamList>;
   Settings: undefined;
 };

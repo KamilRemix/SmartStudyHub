@@ -1,12 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   Modal,
-  TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
@@ -16,6 +15,12 @@ import {
   AI_PROVIDERS,
   AIProviderInfo,
 } from '../../../services/aiMultiProviderService';
+import {
+  subscribeToHealthUpdates,
+  pingAllProviders,
+  ProviderHealthStatus,
+  getCachedProviderHealth,
+} from '../../../services/aiProviderHealthService';
 
 interface ModelSelectorModalProps {
   visible: boolean;
@@ -31,6 +36,162 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
   onClose,
 }) => {
   const { colors } = useTheme();
+  const [healthMap, setHealthMap] = useState<Record<AIProviderId, ProviderHealthStatus>>(
+    getCachedProviderHealth()
+  );
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    const unsubscribe = subscribeToHealthUpdates((updated) => {
+      setHealthMap(updated);
+    });
+    pingAllProviders(false).catch(() => {});
+    return () => unsubscribe();
+  }, [visible]);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await pingAllProviders(true);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Sort providers: 'auto' stays first, then online by ping, then offline
+  const sortedProviders = [...AI_PROVIDERS].sort((a, b) => {
+    if (a.id === 'auto') return -1;
+    if (b.id === 'auto') return 1;
+
+    const hA = healthMap[a.id];
+    const hB = healthMap[b.id];
+
+    const isOnlineA = hA?.status === 'online';
+    const isOnlineB = hB?.status === 'online';
+
+    if (isOnlineA && !isOnlineB) return -1;
+    if (!isOnlineA && isOnlineB) return 1;
+
+    const latA = hA?.latencyMs || 9999;
+    const latB = hB?.latencyMs || 9999;
+    return latA - latB;
+  });
+
+  const renderPingBadge = (providerId: AIProviderId) => {
+    const health = healthMap[providerId];
+    if (!health) return null;
+
+    if (providerId === 'auto') {
+      const anyOnline = Object.values(healthMap).some(
+        (h) => h.id !== 'auto' && h.status === 'online'
+      );
+      return (
+        <View
+          style={[
+            styles.pingBadge,
+            {
+              backgroundColor: anyOnline
+                ? colors.primaryAccent + '15'
+                : '#EF444415',
+              borderColor: anyOnline
+                ? colors.primaryAccent + '30'
+                : '#EF444430',
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.pingDot,
+              { backgroundColor: anyOnline ? colors.primaryAccent : '#EF4444' },
+            ]}
+          />
+          <Text
+            style={[
+              styles.pingText,
+              { color: anyOnline ? colors.primaryAccent : '#EF4444' },
+            ]}
+          >
+            {anyOnline ? 'Быстрый отклик' : 'Проверка...'}
+          </Text>
+        </View>
+      );
+    }
+
+    if (health.status === 'checking') {
+      return (
+        <View
+          style={[
+            styles.pingBadge,
+            {
+              backgroundColor: colors.componentBackground,
+              borderColor: colors.borderColor,
+            },
+          ]}
+        >
+          <ActivityIndicator size={9} color={colors.primaryAccent} />
+          <Text style={[styles.pingText, { color: colors.textColorSecondary }]}>
+            Пинг...
+          </Text>
+        </View>
+      );
+    }
+
+    if (health.status === 'online' && typeof health.latencyMs === 'number') {
+      return (
+        <View
+          style={[
+            styles.pingBadge,
+            {
+              backgroundColor: '#10B98115',
+              borderColor: '#10B98135',
+            },
+          ]}
+        >
+          <View style={[styles.pingDot, { backgroundColor: '#10B981' }]} />
+          <Text style={[styles.pingText, { color: '#10B981' }]}>
+            {health.latencyMs} мс
+          </Text>
+        </View>
+      );
+    }
+
+    if (health.status === 'degraded' && typeof health.latencyMs === 'number') {
+      return (
+        <View
+          style={[
+            styles.pingBadge,
+            {
+              backgroundColor: '#F59E0B15',
+              borderColor: '#F59E0B35',
+            },
+          ]}
+        >
+          <View style={[styles.pingDot, { backgroundColor: '#F59E0B' }]} />
+          <Text style={[styles.pingText, { color: '#F59E0B' }]}>
+            {health.latencyMs} мс
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View
+        style={[
+          styles.pingBadge,
+          {
+            backgroundColor: '#EF444415',
+            borderColor: '#EF444435',
+          },
+        ]}
+      >
+        <View style={[styles.pingDot, { backgroundColor: '#EF4444' }]} />
+        <Text style={[styles.pingText, { color: '#EF4444' }]}>
+          Откат
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <Modal
@@ -52,17 +213,34 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                   ИИ-движок ответов
                 </Text>
                 <Text style={[styles.subtitle, { color: colors.textColorSecondary }]}>
-                  Выберите модель или авто-каскад
+                  Проверка пинга и автоматический каскад
                 </Text>
               </View>
             </View>
-            <PressableScale
-              onPress={onClose}
-              style={[styles.closeBtn, { backgroundColor: colors.componentBackground }]}
-              accessibilityLabel="Закрыть"
-            >
-              <Feather name="x" size={18} color={colors.textColorSecondary} />
-            </PressableScale>
+
+            <View style={styles.headerRightGroup}>
+              {/* Refresh Ping Button */}
+              <PressableScale
+                onPress={handleManualRefresh}
+                style={[styles.refreshBtn, { backgroundColor: colors.componentBackground }]}
+                accessibilityLabel="Обновить пинг"
+              >
+                {isRefreshing ? (
+                  <ActivityIndicator size={12} color={colors.primaryAccent} />
+                ) : (
+                  <Feather name="refresh-cw" size={13} color={colors.textColorSecondary} />
+                )}
+              </PressableScale>
+
+              {/* Close Button */}
+              <PressableScale
+                onPress={onClose}
+                style={[styles.closeBtn, { backgroundColor: colors.componentBackground }]}
+                accessibilityLabel="Закрыть"
+              >
+                <Feather name="x" size={18} color={colors.textColorSecondary} />
+              </PressableScale>
+            </View>
           </View>
 
           {/* Model Options List */}
@@ -71,7 +249,7 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {AI_PROVIDERS.map((item: AIProviderInfo) => {
+            {sortedProviders.map((item: AIProviderInfo) => {
               const isSelected = selectedProvider === item.id;
               return (
                 <PressableScale
@@ -125,6 +303,11 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                           >
                             {item.name}
                           </Text>
+
+                          {/* Ping and Health Badge */}
+                          {renderPingBadge(item.id)}
+
+                          {/* Built-in Badge */}
                           <View
                             style={[
                               styles.badge,
@@ -181,9 +364,9 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                 },
               ]}
             >
-              <Feather name="info" size={14} color={colors.primaryAccent} />
+              <Feather name="zap" size={14} color={colors.primaryAccent} />
               <Text style={[styles.infoText, { color: colors.textColorSecondary }]}>
-                В режиме «Авто» приложение мгновенно переключается на доступный резервный ИИ при сетевых задержках или сбоях провайдеров.
+                В режиме «Авто» приложение автоматически направляет запрос на модель с наименьшей задержкой и мгновенно переключается при сетевых сбоях.
               </Text>
             </View>
           </ScrollView>
@@ -209,10 +392,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'transparent',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
     elevation: 10,
   },
   header: {
@@ -227,6 +406,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  headerRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   iconBox: {
     width: 36,
@@ -244,6 +428,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
     marginTop: 2,
+  },
+  refreshBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   closeBtn: {
     width: 32,
@@ -294,6 +485,25 @@ const styles = StyleSheet.create({
   providerName: {
     fontSize: 14,
     fontFamily: 'Inter_600SemiBold',
+  },
+  pingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 0.8,
+  },
+  pingDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  pingText: {
+    fontSize: 9,
+    fontFamily: 'Inter_600SemiBold',
+    fontWeight: '600',
   },
   badge: {
     paddingHorizontal: 6,

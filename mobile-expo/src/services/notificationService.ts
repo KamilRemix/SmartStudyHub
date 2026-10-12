@@ -239,6 +239,41 @@ class NotificationService {
   }
 
   /**
+   * Safely listen for user tapping/interacting with a notification.
+   */
+  public addNotificationResponseListener(callback: (noteId: string) => void): { remove: () => void } {
+    if (isExpoGo || !Notifications) {
+      return { remove: () => {} };
+    }
+    try {
+      const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+        const noteId = response?.notification?.request?.content?.data?.noteId;
+        if (noteId) {
+          callback(String(noteId));
+        }
+      });
+      return subscription;
+    } catch (e) {
+      console.warn('[NotificationService] addNotificationResponseListener error:', e);
+      return { remove: () => {} };
+    }
+  }
+
+  /**
+   * Check if app was cold-started from tapping a notification.
+   */
+  public async getLastNotificationResponse(): Promise<string | null> {
+    if (isExpoGo || !Notifications) return null;
+    try {
+      const response = await Notifications.getLastNotificationResponseAsync();
+      const noteId = response?.notification?.request?.content?.data?.noteId;
+      return noteId ? String(noteId) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
    * Safely cancel a scheduled reminder.
    */
   public async cancelReminder(notificationId: string): Promise<void> {
