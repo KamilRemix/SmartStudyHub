@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { PressableScale } from '../../../components/common/PressableScale';
 import { ChatSession } from '../../../services/aiChatStorageService';
 
 interface ChatHistoryModalProps {
@@ -58,10 +59,9 @@ export const ChatHistoryModal: React.FC<ChatHistoryModalProps> = ({
           },
         ]}
       >
-        <TouchableOpacity
+        <PressableScale
           style={styles.chatItemMain}
           onPress={() => onSelectSession(item)}
-          activeOpacity={0.7}
         >
           <View
             style={[
@@ -99,16 +99,15 @@ export const ChatHistoryModal: React.FC<ChatHistoryModalProps> = ({
               </Text>
             </View>
           </View>
-        </TouchableOpacity>
+        </PressableScale>
 
-        <TouchableOpacity
+        <PressableScale
           style={styles.deleteBtn}
           onPress={() => onDeleteSession(item.id)}
           accessibilityLabel="Delete chat"
-          activeOpacity={0.7}
         >
           <Feather name="trash-2" size={15} color={colors.textColorSecondary} />
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     );
   };
@@ -146,18 +145,18 @@ export const ChatHistoryModal: React.FC<ChatHistoryModalProps> = ({
               </View>
             </View>
 
-            <TouchableOpacity
+            <PressableScale
               onPress={onClose}
               style={styles.closeBtn}
               accessibilityLabel="Close"
             >
               <Feather name="x" size={20} color={colors.textColorSecondary} />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
 
           {/* New Chat Button */}
           <View style={styles.actionRow}>
-            <TouchableOpacity
+            <PressableScale
               style={[
                 styles.newChatBtn,
                 {
@@ -165,11 +164,10 @@ export const ChatHistoryModal: React.FC<ChatHistoryModalProps> = ({
                 },
               ]}
               onPress={onNewChat}
-              activeOpacity={0.8}
             >
               <Feather name="plus" size={16} color="#ffffff" />
               <Text style={styles.newChatBtnText}>Начать новый диалог</Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
 
           {/* Sessions List */}

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { PressableScale } from '../../../components/common/PressableScale';
 import {
   AIProviderId,
   AI_PROVIDERS,
@@ -55,13 +56,13 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                 </Text>
               </View>
             </View>
-            <TouchableOpacity
+            <PressableScale
               onPress={onClose}
               style={[styles.closeBtn, { backgroundColor: colors.componentBackground }]}
               accessibilityLabel="Закрыть"
             >
               <Feather name="x" size={18} color={colors.textColorSecondary} />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
 
           {/* Model Options List */}
@@ -73,7 +74,7 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
             {AI_PROVIDERS.map((item: AIProviderInfo) => {
               const isSelected = selectedProvider === item.id;
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={item.id}
                   style={[
                     styles.providerItem,
@@ -90,7 +91,6 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                     onSelectProvider(item.id);
                     onClose();
                   }}
-                  activeOpacity={0.7}
                 >
                   <View style={styles.itemTopRow}>
                     <View style={styles.itemTitleGroup}>
@@ -167,7 +167,7 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                   >
                     {item.description}
                   </Text>
-                </TouchableOpacity>
+                </PressableScale>
               );
             })}
 

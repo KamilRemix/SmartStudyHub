@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../theme';
 import { AppHeader } from '../../components/common/AppHeader';
+import { PressableScale } from '../../components/common/PressableScale';
 import { FeatherIconName, ToolsStackParamList } from '../../navigation/types';
 import { useI18n } from '../../i18n';
 
@@ -77,7 +78,7 @@ export const ToolsScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.grid}>
           {TOOLS_LIST.map((tool) => (
-            <TouchableOpacity
+            <PressableScale
               key={tool.id}
               style={[
                 styles.card,
@@ -86,7 +87,6 @@ export const ToolsScreen: React.FC = () => {
                   borderColor: colors.borderColor,
                 },
               ]}
-              activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel={t(tool.titleKey)}
               onPress={() => navigation.navigate(tool.screen)}
@@ -103,7 +103,7 @@ export const ToolsScreen: React.FC = () => {
                 </Text>
               </View>
               <Feather name="chevron-right" size={18} color={colors.textColorSecondary} />
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </View>
       </ScrollView>

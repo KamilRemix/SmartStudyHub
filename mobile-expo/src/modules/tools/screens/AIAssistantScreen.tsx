@@ -10,6 +10,10 @@ import {
   Platform,
   ActivityIndicator,
   Image,
+  Modal,
+  SafeAreaView,
+  StatusBar,
+  Animated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -18,7 +22,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../../theme';
 import { useI18n } from '../../../i18n';
-import { AppHeader } from '../../../components/common/AppHeader';
+import { PressableScale } from '../../../components/common/PressableScale';
 import {
   sendChatMessage,
   ChatMessage,
@@ -51,7 +55,7 @@ import { ToolsStackParamList } from '../../../navigation/types';
 type NavProp = NativeStackNavigationProp<ToolsStackParamList>;
 
 export const AIAssistantScreen: React.FC = () => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const navigation = useNavigation<NavProp>();
   const { t } = useI18n();
 
@@ -64,6 +68,7 @@ export const AIAssistantScreen: React.FC = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showPersonalizationModal, setShowPersonalizationModal] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
+  const [showAttachModal, setShowAttachModal] = useState(false);
   const [selectedProvider, setSelectedProviderState] = useState<AIProviderId>('auto');
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [searchQueryStatus, setSearchQueryStatus] = useState<string | null>(null);
@@ -96,6 +101,7 @@ export const AIAssistantScreen: React.FC = () => {
   };
 
   const handlePickFromGallery = async () => {
+    setShowAttachModal(false);
     try {
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -117,6 +123,7 @@ export const AIAssistantScreen: React.FC = () => {
   };
 
   const handleLaunchCamera = async () => {
+    setShowAttachModal(false);
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) return;
@@ -233,40 +240,134 @@ export const AIAssistantScreen: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleClear = () => {
-    const cleared: ChatMessage[] = [
-      {
-        id: 'welcome',
-        role: 'model',
-        content: t('aiWelcome'),
-        timestamp: Date.now(),
-        modelUsed: 'SmartStudyAI',
-      },
-    ];
-    setMessages(cleared);
-    setAttachedImage(null);
-    if (activeSessionId) {
-      updateSessionMessages(activeSessionId, cleared).then(setSessions);
-    }
-  };
+  const isConversationEmpty = messages.length === 0 || (messages.length === 1 && messages[0].id === 'welcome');
 
-  const suggestions = [
-    'Проанализируй мою успеваемость',
-    'Объясни тему простыми словами',
-    'Помоги решить задачу',
-    'Помоги подготовиться к контрольной',
-    'Сгенерировать тест по теме',
-  ];
+  const selectedProviderInfo =
+    AI_PROVIDERS.find((p) => p.id === selectedProvider) || AI_PROVIDERS[0];
 
-  const handleSuggestionPress = (s: string) => {
-    if (s === 'Сгенерировать тест по теме') {
-      navigation.navigate('QuizGenerator');
-    } else {
-      handleSend(s);
-    }
-  };
+  const hasActivePersonalization = personalization.enabled && personalization.instructions.trim().length > 0;
+  const isSendActive = (inputText.trim().length > 0 || attachedImage !== null) && !isLoading;
+
+  const renderWelcomeHero = () => (
+    <View style={styles.heroContainer}>
+      <View
+        style={[
+          styles.heroBadge,
+          {
+            backgroundColor: colors.primaryAccent + '15',
+            borderColor: colors.primaryAccent + '30',
+          },
+        ]}
+      >
+        <Feather name="cpu" size={28} color={colors.primaryAccent} />
+      </View>
+
+      <Text style={[styles.heroTitle, { color: colors.textColor }]}>
+        SmartStudy AI
+      </Text>
+      <Text style={[styles.heroSubtitle, { color: colors.textColorSecondary }]}>
+        Персональный академический ассистент
+      </Text>
+
+      {/* Suggested prompts in modern 2x2 grid */}
+      <View style={styles.promptCardsGrid}>
+        <PressableScale
+          style={[
+            styles.promptCard,
+            {
+              backgroundColor: colors.componentBackground,
+              borderColor: colors.borderColor,
+            },
+          ]}
+          onPress={() => setShowAttachModal(true)}
+          accessibilityLabel="Решить задачу по фото"
+        >
+          <View style={[styles.promptCardIconWrap, { backgroundColor: colors.primaryAccent + '15' }]}>
+            <Feather name="camera" size={16} color={colors.primaryAccent} />
+          </View>
+          <Text style={[styles.promptCardTitle, { color: colors.textColor }]}>
+            Решить по фото
+          </Text>
+          <Text style={[styles.promptCardDesc, { color: colors.textColorSecondary }]}>
+            Сфотографируйте задание или сложную формулу
+          </Text>
+        </PressableScale>
+
+        <PressableScale
+          style={[
+            styles.promptCard,
+            {
+              backgroundColor: colors.componentBackground,
+              borderColor: colors.borderColor,
+            },
+          ]}
+          onPress={() => handleSend('Объясни эту тему простыми словами с жизненными примерами')}
+          accessibilityLabel="Объяснить тему"
+        >
+          <View style={[styles.promptCardIconWrap, { backgroundColor: colors.primaryAccent + '15' }]}>
+            <Feather name="book-open" size={16} color={colors.primaryAccent} />
+          </View>
+          <Text style={[styles.promptCardTitle, { color: colors.textColor }]}>
+            Объяснить тему
+          </Text>
+          <Text style={[styles.promptCardDesc, { color: colors.textColorSecondary }]}>
+            Простыми словами и понятными примерами
+          </Text>
+        </PressableScale>
+
+        <PressableScale
+          style={[
+            styles.promptCard,
+            {
+              backgroundColor: colors.componentBackground,
+              borderColor: colors.borderColor,
+            },
+          ]}
+          onPress={() => handleSend('Помоги подготовиться к контрольной работе: составь план и вопросы')}
+          accessibilityLabel="Подготовка к контрольной"
+        >
+          <View style={[styles.promptCardIconWrap, { backgroundColor: colors.primaryAccent + '15' }]}>
+            <Feather name="award" size={16} color={colors.primaryAccent} />
+          </View>
+          <Text style={[styles.promptCardTitle, { color: colors.textColor }]}>
+            Подготовка к тесту
+          </Text>
+          <Text style={[styles.promptCardDesc, { color: colors.textColorSecondary }]}>
+            Главные тезисы и вопросы для самопроверки
+          </Text>
+        </PressableScale>
+
+        <PressableScale
+          style={[
+            styles.promptCard,
+            {
+              backgroundColor: colors.componentBackground,
+              borderColor: colors.borderColor,
+            },
+          ]}
+          onPress={() => navigation.navigate('QuizGenerator')}
+          accessibilityLabel="Сгенерировать тест"
+        >
+          <View style={[styles.promptCardIconWrap, { backgroundColor: colors.primaryAccent + '15' }]}>
+            <Feather name="check-circle" size={16} color={colors.primaryAccent} />
+          </View>
+          <Text style={[styles.promptCardTitle, { color: colors.textColor }]}>
+            Создать квиз
+          </Text>
+          <Text style={[styles.promptCardDesc, { color: colors.textColorSecondary }]}>
+            Интерактивный тест по любому предмету
+          </Text>
+        </PressableScale>
+      </View>
+    </View>
+  );
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
+    // Hide the initial 'welcome' message from raw bubble list when showing modern layout
+    if (item.id === 'welcome' && isConversationEmpty) {
+      return null;
+    }
+
     const isUser = item.role === 'user';
     return (
       <View
@@ -290,11 +391,11 @@ export const AIAssistantScreen: React.FC = () => {
           ]}
         >
           {/* Assistant Model Badge */}
-          {!isUser && item.modelUsed && (
+          {!isUser && (
             <View style={styles.modelHeader}>
               <View style={[styles.modelDot, { backgroundColor: colors.primaryAccent }]} />
               <Text style={[styles.modelBadgeText, { color: colors.textColorSecondary }]}>
-                {item.modelUsed}
+                {item.modelUsed || selectedProviderInfo.name}
               </Text>
             </View>
           )}
@@ -314,20 +415,30 @@ export const AIAssistantScreen: React.FC = () => {
           {/* Bottom Actions for Model messages */}
           {!isUser && item.id !== 'welcome' && (
             <View style={styles.bubbleFooter}>
-              <TouchableOpacity
+              <PressableScale
                 style={styles.copyBtn}
                 onPress={() => handleCopy(item.id, item.content)}
-                accessibilityLabel="Copy full response"
+                accessibilityLabel="Copy response"
               >
                 <Feather
                   name={copiedId === item.id ? 'check' : 'copy'}
-                  size={14}
-                  color={colors.textColorSecondary}
+                  size={13}
+                  color={copiedId === item.id ? colors.primaryAccent : colors.textColorSecondary}
                 />
-                <Text style={[styles.copyLabel, { color: colors.textColorSecondary }]}>
-                  {copiedId === item.id ? 'Скопировано' : 'Весь ответ'}
+                <Text
+                  style={[
+                    styles.copyLabel,
+                    {
+                      color:
+                        copiedId === item.id
+                          ? colors.primaryAccent
+                          : colors.textColorSecondary,
+                    },
+                  ]}
+                >
+                  {copiedId === item.id ? 'Скопировано' : 'Копировать'}
                 </Text>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
           )}
         </View>
@@ -335,394 +446,559 @@ export const AIAssistantScreen: React.FC = () => {
     );
   };
 
-  const selectedProviderInfo =
-    AI_PROVIDERS.find((p) => p.id === selectedProvider) || AI_PROVIDERS[0];
-
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <AppHeader
-        title={t('aiAssistantTitle')}
-        subtitle={t('aiAssistantSub')}
-        leftAction={{
-          icon: 'arrow-left',
-          onPress: () => navigation.goBack(),
-          accessibilityLabel: 'Back',
-        }}
-        rightActionSecondary={{
-          icon: 'clock',
-          onPress: () => setShowHistoryModal(true),
-          accessibilityLabel: 'Chat History',
-        }}
-        rightAction={{
-          icon: 'plus',
-          onPress: handleNewChat,
-          accessibilityLabel: 'New Chat',
-        }}
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.background}
       />
-
-      {/* Top Controls Bar: Model Selector & Personalization */}
-      <View
-        style={[
-          styles.topControlsBar,
-          {
-            backgroundColor: colors.componentBackground,
-            borderBottomColor: colors.borderColor,
-          },
-        ]}
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
       >
-        {/* Model Selector Chip */}
-        <TouchableOpacity
-          style={[
-            styles.controlChip,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.borderColor,
-            },
-          ]}
-          onPress={() => setShowModelModal(true)}
-          activeOpacity={0.7}
-          accessibilityLabel="Выбрать модель ИИ"
-        >
-          <Feather
-            name={selectedProviderInfo.icon as any}
-            size={13}
-            color={colors.primaryAccent}
-          />
-          <Text
-            style={[styles.controlChipText, { color: colors.textColor }]}
-            numberOfLines={1}
-          >
-            {selectedProviderInfo.name}
-          </Text>
-          <Feather name="chevron-down" size={12} color={colors.textColorSecondary} />
-        </TouchableOpacity>
-
-        {/* Quick Personalization Status */}
-        <TouchableOpacity
-          style={[
-            styles.controlChip,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.borderColor,
-            },
-          ]}
-          onPress={() => setShowPersonalizationModal(true)}
-          activeOpacity={0.7}
-          accessibilityLabel="Персонализация"
-        >
-          <Feather
-            name="sliders"
-            size={13}
-            color={
-              personalization.enabled && personalization.instructions
-                ? colors.primaryAccent
-                : colors.textColorSecondary
-            }
-          />
-          <Text
-            style={[styles.controlChipText, { color: colors.textColorSecondary }]}
-            numberOfLines={1}
-          >
-            {personalization.enabled && personalization.instructions.trim()
-              ? 'Контекст: Вкл'
-              : 'Контекст'}
-          </Text>
-          <Feather name="chevron-right" size={12} color={colors.textColorSecondary} />
-        </TouchableOpacity>
-      </View>
-
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={renderMessage}
-        contentContainerStyle={styles.chatList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        ListFooterComponent={
-          isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={colors.primaryAccent} />
-              <Text style={[styles.loadingText, { color: colors.textColorSecondary }]}>
-                {t('aiTyping')}
-              </Text>
-            </View>
-          ) : messages.length <= 1 ? (
-            <View style={styles.suggestionsContainer}>
-              <Text style={[styles.suggestionsTitle, { color: colors.textColorSecondary }]}>
-                Быстрые подсказки:
-              </Text>
-              <View style={styles.chipsRow}>
-                {suggestions.map((s, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: colors.componentBackground,
-                        borderColor: colors.borderColor,
-                      },
-                    ]}
-                    onPress={() => handleSuggestionPress(s)}
-                  >
-                    <Text style={[styles.chipText, { color: colors.textColor }]}>
-                      {s}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          ) : null
-        }
-      />
-
-      {/* Image attachment preview pill */}
-      {attachedImage && (
+        {/* Unified Top Navigation Bar (ChatGPT / Claude Style) */}
         <View
           style={[
-            styles.attachedPill,
-            {
-              backgroundColor: colors.componentBackground,
-              borderColor: colors.borderColor,
-            },
-          ]}
-        >
-          <Image source={{ uri: attachedImage.uri }} style={styles.attachedThumbnail} />
-          <View style={styles.attachedPillInfo}>
-            <Text style={[styles.attachedPillTitle, { color: colors.textColor }]}>
-              Фото прикреплено
-            </Text>
-            <Text style={[styles.attachedPillSub, { color: colors.textColorSecondary }]}>
-              ИИ распознает задания и формулы
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => setAttachedImage(null)}
-            style={styles.attachedPillClose}
-          >
-            <Feather name="x" size={16} color={colors.textColorSecondary} />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Search Status Banner or Web Search Active Badge */}
-      {searchQueryStatus ? (
-        <View
-          style={[
-            styles.searchStatusStrip,
-            {
-              backgroundColor: colors.componentBackground,
-              borderTopColor: colors.borderColor,
-            },
-          ]}
-        >
-          <ActivityIndicator size="small" color={colors.primaryAccent} />
-          <Text
-            style={[styles.searchStatusText, { color: colors.textColor }]}
-            numberOfLines={1}
-          >
-            Ищем в интернете: «{searchQueryStatus}»
-          </Text>
-        </View>
-      ) : webSearchEnabled ? (
-        <View
-          style={[
-            styles.webSearchNoticeStrip,
-            {
-              backgroundColor: colors.componentBackground,
-              borderTopColor: colors.borderColor,
-            },
-          ]}
-        >
-          <View style={styles.webSearchNoticeLeft}>
-            <Feather name="globe" size={13} color={colors.primaryAccent} />
-            <Text
-              style={[styles.webSearchNoticeText, { color: colors.textColorSecondary }]}
-            >
-              Веб-поиск активен (поиск актуальных данных в сети)
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => setWebSearchEnabled(false)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Feather name="x" size={14} color={colors.textColorSecondary} />
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
-      {/* Input container */}
-      <View
-        style={[
-          styles.inputContainer,
-          {
-            backgroundColor: colors.componentBackground,
-            borderTopColor: colors.borderColor,
-          },
-        ]}
-      >
-        {/* Camera / Photo Button */}
-        <TouchableOpacity
-          style={[
-            styles.toolbarBtn,
-            {
-              backgroundColor: attachedImage
-                ? colors.primaryAccent + '22'
-                : colors.background,
-              borderColor: attachedImage
-                ? colors.primaryAccent
-                : colors.borderColor,
-            },
-          ]}
-          onPress={handlePickFromGallery}
-          accessibilityLabel="Attach photo"
-        >
-          <Feather
-            name="camera"
-            size={18}
-            color={attachedImage ? colors.primaryAccent : colors.textColorSecondary}
-          />
-        </TouchableOpacity>
-
-        {/* Web Search Button (ChatGPT style) */}
-        <TouchableOpacity
-          style={[
-            styles.toolbarBtn,
-            {
-              backgroundColor: webSearchEnabled
-                ? colors.primaryAccent + '22'
-                : colors.background,
-              borderColor: webSearchEnabled
-                ? colors.primaryAccent
-                : colors.borderColor,
-            },
-          ]}
-          onPress={() => setWebSearchEnabled((prev) => !prev)}
-          accessibilityLabel="Веб-поиск в интернете"
-        >
-          <Feather
-            name="globe"
-            size={18}
-            color={webSearchEnabled ? colors.primaryAccent : colors.textColorSecondary}
-          />
-        </TouchableOpacity>
-
-        <TextInput
-          style={[
-            styles.input,
+            styles.headerBar,
             {
               backgroundColor: colors.background,
-              color: colors.textColor,
-              borderColor: colors.borderColor,
+              borderBottomColor: colors.borderColor,
             },
           ]}
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder={attachedImage ? 'Добавьте вопрос к фото...' : 'Спросите у SmartStudyAI...'}
-          placeholderTextColor={colors.textColorSecondary}
-          multiline
-          maxLength={2000}
+        >
+          {/* Left: Back Button */}
+          <PressableScale
+            style={[styles.navIconButton, { backgroundColor: colors.componentBackground }]}
+            onPress={() => navigation.goBack()}
+            accessibilityLabel="Назад"
+          >
+            <Feather name="arrow-left" size={18} color={colors.textColor} />
+          </PressableScale>
+
+          {/* Center: Model Selector Capsule */}
+          <PressableScale
+            style={[
+              styles.modelCapsule,
+              {
+                backgroundColor: colors.componentBackground,
+                borderColor: colors.borderColor,
+              },
+            ]}
+            onPress={() => setShowModelModal(true)}
+            accessibilityLabel="Выбрать модель ИИ"
+          >
+            <Feather
+              name={selectedProviderInfo.icon as any}
+              size={13}
+              color={colors.primaryAccent}
+            />
+            <Text
+              style={[styles.modelCapsuleText, { color: colors.textColor }]}
+              numberOfLines={1}
+            >
+              {selectedProviderInfo.name}
+            </Text>
+            <Feather name="chevron-down" size={13} color={colors.textColorSecondary} />
+          </PressableScale>
+
+          {/* Right Action Group */}
+          <View style={styles.headerRightActions}>
+            {/* Personalization Context Button */}
+            <PressableScale
+              style={[
+                styles.navIconButton,
+                {
+                  backgroundColor: colors.componentBackground,
+                  borderColor: hasActivePersonalization
+                    ? colors.primaryAccent
+                    : 'transparent',
+                  borderWidth: hasActivePersonalization ? 1 : 0,
+                },
+              ]}
+              onPress={() => setShowPersonalizationModal(true)}
+              accessibilityLabel="Контекст и персонализация"
+            >
+              <Feather
+                name="sliders"
+                size={16}
+                color={hasActivePersonalization ? colors.primaryAccent : colors.textColorSecondary}
+              />
+              {hasActivePersonalization && (
+                <View style={[styles.activeDotBadge, { backgroundColor: colors.primaryAccent }]} />
+              )}
+            </PressableScale>
+
+            {/* Chat History Button */}
+            <PressableScale
+              style={[styles.navIconButton, { backgroundColor: colors.componentBackground }]}
+              onPress={() => setShowHistoryModal(true)}
+              accessibilityLabel="История диалогов"
+            >
+              <Feather name="clock" size={16} color={colors.textColorSecondary} />
+            </PressableScale>
+
+            {/* New Chat Button */}
+            <PressableScale
+              style={[styles.navIconButton, { backgroundColor: colors.componentBackground }]}
+              onPress={handleNewChat}
+              accessibilityLabel="Новый диалог"
+            >
+              <Feather name="plus" size={18} color={colors.primaryAccent} />
+            </PressableScale>
+          </View>
+        </View>
+
+        {/* Message Stream or Empty Welcome Hero */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMessage}
+          contentContainerStyle={[
+            styles.chatList,
+            isConversationEmpty && styles.chatListEmpty,
+          ]}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          ListHeaderComponent={isConversationEmpty ? renderWelcomeHero : null}
+          ListFooterComponent={
+            isLoading ? (
+              <View style={styles.loadingContainer}>
+                <View style={[styles.loadingBubble, { backgroundColor: colors.componentBackground, borderColor: colors.borderColor }]}>
+                  <ActivityIndicator size="small" color={colors.primaryAccent} />
+                  <Text style={[styles.loadingText, { color: colors.textColorSecondary }]}>
+                    {t('aiTyping')}
+                  </Text>
+                </View>
+              </View>
+            ) : null
+          }
         />
 
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            {
-              backgroundColor:
-                (inputText.trim().length > 0 || attachedImage) && !isLoading
-                  ? colors.primaryAccent
-                  : colors.borderColor,
-            },
-          ]}
-          onPress={() => handleSend()}
-          disabled={(!inputText.trim() && !attachedImage) || isLoading}
-          accessibilityLabel="Send message"
+        {/* Search Status Strip when active */}
+        {searchQueryStatus && (
+          <View
+            style={[
+              styles.searchStatusStrip,
+              {
+                backgroundColor: colors.componentBackground,
+                borderColor: colors.borderColor,
+              },
+            ]}
+          >
+            <ActivityIndicator size="small" color={colors.primaryAccent} />
+            <Text
+              style={[styles.searchStatusText, { color: colors.textColor }]}
+              numberOfLines={1}
+            >
+              Ищем в интернете: «{searchQueryStatus}»
+            </Text>
+          </View>
+        )}
+
+        {/* Modern Prompt Capsule (ChatGPT / Claude / Gemini Input Box) */}
+        <View style={styles.promptCapsuleWrapper}>
+          <View
+            style={[
+              styles.promptCapsule,
+              {
+                backgroundColor: colors.componentBackground,
+                borderColor: colors.borderColor,
+              },
+            ]}
+          >
+            {/* Attached Image Preview inside capsule */}
+            {attachedImage && (
+              <View
+                style={[
+                  styles.attachedImageRow,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.borderColor,
+                  },
+                ]}
+              >
+                <Image source={{ uri: attachedImage.uri }} style={styles.attachedImageThumb} />
+                <View style={styles.attachedImageTextWrap}>
+                  <Text style={[styles.attachedImageTitle, { color: colors.textColor }]}>
+                    Фото прикреплено
+                  </Text>
+                  <Text style={[styles.attachedImageSubtitle, { color: colors.textColorSecondary }]}>
+                    ИИ распознает задания и формулы
+                  </Text>
+                </View>
+                <PressableScale
+                  style={[styles.removeAttachedBtn, { backgroundColor: colors.componentBackground }]}
+                  onPress={() => setAttachedImage(null)}
+                  accessibilityLabel="Удалить фото"
+                >
+                  <Feather name="x" size={14} color={colors.textColorSecondary} />
+                </PressableScale>
+              </View>
+            )}
+
+            {/* Main Multi-line Input Field */}
+            <TextInput
+              style={[
+                styles.capsuleInput,
+                {
+                  color: colors.textColor,
+                },
+              ]}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder={
+                attachedImage
+                  ? 'Добавьте вопрос или пояснение к фото...'
+                  : 'Спросите что угодно или прикрепите задачу...'
+              }
+              placeholderTextColor={colors.textColorSecondary}
+              multiline
+              maxLength={2000}
+            />
+
+            {/* Bottom Capsule Toolbar: Attachments, Web Search, Send Button */}
+            <View style={styles.capsuleToolbar}>
+              {/* Left Utilities */}
+              <View style={styles.toolbarLeftGroup}>
+                {/* Photo / Media Attachment Button */}
+                <PressableScale
+                  style={[
+                    styles.toolbarIconBtn,
+                    {
+                      backgroundColor: attachedImage
+                        ? colors.primaryAccent + '18'
+                        : colors.surface,
+                      borderColor: attachedImage
+                        ? colors.primaryAccent
+                        : colors.borderColor,
+                    },
+                  ]}
+                  onPress={() => setShowAttachModal(true)}
+                  accessibilityLabel="Прикрепить фото"
+                >
+                  <Feather
+                    name="image"
+                    size={16}
+                    color={attachedImage ? colors.primaryAccent : colors.textColorSecondary}
+                  />
+                </PressableScale>
+
+                {/* Web Search Toggle Pill */}
+                <PressableScale
+                  style={[
+                    styles.webSearchPill,
+                    {
+                      backgroundColor: webSearchEnabled
+                        ? colors.primaryAccent + '18'
+                        : colors.surface,
+                      borderColor: webSearchEnabled
+                        ? colors.primaryAccent
+                        : colors.borderColor,
+                    },
+                  ]}
+                  onPress={() => setWebSearchEnabled((prev) => !prev)}
+                  accessibilityLabel="Веб-поиск в интернете"
+                >
+                  <Feather
+                    name="globe"
+                    size={13}
+                    color={webSearchEnabled ? colors.primaryAccent : colors.textColorSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.webSearchPillText,
+                      {
+                        color: webSearchEnabled
+                          ? colors.primaryAccent
+                          : colors.textColorSecondary,
+                        fontFamily: webSearchEnabled
+                          ? 'Inter_600SemiBold'
+                          : 'Inter_500Medium',
+                      },
+                    ]}
+                  >
+                    Поиск
+                  </Text>
+                </PressableScale>
+              </View>
+
+              {/* Right: Circular Send Button */}
+              <PressableScale
+                style={[
+                  styles.sendButtonCircle,
+                  {
+                    backgroundColor: isSendActive
+                      ? colors.primaryAccent
+                      : colors.surface,
+                    borderColor: isSendActive
+                      ? colors.primaryAccent
+                      : colors.borderColor,
+                  },
+                ]}
+                onPress={() => handleSend()}
+                disabled={!isSendActive}
+                accessibilityLabel="Отправить сообщение"
+              >
+                <Feather
+                  name="arrow-up"
+                  size={18}
+                  color={isSendActive ? '#FFFFFF' : colors.textColorSecondary + '77'}
+                />
+              </PressableScale>
+            </View>
+          </View>
+        </View>
+
+        {/* Attachment Source Selection Modal (Emil Kowalski Sheet Style) */}
+        <Modal
+          visible={showAttachModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowAttachModal(false)}
         >
-          <Feather name="send" size={18} color="#ffffff" />
-        </TouchableOpacity>
-      </View>
+          <View style={styles.modalBackdrop}>
+            <TouchableOpacity
+              style={styles.modalBackdropTouch}
+              activeOpacity={1}
+              onPress={() => setShowAttachModal(false)}
+            />
+            <View
+              style={[
+                styles.attachSheet,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderColor,
+                },
+              ]}
+            >
+              <View style={[styles.sheetHandle, { backgroundColor: colors.borderColor }]} />
 
-      {/* Chat History Modal */}
-      <ChatHistoryModal
-        visible={showHistoryModal}
-        sessions={sessions}
-        activeSessionId={activeSessionId}
-        onSelectSession={handleSelectSession}
-        onNewChat={handleNewChat}
-        onDeleteSession={handleDeleteSession}
-        onClose={() => setShowHistoryModal(false)}
-      />
+              <Text style={[styles.sheetTitle, { color: colors.textColor }]}>
+                Прикрепить изображение
+              </Text>
+              <Text style={[styles.sheetSubtitle, { color: colors.textColorSecondary }]}>
+                ИИ мгновенно решит задачу и распознает формулы
+              </Text>
 
-      {/* Personalization Modal */}
-      <PersonalizationModal
-        visible={showPersonalizationModal}
-        onClose={() => setShowPersonalizationModal(false)}
-        onSaved={(updated) => setPersonalization(updated)}
-      />
+              <View style={styles.sheetActionsList}>
+                <PressableScale
+                  style={[
+                    styles.sheetActionItem,
+                    {
+                      backgroundColor: colors.componentBackground,
+                      borderColor: colors.borderColor,
+                    },
+                  ]}
+                  onPress={handleLaunchCamera}
+                >
+                  <View style={[styles.sheetActionIcon, { backgroundColor: colors.primaryAccent + '15' }]}>
+                    <Feather name="camera" size={18} color={colors.primaryAccent} />
+                  </View>
+                  <View style={styles.sheetActionTexts}>
+                    <Text style={[styles.sheetActionLabel, { color: colors.textColor }]}>
+                      Сделать фото
+                    </Text>
+                    <Text style={[styles.sheetActionDesc, { color: colors.textColorSecondary }]}>
+                      Снять задание или страницу учебника на камеру
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={colors.textColorSecondary} />
+                </PressableScale>
 
-      {/* Model Selector Modal */}
-      <ModelSelectorModal
-        visible={showModelModal}
-        selectedProvider={selectedProvider}
-        onSelectProvider={handleSelectProvider}
-        onClose={() => setShowModelModal(false)}
-      />
-    </KeyboardAvoidingView>
+                <PressableScale
+                  style={[
+                    styles.sheetActionItem,
+                    {
+                      backgroundColor: colors.componentBackground,
+                      borderColor: colors.borderColor,
+                    },
+                  ]}
+                  onPress={handlePickFromGallery}
+                >
+                  <View style={[styles.sheetActionIcon, { backgroundColor: colors.primaryAccent + '15' }]}>
+                    <Feather name="image" size={18} color={colors.primaryAccent} />
+                  </View>
+                  <View style={styles.sheetActionTexts}>
+                    <Text style={[styles.sheetActionLabel, { color: colors.textColor }]}>
+                      Выбрать из галереи
+                    </Text>
+                    <Text style={[styles.sheetActionDesc, { color: colors.textColorSecondary }]}>
+                      Загрузить сохраненный скриншот или снимок
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={colors.textColorSecondary} />
+                </PressableScale>
+              </View>
+
+              <PressableScale
+                style={[
+                  styles.sheetCancelBtn,
+                  {
+                    backgroundColor: colors.componentBackground,
+                    borderColor: colors.borderColor,
+                  },
+                ]}
+                onPress={() => setShowAttachModal(false)}
+              >
+                <Text style={[styles.sheetCancelText, { color: colors.textColorSecondary }]}>
+                  Отмена
+                </Text>
+              </PressableScale>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Chat History Modal */}
+        <ChatHistoryModal
+          visible={showHistoryModal}
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelectSession={handleSelectSession}
+          onNewChat={handleNewChat}
+          onDeleteSession={handleDeleteSession}
+          onClose={() => setShowHistoryModal(false)}
+        />
+
+        {/* Personalization Modal */}
+        <PersonalizationModal
+          visible={showPersonalizationModal}
+          onClose={() => setShowPersonalizationModal(false)}
+          onSaved={(updated) => setPersonalization(updated)}
+        />
+
+        {/* Model Selector Modal */}
+        <ModelSelectorModal
+          visible={showModelModal}
+          selectedProvider={selectedProvider}
+          onSelectProvider={handleSelectProvider}
+          onClose={() => setShowModelModal(false)}
+        />
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
-  topControlsBar: {
+  headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 7,
+    paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 10,
+    gap: 8,
   },
-  controlChip: {
+  navIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modelCapsule: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 18,
     borderWidth: 1,
-    flexShrink: 1,
+    maxWidth: '52%',
   },
-  controlChipText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    maxWidth: 160,
+  modelCapsuleText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
   },
-  personalizationStrip: {
+  headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 6,
   },
-  personalizationStripText: {
-    flex: 1,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 11,
+  activeDotBadge: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   chatList: {
-    padding: 16,
-    paddingBottom: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
     gap: 12,
+  },
+  chatListEmpty: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  heroContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 10,
+  },
+  heroBadge: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  heroTitle: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 22,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  heroSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  promptCardsGrid: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  promptCard: {
+    width: '48%',
+    padding: 13,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 6,
+  },
+  promptCardIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  promptCardTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+  },
+  promptCardDesc: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 10,
+    lineHeight: 14,
   },
   messageRow: {
     flexDirection: 'row',
-    marginVertical: 4,
+    marginVertical: 3,
   },
   messageRowUser: {
     justifyContent: 'flex-end',
@@ -746,8 +1022,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 8,
-    paddingBottom: 4,
+    marginBottom: 6,
   },
   modelDot: {
     width: 6,
@@ -760,158 +1035,227 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   bubbleAttachedImage: {
-    width: 200,
+    width: 220,
     height: 140,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 8,
   },
   bubbleFooter: {
     marginTop: 8,
-    paddingTop: 6,
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
   copyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 2,
+    gap: 4,
+    paddingVertical: 3,
     paddingHorizontal: 6,
+    borderRadius: 6,
   },
   copyLabel: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Inter_500Medium',
     fontSize: 11,
   },
   loadingContainer: {
     flexDirection: 'row',
+    marginVertical: 6,
+  },
+  loadingBubble: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   loadingText: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-  },
-  suggestionsContainer: {
-    marginTop: 20,
-    gap: 10,
-  },
-  suggestionsTitle: {
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 13,
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-  },
-  attachedPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    marginHorizontal: 12,
-    marginBottom: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 10,
-  },
-  attachedThumbnail: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
-  },
-  attachedPillInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  attachedPillTitle: {
-    fontFamily: 'Poppins_600SemiBold',
     fontSize: 12,
-  },
-  attachedPillSub: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 10,
-  },
-  attachedPillClose: {
-    padding: 6,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 12,
-    gap: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  toolbarBtn: {
-    width: 40,
-    height: 44,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toolbarBtnText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  input: {
-    flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   searchStatusStrip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 16,
+    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   searchStatusText: {
     fontFamily: 'Inter_500Medium',
-    fontSize: 12,
+    fontSize: 11,
     flex: 1,
   },
-  webSearchNoticeStrip: {
+  promptCapsuleWrapper: {
+    paddingHorizontal: 14,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 12,
+    paddingTop: 4,
+  },
+  promptCapsule: {
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 8,
+    gap: 6,
+  },
+  attachedImageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  attachedImageThumb: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+  },
+  attachedImageTextWrap: {
+    flex: 1,
+  },
+  attachedImageTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+  },
+  attachedImageSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 9,
+  },
+  removeAttachedBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  capsuleInput: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    lineHeight: 20,
+    minHeight: 38,
+    maxHeight: 120,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    textAlignVertical: 'center',
+  },
+  capsuleToolbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 2,
   },
-  webSearchNoticeLeft: {
+  toolbarLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
+  },
+  toolbarIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webSearchPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+  },
+  webSearchPillText: {
+    fontSize: 11,
+  },
+  sendButtonCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalBackdropTouch: {
     flex: 1,
   },
-  webSearchNoticeText: {
+  attachSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    gap: 12,
+  },
+  sheetHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 6,
+  },
+  sheetTitle: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 17,
+  },
+  sheetSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    marginTop: -8,
+  },
+  sheetActionsList: {
+    gap: 10,
+    marginTop: 6,
+  },
+  sheetActionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+  },
+  sheetActionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetActionTexts: {
+    flex: 1,
+  },
+  sheetActionLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+  },
+  sheetActionDesc: {
     fontFamily: 'Inter_400Regular',
     fontSize: 11,
+    marginTop: 1,
+  },
+  sheetCancelBtn: {
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  sheetCancelText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
   },
 });

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
+import { PressableScale } from '../../../components/common/PressableScale';
 import {
   AIPersonalization,
   getPersonalization,
@@ -92,13 +93,13 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
               </View>
             </View>
 
-            <TouchableOpacity
+            <PressableScale
               onPress={onClose}
               style={styles.closeBtn}
               accessibilityLabel="Close"
             >
               <Feather name="x" size={20} color={colors.textColorSecondary} />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
 
           <ScrollView contentContainerStyle={styles.scrollBody} showsVerticalScrollIndicator={false}>
@@ -146,20 +147,19 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
 
           {/* Footer Save Button */}
           <View style={[styles.footer, { borderTopColor: colors.borderColor }]}>
-            <TouchableOpacity
+            <PressableScale
               style={[
                 styles.saveButton,
                 { backgroundColor: colors.primaryAccent },
               ]}
               onPress={handleSave}
               disabled={isSaving}
-              activeOpacity={0.8}
             >
               <Feather name="check" size={18} color="#ffffff" />
               <Text style={styles.saveButtonText}>
                 {isSaving ? 'Сохранение...' : 'Сохранить контекст'}
               </Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         </View>
       </KeyboardAvoidingView>
