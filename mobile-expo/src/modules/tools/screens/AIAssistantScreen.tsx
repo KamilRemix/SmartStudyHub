@@ -1,11 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TextInput,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -14,14 +13,16 @@ import {
   SafeAreaView,
   StatusBar,
   Animated,
+  Dimensions,
+  ScrollView,
+  TouchableWithoutFeedback,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../../theme';
 import { useI18n } from '../../../i18n';
+import { useAuth } from '../../../context/AuthContext';
 import { PressableScale } from '../../../components/common/PressableScale';
 import {
   sendChatMessage,
@@ -48,25 +49,54 @@ import {
   setActiveSessionId,
 } from '../../../services/aiChatStorageService';
 import { ChatMessageRenderer } from '../components/ChatMessageRenderer';
-import { ChatHistoryModal } from '../components/ChatHistoryModal';
 import { PersonalizationModal } from '../components/PersonalizationModal';
 import { ModelSelectorModal } from '../components/ModelSelectorModal';
-import { ToolsStackParamList } from '../../../navigation/types';
 
-type NavProp = NativeStackNavigationProp<ToolsStackParamList>;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 340);
 
+// ─── Helper: format date group label ────────────────────────────────────────
+function getDateGroup(timestamp: number): string {
+  const now = new Date();
+  const d = new Date(timestamp);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const yesterdayStart = todayStart - 86400000;
+  if (d.getTime() >= todayStart) return 'Сегодня';
+  if (d.getTime() >= yesterdayStart) return 'Вчера';
+  return 'Ранее';
+}
+
+function formatTime(timestamp: number): string {
+  if (!timestamp) return '';
+  const d = new Date(timestamp);
+  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+}
+
+// ─── Quick Prompt pills ──────────────────────────────────────────────────────
+const QUICK_PROMPTS = [
+  { icon: 'camera' as const, label: 'Камера', action: 'camera' },
+  { icon: 'book-open' as const, label: 'Объяснить тему', action: 'explain' },
+  { icon: 'award' as const, label: 'К тесту', action: 'test' },
+  { icon: 'check-circle' as const, label: 'Создать квиз', action: 'quiz' },
+];
+
+// ─── Main Screen ─────────────────────────────────────────────────────────────
 export const AIAssistantScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
-  const navigation = useNavigation<NavProp>();
   const { t } = useI18n();
+  const { user } = useAuth();
 
+  // Dynamic greeting
+  const firstName = user?.displayName?.split(' ')[0] ?? null;
+  const greeting = firstName ? `${firstName}, чем помочь?` : 'Задайте любой вопрос';
+
+  // State
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionIdState] = useState<string>('');
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showPersonalizationModal, setShowPersonalizationModal] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
   const [showAttachModal, setShowAttachModal] = useState(false);
@@ -76,8 +106,14 @@ export const AIAssistantScreen: React.FC = () => {
   const [personalization, setPersonalization] = useState<AIPersonalization>(DEFAULT_PERSONALIZATION);
   const [attachedImage, setAttachedImage] = useState<ChatImageAttachment | null>(null);
 
+  // Drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+
   const flatListRef = useRef<FlatList>(null);
 
+  // ─── Init ────────────────────────────────────────────────────────────────
   useEffect(() => {
     async function init() {
       const allSessions = await loadAllChatSessions();
@@ -92,12 +128,44 @@ export const AIAssistantScreen: React.FC = () => {
       setPersonalization(p);
       const prov = await getSelectedProvider();
       setSelectedProviderState(prov);
-      // Background health check & ping of all AI models
       pingAllProviders(false).catch(() => {});
     }
     init();
   }, []);
 
+  // ─── Drawer animation ────────────────────────────────────────────────────
+  const openDrawer = useCallback(() => {
+    setDrawerOpen(true);
+    Animated.parallel([
+      Animated.timing(drawerAnim, {
+        toValue: 0,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 1,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [drawerAnim, backdropAnim]);
+
+  const closeDrawer = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(drawerAnim, {
+        toValue: -DRAWER_WIDTH,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setDrawerOpen(false));
+  }, [drawerAnim, backdropAnim]);
+
+  // ─── Handlers ────────────────────────────────────────────────────────────
   const handleSelectProvider = async (providerId: AIProviderId) => {
     setSelectedProviderState(providerId);
     await setSelectedProvider(providerId);
@@ -112,7 +180,6 @@ export const AIAssistantScreen: React.FC = () => {
         quality: 0.7,
         base64: true,
       });
-
       if (!res.canceled && res.assets && res.assets[0]?.base64) {
         setAttachedImage({
           uri: res.assets[0].uri,
@@ -130,12 +197,7 @@ export const AIAssistantScreen: React.FC = () => {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) return;
-
-      const res = await ImagePicker.launchCameraAsync({
-        quality: 0.7,
-        base64: true,
-      });
-
+      const res = await ImagePicker.launchCameraAsync({ quality: 0.7, base64: true });
       if (!res.canceled && res.assets && res.assets[0]?.base64) {
         setAttachedImage({
           uri: res.assets[0].uri,
@@ -154,14 +216,14 @@ export const AIAssistantScreen: React.FC = () => {
     setSessions(updated);
     setActiveSessionIdState(newSession.id);
     setMessages(newSession.messages);
-    setShowHistoryModal(false);
+    closeDrawer();
   };
 
   const handleSelectSession = async (session: ChatSession) => {
     await setActiveSessionId(session.id);
     setActiveSessionIdState(session.id);
     setMessages(session.messages || []);
-    setShowHistoryModal(false);
+    closeDrawer();
   };
 
   const handleDeleteSession = async (sessionId: string) => {
@@ -170,6 +232,18 @@ export const AIAssistantScreen: React.FC = () => {
     if (activeSessionId === sessionId && updated.length > 0) {
       setActiveSessionIdState(updated[0].id);
       setMessages(updated[0].messages || []);
+    }
+  };
+
+  const handleQuickPrompt = (action: string) => {
+    if (action === 'camera') {
+      setShowAttachModal(true);
+    } else if (action === 'explain') {
+      handleSend('Объясни эту тему простыми словами с жизненными примерами');
+    } else if (action === 'test') {
+      handleSend('Помоги подготовиться к контрольной работе: составь план и ключевые вопросы');
+    } else if (action === 'quiz') {
+      handleSend('Создай интерактивный тест по любому предмету');
     }
   };
 
@@ -243,142 +317,95 @@ export const AIAssistantScreen: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const isConversationEmpty = messages.length === 0 || (messages.length === 1 && messages[0].id === 'welcome');
+  // ─── Derived ──────────────────────────────────────────────────────────────
+  const isConversationEmpty =
+    messages.length === 0 || (messages.length === 1 && messages[0].id === 'welcome');
 
   const selectedProviderInfo =
     AI_PROVIDERS.find((p) => p.id === selectedProvider) || AI_PROVIDERS[0];
 
-  const hasActivePersonalization = personalization.enabled && personalization.instructions.trim().length > 0;
+  const hasActivePersonalization =
+    personalization.enabled && personalization.instructions.trim().length > 0;
+
   const isSendActive = (inputText.trim().length > 0 || attachedImage !== null) && !isLoading;
 
+  // ─── Drawer sessions grouped by date ─────────────────────────────────────
+  type DrawerItem =
+    | { type: 'header'; label: string; key: string }
+    | { type: 'session'; session: ChatSession; key: string };
+
+  const drawerItems: DrawerItem[] = [];
+  let lastGroup = '';
+  sessions.forEach((s) => {
+    const group = getDateGroup(s.updatedAt || s.createdAt);
+    if (group !== lastGroup) {
+      drawerItems.push({ type: 'header', label: group, key: `h_${group}` });
+      lastGroup = group;
+    }
+    drawerItems.push({ type: 'session', session: s, key: s.id });
+  });
+
+  // ─── User avatar initials ────────────────────────────────────────────────
+  const userInitials = (() => {
+    const name = user?.displayName || '';
+    if (!name) return user?.email?.[0]?.toUpperCase() || '?';
+    return name
+      .split(' ')
+      .slice(0, 2)
+      .map((w: string) => w[0]?.toUpperCase() || '')
+      .join('');
+  })();
+
+  // ─── Render: Empty Hero ───────────────────────────────────────────────────
   const renderWelcomeHero = () => (
     <View style={styles.heroContainer}>
+      {/* Logo badge */}
       <View
         style={[
           styles.heroBadge,
-          {
-            backgroundColor: colors.primaryAccent + '15',
-            borderColor: colors.primaryAccent + '30',
-          },
+          { backgroundColor: colors.primaryAccent + '14', borderColor: colors.primaryAccent + '28' },
         ]}
       >
-        <Feather name="cpu" size={28} color={colors.primaryAccent} />
+        <Feather name="cpu" size={26} color={colors.primaryAccent} />
       </View>
 
-      <Text style={[styles.heroTitle, { color: colors.textColor }]}>
-        SmartStudy AI
-      </Text>
+      {/* Greeting */}
+      <Text style={[styles.heroTitle, { color: colors.textColor }]}>{greeting}</Text>
       <Text style={[styles.heroSubtitle, { color: colors.textColorSecondary }]}>
-        Персональный академический ассистент
+        SmartStudy AI — персональный академический ассистент
       </Text>
 
-      {/* Suggested prompts in modern 2x2 grid */}
-      <View style={styles.promptCardsGrid}>
-        <PressableScale
-          style={[
-            styles.promptCard,
-            {
-              backgroundColor: colors.componentBackground,
-              borderColor: colors.borderColor,
-            },
-          ]}
-          onPress={() => setShowAttachModal(true)}
-          accessibilityLabel="Решить задачу по фото"
-        >
-          <View style={[styles.promptCardIconWrap, { backgroundColor: colors.primaryAccent + '15' }]}>
-            <Feather name="camera" size={16} color={colors.primaryAccent} />
-          </View>
-          <Text style={[styles.promptCardTitle, { color: colors.textColor }]}>
-            Решить по фото
-          </Text>
-          <Text style={[styles.promptCardDesc, { color: colors.textColorSecondary }]}>
-            Сфотографируйте задание или сложную формулу
-          </Text>
-        </PressableScale>
-
-        <PressableScale
-          style={[
-            styles.promptCard,
-            {
-              backgroundColor: colors.componentBackground,
-              borderColor: colors.borderColor,
-            },
-          ]}
-          onPress={() => handleSend('Объясни эту тему простыми словами с жизненными примерами')}
-          accessibilityLabel="Объяснить тему"
-        >
-          <View style={[styles.promptCardIconWrap, { backgroundColor: colors.primaryAccent + '15' }]}>
-            <Feather name="book-open" size={16} color={colors.primaryAccent} />
-          </View>
-          <Text style={[styles.promptCardTitle, { color: colors.textColor }]}>
-            Объяснить тему
-          </Text>
-          <Text style={[styles.promptCardDesc, { color: colors.textColorSecondary }]}>
-            Простыми словами и понятными примерами
-          </Text>
-        </PressableScale>
-
-        <PressableScale
-          style={[
-            styles.promptCard,
-            {
-              backgroundColor: colors.componentBackground,
-              borderColor: colors.borderColor,
-            },
-          ]}
-          onPress={() => handleSend('Помоги подготовиться к контрольной работе: составь план и вопросы')}
-          accessibilityLabel="Подготовка к контрольной"
-        >
-          <View style={[styles.promptCardIconWrap, { backgroundColor: colors.primaryAccent + '15' }]}>
-            <Feather name="award" size={16} color={colors.primaryAccent} />
-          </View>
-          <Text style={[styles.promptCardTitle, { color: colors.textColor }]}>
-            Подготовка к тесту
-          </Text>
-          <Text style={[styles.promptCardDesc, { color: colors.textColorSecondary }]}>
-            Главные тезисы и вопросы для самопроверки
-          </Text>
-        </PressableScale>
-
-        <PressableScale
-          style={[
-            styles.promptCard,
-            {
-              backgroundColor: colors.componentBackground,
-              borderColor: colors.borderColor,
-            },
-          ]}
-          onPress={() => navigation.navigate('QuizGenerator')}
-          accessibilityLabel="Сгенерировать тест"
-        >
-          <View style={[styles.promptCardIconWrap, { backgroundColor: colors.primaryAccent + '15' }]}>
-            <Feather name="check-circle" size={16} color={colors.primaryAccent} />
-          </View>
-          <Text style={[styles.promptCardTitle, { color: colors.textColor }]}>
-            Создать квиз
-          </Text>
-          <Text style={[styles.promptCardDesc, { color: colors.textColorSecondary }]}>
-            Интерактивный тест по любому предмету
-          </Text>
-        </PressableScale>
-      </View>
+      {/* Quick Prompt Pills */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.pillsScroll}
+        contentContainerStyle={styles.pillsContent}
+      >
+        {QUICK_PROMPTS.map((p) => (
+          <PressableScale
+            key={p.action}
+            style={[
+              styles.pill,
+              { backgroundColor: colors.componentBackground, borderColor: colors.borderColor },
+            ]}
+            onPress={() => handleQuickPrompt(p.action)}
+            accessibilityLabel={p.label}
+          >
+            <Feather name={p.icon} size={13} color={colors.primaryAccent} />
+            <Text style={[styles.pillText, { color: colors.textColor }]}>{p.label}</Text>
+          </PressableScale>
+        ))}
+      </ScrollView>
     </View>
   );
 
+  // ─── Render: Message bubble ───────────────────────────────────────────────
   const renderMessage = ({ item }: { item: ChatMessage }) => {
-    // Hide the initial 'welcome' message from raw bubble list when showing modern layout
-    if (item.id === 'welcome' && isConversationEmpty) {
-      return null;
-    }
-
+    if (item.id === 'welcome' && isConversationEmpty) return null;
     const isUser = item.role === 'user';
     return (
-      <View
-        style={[
-          styles.messageRow,
-          isUser ? styles.messageRowUser : styles.messageRowModel,
-        ]}
-      >
+      <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowModel]}>
         <View
           style={[
             styles.bubble,
@@ -386,14 +413,11 @@ export const AIAssistantScreen: React.FC = () => {
               ? [styles.userBubble, { backgroundColor: colors.primaryAccent }]
               : [
                   styles.modelBubble,
-                  {
-                    backgroundColor: colors.componentBackground,
-                    borderColor: colors.borderColor,
-                  },
+                  { backgroundColor: colors.componentBackground, borderColor: colors.borderColor },
                 ],
           ]}
         >
-          {/* Assistant Model Badge */}
+          {/* Assistant model badge */}
           {!isUser && (
             <View style={styles.modelHeader}>
               <View style={[styles.modelDot, { backgroundColor: colors.primaryAccent }]} />
@@ -403,19 +427,19 @@ export const AIAssistantScreen: React.FC = () => {
             </View>
           )}
 
-          {/* User Attached Image thumbnail in bubble */}
+          {/* Attached image thumbnail */}
           {item.imageUri && (
             <Image source={{ uri: item.imageUri }} style={styles.bubbleAttachedImage} />
           )}
 
-          {/* Render parsed text, code blocks, math formulas, and web sources */}
+          {/* Message content */}
           <ChatMessageRenderer
             content={item.content}
             isUser={isUser}
             webSources={item.webSources}
           />
 
-          {/* Bottom Actions for Model messages */}
+          {/* Copy action for model messages */}
           {!isUser && item.id !== 'welcome' && (
             <View style={styles.bubbleFooter}>
               <PressableScale
@@ -433,9 +457,7 @@ export const AIAssistantScreen: React.FC = () => {
                     styles.copyLabel,
                     {
                       color:
-                        copiedId === item.id
-                          ? colors.primaryAccent
-                          : colors.textColorSecondary,
+                        copiedId === item.id ? colors.primaryAccent : colors.textColorSecondary,
                     },
                   ]}
                 >
@@ -449,44 +471,96 @@ export const AIAssistantScreen: React.FC = () => {
     );
   };
 
+  // ─── Render: Drawer session item ──────────────────────────────────────────
+  const renderDrawerItem = ({ item }: { item: DrawerItem }) => {
+    if (item.type === 'header') {
+      return (
+        <Text style={[styles.drawerGroupLabel, { color: colors.textColorSecondary }]}>
+          {item.label}
+        </Text>
+      );
+    }
+    const { session } = item;
+    const isActive = session.id === activeSessionId;
+    return (
+      <View
+        style={[
+          styles.drawerSessionItem,
+          {
+            backgroundColor: isActive ? colors.primaryAccent + '12' : 'transparent',
+            borderColor: isActive ? colors.primaryAccent + '30' : 'transparent',
+          },
+        ]}
+      >
+        <PressableScale
+          style={styles.drawerSessionMain}
+          onPress={() => handleSelectSession(session)}
+        >
+          <Feather
+            name="message-square"
+            size={14}
+            color={isActive ? colors.primaryAccent : colors.textColorSecondary}
+          />
+          <View style={styles.drawerSessionInfo}>
+            <Text
+              style={[
+                styles.drawerSessionTitle,
+                { color: isActive ? colors.primaryAccent : colors.textColor },
+              ]}
+              numberOfLines={1}
+            >
+              {session.title || 'Новый диалог'}
+            </Text>
+            <Text style={[styles.drawerSessionTime, { color: colors.textColorSecondary }]}>
+              {formatTime(session.updatedAt || session.createdAt)}
+            </Text>
+          </View>
+        </PressableScale>
+        <PressableScale
+          style={styles.drawerDeleteBtn}
+          onPress={() => handleDeleteSession(session.id)}
+          accessibilityLabel="Удалить чат"
+        >
+          <Feather name="trash-2" size={14} color={colors.textColorSecondary} />
+        </PressableScale>
+      </View>
+    );
+  };
+
+  // ─── Main render ──────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={colors.background}
       />
+
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
       >
-        {/* Unified Top Navigation Bar (ChatGPT / Claude Style) */}
+        {/* ── Header ── */}
         <View
           style={[
             styles.headerBar,
-            {
-              backgroundColor: colors.background,
-              borderBottomColor: colors.borderColor,
-            },
+            { backgroundColor: colors.background, borderBottomColor: colors.borderColor },
           ]}
         >
-          {/* Left: Back Button */}
+          {/* Left: Hamburger */}
           <PressableScale
-            style={[styles.navIconButton, { backgroundColor: colors.componentBackground }]}
-            onPress={() => navigation.goBack()}
-            accessibilityLabel="Назад"
+            style={[styles.navIconBtn, { backgroundColor: colors.componentBackground }]}
+            onPress={openDrawer}
+            accessibilityLabel="Открыть меню"
           >
-            <Feather name="arrow-left" size={18} color={colors.textColor} />
+            <Feather name="menu" size={18} color={colors.textColor} />
           </PressableScale>
 
-          {/* Center: Model Selector Capsule */}
+          {/* Center: Model selector */}
           <PressableScale
             style={[
               styles.modelCapsule,
-              {
-                backgroundColor: colors.componentBackground,
-                borderColor: colors.borderColor,
-              },
+              { backgroundColor: colors.componentBackground, borderColor: colors.borderColor },
             ]}
             onPress={() => setShowModelModal(true)}
             accessibilityLabel="Выбрать модель ИИ"
@@ -505,54 +579,17 @@ export const AIAssistantScreen: React.FC = () => {
             <Feather name="chevron-down" size={13} color={colors.textColorSecondary} />
           </PressableScale>
 
-          {/* Right Action Group */}
-          <View style={styles.headerRightActions}>
-            {/* Personalization Context Button */}
-            <PressableScale
-              style={[
-                styles.navIconButton,
-                {
-                  backgroundColor: colors.componentBackground,
-                  borderColor: hasActivePersonalization
-                    ? colors.primaryAccent
-                    : 'transparent',
-                  borderWidth: hasActivePersonalization ? 1 : 0,
-                },
-              ]}
-              onPress={() => setShowPersonalizationModal(true)}
-              accessibilityLabel="Контекст и персонализация"
-            >
-              <Feather
-                name="sliders"
-                size={16}
-                color={hasActivePersonalization ? colors.primaryAccent : colors.textColorSecondary}
-              />
-              {hasActivePersonalization && (
-                <View style={[styles.activeDotBadge, { backgroundColor: colors.primaryAccent }]} />
-              )}
-            </PressableScale>
-
-            {/* Chat History Button */}
-            <PressableScale
-              style={[styles.navIconButton, { backgroundColor: colors.componentBackground }]}
-              onPress={() => setShowHistoryModal(true)}
-              accessibilityLabel="История диалогов"
-            >
-              <Feather name="clock" size={16} color={colors.textColorSecondary} />
-            </PressableScale>
-
-            {/* New Chat Button */}
-            <PressableScale
-              style={[styles.navIconButton, { backgroundColor: colors.componentBackground }]}
-              onPress={handleNewChat}
-              accessibilityLabel="Новый диалог"
-            >
-              <Feather name="plus" size={18} color={colors.primaryAccent} />
-            </PressableScale>
-          </View>
+          {/* Right: New chat */}
+          <PressableScale
+            style={[styles.navIconBtn, { backgroundColor: colors.componentBackground }]}
+            onPress={handleNewChat}
+            accessibilityLabel="Новый чат"
+          >
+            <Feather name="edit-2" size={17} color={colors.primaryAccent} />
+          </PressableScale>
         </View>
 
-        {/* Message Stream or Empty Welcome Hero */}
+        {/* ── Messages ── */}
         <FlatList
           ref={flatListRef}
           data={messages}
@@ -567,7 +604,15 @@ export const AIAssistantScreen: React.FC = () => {
           ListFooterComponent={
             isLoading ? (
               <View style={styles.loadingContainer}>
-                <View style={[styles.loadingBubble, { backgroundColor: colors.componentBackground, borderColor: colors.borderColor }]}>
+                <View
+                  style={[
+                    styles.loadingBubble,
+                    {
+                      backgroundColor: colors.componentBackground,
+                      borderColor: colors.borderColor,
+                    },
+                  ]}
+                >
                   <ActivityIndicator size="small" color={colors.primaryAccent} />
                   <Text style={[styles.loadingText, { color: colors.textColorSecondary }]}>
                     {t('aiTyping')}
@@ -578,15 +623,12 @@ export const AIAssistantScreen: React.FC = () => {
           }
         />
 
-        {/* Search Status Strip when active */}
+        {/* ── Web search status strip ── */}
         {searchQueryStatus && (
           <View
             style={[
               styles.searchStatusStrip,
-              {
-                backgroundColor: colors.componentBackground,
-                borderColor: colors.borderColor,
-              },
+              { backgroundColor: colors.componentBackground, borderColor: colors.borderColor },
             ]}
           >
             <ActivityIndicator size="small" color={colors.primaryAccent} />
@@ -599,39 +641,33 @@ export const AIAssistantScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Modern Prompt Capsule (ChatGPT / Claude / Gemini Input Box) */}
-        <View style={styles.promptCapsuleWrapper}>
+        {/* ── Input bar ── */}
+        <View style={styles.inputWrapper}>
           <View
             style={[
-              styles.promptCapsule,
-              {
-                backgroundColor: colors.componentBackground,
-                borderColor: colors.borderColor,
-              },
+              styles.inputCapsule,
+              { backgroundColor: colors.componentBackground, borderColor: colors.borderColor },
             ]}
           >
-            {/* Attached Image Preview inside capsule */}
+            {/* Attached image preview */}
             {attachedImage && (
               <View
                 style={[
-                  styles.attachedImageRow,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.borderColor,
-                  },
+                  styles.attachedRow,
+                  { backgroundColor: colors.surface, borderColor: colors.borderColor },
                 ]}
               >
-                <Image source={{ uri: attachedImage.uri }} style={styles.attachedImageThumb} />
-                <View style={styles.attachedImageTextWrap}>
-                  <Text style={[styles.attachedImageTitle, { color: colors.textColor }]}>
+                <Image source={{ uri: attachedImage.uri }} style={styles.attachedThumb} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.attachedTitle, { color: colors.textColor }]}>
                     Фото прикреплено
                   </Text>
-                  <Text style={[styles.attachedImageSubtitle, { color: colors.textColorSecondary }]}>
+                  <Text style={[styles.attachedSub, { color: colors.textColorSecondary }]}>
                     ИИ распознает задания и формулы
                   </Text>
                 </View>
                 <PressableScale
-                  style={[styles.removeAttachedBtn, { backgroundColor: colors.componentBackground }]}
+                  style={[styles.attachedRemoveBtn, { backgroundColor: colors.componentBackground }]}
                   onPress={() => setAttachedImage(null)}
                   accessibilityLabel="Удалить фото"
                 >
@@ -640,31 +676,25 @@ export const AIAssistantScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Main Multi-line Input Field */}
+            {/* Text input */}
             <TextInput
-              style={[
-                styles.capsuleInput,
-                {
-                  color: colors.textColor,
-                },
-              ]}
+              style={[styles.textInput, { color: colors.textColor }]}
               value={inputText}
               onChangeText={setInputText}
               placeholder={
                 attachedImage
-                  ? 'Добавьте вопрос или пояснение к фото...'
-                  : 'Спросите что угодно или прикрепите задачу...'
+                  ? 'Добавьте вопрос к фото...'
+                  : 'Спросите что угодно...'
               }
               placeholderTextColor={colors.textColorSecondary}
               multiline
               maxLength={2000}
             />
 
-            {/* Bottom Capsule Toolbar: Attachments, Web Search, Send Button */}
-            <View style={styles.capsuleToolbar}>
-              {/* Left Utilities */}
-              <View style={styles.toolbarLeftGroup}>
-                {/* Photo / Media Attachment Button */}
+            {/* Toolbar: attach | web search | send */}
+            <View style={styles.inputToolbar}>
+              <View style={styles.inputToolbarLeft}>
+                {/* Attach button */}
                 <PressableScale
                   style={[
                     styles.toolbarIconBtn,
@@ -672,9 +702,7 @@ export const AIAssistantScreen: React.FC = () => {
                       backgroundColor: attachedImage
                         ? colors.primaryAccent + '18'
                         : colors.surface,
-                      borderColor: attachedImage
-                        ? colors.primaryAccent
-                        : colors.borderColor,
+                      borderColor: attachedImage ? colors.primaryAccent : colors.borderColor,
                     },
                   ]}
                   onPress={() => setShowAttachModal(true)}
@@ -687,7 +715,7 @@ export const AIAssistantScreen: React.FC = () => {
                   />
                 </PressableScale>
 
-                {/* Web Search Toggle Pill */}
+                {/* Web search pill */}
                 <PressableScale
                   style={[
                     styles.webSearchPill,
@@ -695,13 +723,11 @@ export const AIAssistantScreen: React.FC = () => {
                       backgroundColor: webSearchEnabled
                         ? colors.primaryAccent + '18'
                         : colors.surface,
-                      borderColor: webSearchEnabled
-                        ? colors.primaryAccent
-                        : colors.borderColor,
+                      borderColor: webSearchEnabled ? colors.primaryAccent : colors.borderColor,
                     },
                   ]}
-                  onPress={() => setWebSearchEnabled((prev) => !prev)}
-                  accessibilityLabel="Веб-поиск в интернете"
+                  onPress={() => setWebSearchEnabled((v) => !v)}
+                  accessibilityLabel="Поиск в интернете"
                 >
                   <Feather
                     name="globe"
@@ -710,38 +736,30 @@ export const AIAssistantScreen: React.FC = () => {
                   />
                   <Text
                     style={[
-                      styles.webSearchPillText,
+                      styles.webSearchText,
                       {
-                        color: webSearchEnabled
-                          ? colors.primaryAccent
-                          : colors.textColorSecondary,
-                        fontFamily: webSearchEnabled
-                          ? 'Inter_600SemiBold'
-                          : 'Inter_500Medium',
+                        color: webSearchEnabled ? colors.primaryAccent : colors.textColorSecondary,
+                        fontFamily: webSearchEnabled ? 'Inter_600SemiBold' : 'Inter_400Regular',
                       },
                     ]}
                   >
-                    Поиск
+                    Поиск в сети
                   </Text>
                 </PressableScale>
               </View>
 
-              {/* Right: Circular Send Button */}
+              {/* Send button */}
               <PressableScale
                 style={[
-                  styles.sendButtonCircle,
+                  styles.sendBtn,
                   {
-                    backgroundColor: isSendActive
-                      ? colors.primaryAccent
-                      : colors.surface,
-                    borderColor: isSendActive
-                      ? colors.primaryAccent
-                      : colors.borderColor,
+                    backgroundColor: isSendActive ? colors.primaryAccent : colors.surface,
+                    borderColor: isSendActive ? colors.primaryAccent : colors.borderColor,
                   },
                 ]}
                 onPress={() => handleSend()}
                 disabled={!isSendActive}
-                accessibilityLabel="Отправить сообщение"
+                accessibilityLabel="Отправить"
               >
                 <Feather
                   name="arrow-up"
@@ -752,153 +770,298 @@ export const AIAssistantScreen: React.FC = () => {
             </View>
           </View>
         </View>
+      </KeyboardAvoidingView>
 
-        {/* Attachment Source Selection Modal (Emil Kowalski Sheet Style) */}
-        <Modal
-          visible={showAttachModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowAttachModal(false)}
-        >
-          <View style={styles.modalBackdrop}>
-            <TouchableOpacity
-              style={styles.modalBackdropTouch}
-              activeOpacity={1}
-              onPress={() => setShowAttachModal(false)}
+      {/* ═══ Side Drawer ═══ */}
+      {drawerOpen && (
+        <>
+          {/* Backdrop */}
+          <TouchableWithoutFeedback onPress={closeDrawer} accessibilityLabel="Закрыть меню">
+            <Animated.View
+              style={[
+                styles.drawerBackdrop,
+                { opacity: backdropAnim },
+              ]}
             />
+          </TouchableWithoutFeedback>
+
+          {/* Drawer panel */}
+          <Animated.View
+            style={[
+              styles.drawer,
+              {
+                backgroundColor: colors.componentBackground,
+                borderRightColor: colors.borderColor,
+                transform: [{ translateX: drawerAnim }],
+                width: DRAWER_WIDTH,
+              },
+            ]}
+          >
+            {/* Drawer header */}
+            <View
+              style={[styles.drawerHeader, { borderBottomColor: colors.borderColor }]}
+            >
+              <View style={styles.drawerHeaderLeft}>
+                <View
+                  style={[
+                    styles.drawerLogoWrap,
+                    { backgroundColor: colors.primaryAccent + '16' },
+                  ]}
+                >
+                  <Feather name="cpu" size={16} color={colors.primaryAccent} />
+                </View>
+                <Text style={[styles.drawerTitle, { color: colors.textColor }]}>
+                  SmartStudy AI
+                </Text>
+              </View>
+              <PressableScale
+                onPress={closeDrawer}
+                style={styles.drawerCloseBtn}
+                accessibilityLabel="Закрыть меню"
+              >
+                <Feather name="x" size={20} color={colors.textColorSecondary} />
+              </PressableScale>
+            </View>
+
+            {/* New Chat button */}
+            <View style={styles.drawerNewChatWrap}>
+              <PressableScale
+                style={[styles.drawerNewChatBtn, { backgroundColor: colors.primaryAccent }]}
+                onPress={handleNewChat}
+              >
+                <Feather name="plus" size={16} color="#fff" />
+                <Text style={styles.drawerNewChatText}>Новый чат</Text>
+              </PressableScale>
+            </View>
+
+            {/* Session list */}
+            <FlatList
+              data={drawerItems}
+              keyExtractor={(item) => item.key}
+              renderItem={renderDrawerItem}
+              contentContainerStyle={styles.drawerListContent}
+              showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              ListEmptyComponent={
+                <View style={styles.drawerEmptyWrap}>
+                  <Feather name="inbox" size={28} color={colors.textColorSecondary} />
+                  <Text style={[styles.drawerEmptyText, { color: colors.textColorSecondary }]}>
+                    История пуста
+                  </Text>
+                </View>
+              }
+            />
+
+            {/* Bottom profile block */}
             <View
               style={[
-                styles.attachSheet,
+                styles.drawerProfile,
                 {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.borderColor,
+                  borderTopColor: colors.borderColor,
+                  backgroundColor: colors.componentBackground,
                 },
               ]}
             >
-              <View style={[styles.sheetHandle, { backgroundColor: colors.borderColor }]} />
-
-              <Text style={[styles.sheetTitle, { color: colors.textColor }]}>
-                Прикрепить изображение
-              </Text>
-              <Text style={[styles.sheetSubtitle, { color: colors.textColorSecondary }]}>
-                ИИ мгновенно решит задачу и распознает формулы
-              </Text>
-
-              <View style={styles.sheetActionsList}>
-                <PressableScale
-                  style={[
-                    styles.sheetActionItem,
-                    {
-                      backgroundColor: colors.componentBackground,
-                      borderColor: colors.borderColor,
-                    },
-                  ]}
-                  onPress={handleLaunchCamera}
-                >
-                  <View style={[styles.sheetActionIcon, { backgroundColor: colors.primaryAccent + '15' }]}>
-                    <Feather name="camera" size={18} color={colors.primaryAccent} />
-                  </View>
-                  <View style={styles.sheetActionTexts}>
-                    <Text style={[styles.sheetActionLabel, { color: colors.textColor }]}>
-                      Сделать фото
-                    </Text>
-                    <Text style={[styles.sheetActionDesc, { color: colors.textColorSecondary }]}>
-                      Снять задание или страницу учебника на камеру
-                    </Text>
-                  </View>
-                  <Feather name="chevron-right" size={16} color={colors.textColorSecondary} />
-                </PressableScale>
-
-                <PressableScale
-                  style={[
-                    styles.sheetActionItem,
-                    {
-                      backgroundColor: colors.componentBackground,
-                      borderColor: colors.borderColor,
-                    },
-                  ]}
-                  onPress={handlePickFromGallery}
-                >
-                  <View style={[styles.sheetActionIcon, { backgroundColor: colors.primaryAccent + '15' }]}>
-                    <Feather name="image" size={18} color={colors.primaryAccent} />
-                  </View>
-                  <View style={styles.sheetActionTexts}>
-                    <Text style={[styles.sheetActionLabel, { color: colors.textColor }]}>
-                      Выбрать из галереи
-                    </Text>
-                    <Text style={[styles.sheetActionDesc, { color: colors.textColorSecondary }]}>
-                      Загрузить сохраненный скриншот или снимок
-                    </Text>
-                  </View>
-                  <Feather name="chevron-right" size={16} color={colors.textColorSecondary} />
-                </PressableScale>
+              {/* Avatar */}
+              <View
+                style={[
+                  styles.drawerAvatar,
+                  { backgroundColor: colors.primaryAccent + '20' },
+                ]}
+              >
+                {user?.photoURL ? (
+                  <Image
+                    source={{ uri: user.photoURL }}
+                    style={styles.drawerAvatarImg}
+                  />
+                ) : (
+                  <Text style={[styles.drawerAvatarText, { color: colors.primaryAccent }]}>
+                    {userInitials}
+                  </Text>
+                )}
               </View>
 
+              {/* Name / email */}
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text
+                  style={[styles.drawerProfileName, { color: colors.textColor }]}
+                  numberOfLines={1}
+                >
+                  {user?.displayName || user?.email || 'Гость'}
+                </Text>
+                {user?.displayName && user?.email && (
+                  <Text
+                    style={[styles.drawerProfileEmail, { color: colors.textColorSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {user.email}
+                  </Text>
+                )}
+              </View>
+
+              {/* Personalization button */}
               <PressableScale
                 style={[
-                  styles.sheetCancelBtn,
+                  styles.drawerProfileBtn,
+                  {
+                    backgroundColor: hasActivePersonalization
+                      ? colors.primaryAccent + '14'
+                      : colors.surface,
+                    borderColor: hasActivePersonalization
+                      ? colors.primaryAccent + '40'
+                      : colors.borderColor,
+                  },
+                ]}
+                onPress={() => {
+                  closeDrawer();
+                  setTimeout(() => setShowPersonalizationModal(true), 280);
+                }}
+                accessibilityLabel="Персонализация"
+              >
+                <Feather
+                  name="sliders"
+                  size={15}
+                  color={
+                    hasActivePersonalization ? colors.primaryAccent : colors.textColorSecondary
+                  }
+                />
+              </PressableScale>
+            </View>
+          </Animated.View>
+        </>
+      )}
+
+      {/* ═══ Attach Modal ═══ */}
+      <Modal
+        visible={showAttachModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAttachModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setShowAttachModal(false)}
+          />
+          <View
+            style={[
+              styles.attachSheet,
+              { backgroundColor: colors.surface, borderColor: colors.borderColor },
+            ]}
+          >
+            <View style={[styles.sheetHandle, { backgroundColor: colors.borderColor }]} />
+            <Text style={[styles.sheetTitle, { color: colors.textColor }]}>
+              Прикрепить изображение
+            </Text>
+            <Text style={[styles.sheetSub, { color: colors.textColorSecondary }]}>
+              ИИ мгновенно решит задачу и распознает формулы
+            </Text>
+
+            <View style={styles.sheetActions}>
+              {/* Camera */}
+              <PressableScale
+                style={[
+                  styles.sheetActionItem,
                   {
                     backgroundColor: colors.componentBackground,
                     borderColor: colors.borderColor,
                   },
                 ]}
-                onPress={() => setShowAttachModal(false)}
+                onPress={handleLaunchCamera}
               >
-                <Text style={[styles.sheetCancelText, { color: colors.textColorSecondary }]}>
-                  Отмена
-                </Text>
+                <View
+                  style={[styles.sheetActionIcon, { backgroundColor: colors.primaryAccent + '15' }]}
+                >
+                  <Feather name="camera" size={18} color={colors.primaryAccent} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.sheetActionLabel, { color: colors.textColor }]}>
+                    Сделать фото
+                  </Text>
+                  <Text style={[styles.sheetActionDesc, { color: colors.textColorSecondary }]}>
+                    Снять задание на камеру
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={colors.textColorSecondary} />
+              </PressableScale>
+
+              {/* Gallery */}
+              <PressableScale
+                style={[
+                  styles.sheetActionItem,
+                  {
+                    backgroundColor: colors.componentBackground,
+                    borderColor: colors.borderColor,
+                  },
+                ]}
+                onPress={handlePickFromGallery}
+              >
+                <View
+                  style={[styles.sheetActionIcon, { backgroundColor: colors.primaryAccent + '15' }]}
+                >
+                  <Feather name="image" size={18} color={colors.primaryAccent} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.sheetActionLabel, { color: colors.textColor }]}>
+                    Выбрать из галереи
+                  </Text>
+                  <Text style={[styles.sheetActionDesc, { color: colors.textColorSecondary }]}>
+                    Загрузить скриншот или снимок
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={colors.textColorSecondary} />
               </PressableScale>
             </View>
+
+            <PressableScale
+              style={[
+                styles.sheetCancelBtn,
+                { backgroundColor: colors.componentBackground, borderColor: colors.borderColor },
+              ]}
+              onPress={() => setShowAttachModal(false)}
+            >
+              <Text style={[styles.sheetCancelText, { color: colors.textColorSecondary }]}>
+                Отмена
+              </Text>
+            </PressableScale>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* Chat History Modal */}
-        <ChatHistoryModal
-          visible={showHistoryModal}
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          onSelectSession={handleSelectSession}
-          onNewChat={handleNewChat}
-          onDeleteSession={handleDeleteSession}
-          onClose={() => setShowHistoryModal(false)}
-        />
+      {/* Personalization Modal */}
+      <PersonalizationModal
+        visible={showPersonalizationModal}
+        onClose={() => setShowPersonalizationModal(false)}
+        onSaved={(updated) => setPersonalization(updated)}
+      />
 
-        {/* Personalization Modal */}
-        <PersonalizationModal
-          visible={showPersonalizationModal}
-          onClose={() => setShowPersonalizationModal(false)}
-          onSaved={(updated) => setPersonalization(updated)}
-        />
-
-        {/* Model Selector Modal */}
-        <ModelSelectorModal
-          visible={showModelModal}
-          selectedProvider={selectedProvider}
-          onSelectProvider={handleSelectProvider}
-          onClose={() => setShowModelModal(false)}
-        />
-      </KeyboardAvoidingView>
+      {/* Model Selector Modal */}
+      <ModelSelectorModal
+        visible={showModelModal}
+        selectedProvider={selectedProvider}
+        onSelectProvider={handleSelectProvider}
+        onClose={() => setShowModelModal(false)}
+      />
     </SafeAreaView>
   );
 };
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
+  container: { flex: 1 },
+
+  // ── Header ──
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
   },
-  navIconButton: {
+  navIconBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -909,29 +1072,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1,
-    maxWidth: '52%',
+    flex: 1,
+    marginHorizontal: 8,
+    maxWidth: '60%',
   },
   modelCapsuleText: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
+    fontSize: 13,
+    flex: 1,
   },
-  headerRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  activeDotBadge: {
-    position: 'absolute',
-    top: 7,
-    right: 7,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
+
+  // ── Chat list ──
   chatList: {
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -942,98 +1097,72 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
   },
+
+  // ── Empty Hero ──
   heroContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 10,
+    paddingVertical: 24,
+    paddingHorizontal: 16,
   },
   heroBadge: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   heroTitle: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 22,
-    marginBottom: 4,
     textAlign: 'center',
+    marginBottom: 6,
   },
   heroSubtitle: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
-    marginBottom: 24,
     textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 19,
   },
-  promptCardsGrid: {
-    width: '100%',
+  pillsScroll: {
+    alignSelf: 'stretch',
+  },
+  pillsContent: {
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  pill: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  promptCard: {
-    width: '48%',
-    padding: 13,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 6,
-  },
-  promptCardIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  promptCardTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-  },
-  promptCardDesc: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 10,
-    lineHeight: 14,
-  },
-  messageRow: {
-    flexDirection: 'row',
-    marginVertical: 3,
-  },
-  messageRowUser: {
-    justifyContent: 'flex-end',
-  },
-  messageRowModel: {
-    justifyContent: 'flex-start',
-  },
-  bubble: {
-    maxWidth: '88%',
-    padding: 14,
-    borderRadius: 18,
-  },
-  userBubble: {
-    borderBottomRightRadius: 4,
-  },
-  modelBubble: {
-    borderBottomLeftRadius: 4,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
     borderWidth: 1,
   },
+  pillText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+  },
+
+  // ── Message bubbles ──
+  messageRow: { flexDirection: 'row', marginVertical: 3 },
+  messageRowUser: { justifyContent: 'flex-end' },
+  messageRowModel: { justifyContent: 'flex-start' },
+  bubble: { maxWidth: '88%', padding: 14, borderRadius: 18 },
+  userBubble: { borderBottomRightRadius: 4 },
+  modelBubble: { borderBottomLeftRadius: 4, borderWidth: 1 },
   modelHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginBottom: 6,
   },
-  modelDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
+  modelDot: { width: 6, height: 6, borderRadius: 3 },
   modelBadgeText: {
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Inter_500Medium',
     fontSize: 10,
     letterSpacing: 0.3,
   },
@@ -1056,14 +1185,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: 6,
   },
-  copyLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    marginVertical: 6,
-  },
+  copyLabel: { fontFamily: 'Inter_500Medium', fontSize: 11 },
+
+  // ── Loading ──
+  loadingContainer: { flexDirection: 'row', marginVertical: 6 },
   loadingBubble: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1073,10 +1198,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
   },
-  loadingText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-  },
+  loadingText: { fontFamily: 'Inter_400Regular', fontSize: 12 },
+
+  // ── Search strip ──
   searchStatusStrip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1088,25 +1212,23 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
-  searchStatusText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    flex: 1,
-  },
-  promptCapsuleWrapper: {
+  searchStatusText: { fontFamily: 'Inter_500Medium', fontSize: 11, flex: 1 },
+
+  // ── Input bar ──
+  inputWrapper: {
     paddingHorizontal: 14,
     paddingBottom: Platform.OS === 'ios' ? 8 : 12,
     paddingTop: 4,
   },
-  promptCapsule: {
-    borderRadius: 22,
+  inputCapsule: {
+    borderRadius: 24,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 8,
     gap: 6,
   },
-  attachedImageRow: {
+  attachedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 6,
@@ -1114,30 +1236,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 8,
   },
-  attachedImageThumb: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-  },
-  attachedImageTextWrap: {
-    flex: 1,
-  },
-  attachedImageTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-  },
-  attachedImageSubtitle: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 9,
-  },
-  removeAttachedBtn: {
+  attachedThumb: { width: 36, height: 36, borderRadius: 8 },
+  attachedTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 11 },
+  attachedSub: { fontFamily: 'Inter_400Regular', fontSize: 9 },
+  attachedRemoveBtn: {
     width: 26,
     height: 26,
     borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  capsuleInput: {
+  textInput: {
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
     lineHeight: 20,
@@ -1145,19 +1254,15 @@ const styles = StyleSheet.create({
     maxHeight: 120,
     paddingHorizontal: 4,
     paddingVertical: 4,
-    textAlignVertical: 'center',
+    textAlignVertical: 'top',
   },
-  capsuleToolbar: {
+  inputToolbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 2,
   },
-  toolbarLeftGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  inputToolbarLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   toolbarIconBtn: {
     width: 32,
     height: 32,
@@ -1170,29 +1275,157 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     height: 30,
     borderRadius: 15,
     borderWidth: 1,
   },
-  webSearchPillText: {
-    fontSize: 11,
-  },
-  sendButtonCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  webSearchText: { fontSize: 12 },
+  sendBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // ── Drawer ──
+  drawerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    zIndex: 10,
+  },
+  drawer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    zIndex: 11,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 16,
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 36 : 14,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  drawerHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  drawerLogoWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drawerTitle: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 16,
+  },
+  drawerCloseBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drawerNewChatWrap: { paddingHorizontal: 14, paddingVertical: 12 },
+  drawerNewChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 11,
+    borderRadius: 14,
+  },
+  drawerNewChatText: {
+    color: '#fff',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
+  drawerListContent: { paddingHorizontal: 10, paddingBottom: 16, gap: 2 },
+  drawerGroupLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    paddingHorizontal: 4,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  drawerSessionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  drawerSessionMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  drawerSessionInfo: { flex: 1 },
+  drawerSessionTitle: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  drawerSessionTime: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  drawerDeleteBtn: { padding: 6 },
+  drawerEmptyWrap: {
+    paddingVertical: 32,
+    alignItems: 'center',
+    gap: 8,
+  },
+  drawerEmptyText: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  drawerProfile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  drawerAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  drawerAvatarImg: { width: 38, height: 38, borderRadius: 19 },
+  drawerAvatarText: { fontFamily: 'Poppins_600SemiBold', fontSize: 14 },
+  drawerProfileName: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  drawerProfileEmail: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 1 },
+  drawerProfileBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+
+  // ── Attach sheet ──
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
-  },
-  modalBackdropTouch: {
-    flex: 1,
   },
   attachSheet: {
     borderTopLeftRadius: 24,
@@ -1210,19 +1443,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 6,
   },
-  sheetTitle: {
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 17,
-  },
-  sheetSubtitle: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    marginTop: -8,
-  },
-  sheetActionsList: {
-    gap: 10,
-    marginTop: 6,
-  },
+  sheetTitle: { fontFamily: 'Poppins_600SemiBold', fontSize: 17 },
+  sheetSub: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: -8 },
+  sheetActions: { gap: 10, marginTop: 6 },
   sheetActionItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1238,13 +1461,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sheetActionTexts: {
-    flex: 1,
-  },
-  sheetActionLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-  },
+  sheetActionLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   sheetActionDesc: {
     fontFamily: 'Inter_400Regular',
     fontSize: 11,
@@ -1257,8 +1474,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
-  sheetCancelText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-  },
+  sheetCancelText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
 });
