@@ -12,7 +12,7 @@
       "backgroundColor": "#121212"
     },
     "notification": {
-      "icon": "./assets/icon.png",
+      "icon": "./assets/notification-icon.png",
       "color": "#007aff"
     },
     "ios": {
@@ -41,7 +41,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/notification-icon.png",
           "color": "#007aff",
           "sounds": []
         }
