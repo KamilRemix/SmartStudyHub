@@ -355,6 +355,13 @@ export async function sendChatMessage(
     }
   }
 
+  const promptForModel =
+    foundSources.length > 0
+      ? `${newPrompt}\n\n[Актуальные данные из поиска в сети]:\n${foundSources
+          .map((s) => `• ${s.title}: ${s.snippet}`)
+          .join('\n')}`
+      : newPrompt;
+
   const userParts: any[] = [];
   if (imageAttachment?.base64) {
     userParts.push({
@@ -364,7 +371,7 @@ export async function sendChatMessage(
       },
     });
   }
-  userParts.push({ text: newPrompt });
+  userParts.push({ text: promptForModel });
 
   geminiContents.push({
     role: 'user',
@@ -383,7 +390,7 @@ export async function sendChatMessage(
 
   const response = await executeMultiProviderCascade({
     history,
-    newPrompt,
+    newPrompt: promptForModel,
     systemInstruction,
     imageAttachment,
     preferredProvider: selectedProvider,

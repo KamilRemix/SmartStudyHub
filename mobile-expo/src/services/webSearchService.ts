@@ -1,6 +1,6 @@
 /**
  * Web Search Service
- * Real-time web search integration using DuckDuckGo Lite and Wikipedia
+ * Real-time web search integration using Google News RSS, DuckDuckGo HTML, and Wikipedia.
  * Provides live internet knowledge for AI models with zero API key requirement.
  */
 
@@ -25,7 +25,10 @@ const TIME_SENSITIVE_KEYWORDS = [
   '2024',
   '2025',
   '2026',
+  '2027',
   'курс валют',
+  'курс доллара',
+  'курс евро',
   'погода',
   'кто сейчас',
   'что произошло',
@@ -35,6 +38,8 @@ const TIME_SENSITIVE_KEYWORDS = [
   'поиск в сети',
   'поиск в интернете',
   'свежие данные',
+  'выборы',
+  'президент',
   'latest news',
   'today',
   'current',
@@ -59,13 +64,22 @@ export function sanitizeSearchQuery(rawQuery: string): string {
 
   // Remove conversational greetings and question starters
   cleaned = cleaned.replace(
-    /^(пожалуйста|скажи( мне)?|подскажи|найди в интернете|поиск в сети|погугли|что такое|кто такой|расскажи о|расскажи про|что ты думаешь о)\s+/i,
+    /^(пожалуйста|скажи( мне)?|подскажи|найди в интернете|поиск в сети|поиск в интернете|погугли|что такое|кто такой|расскажи о|расскажи про|что ты думаешь о)\s+/i,
     ''
   );
   // Remove punctuation at the end
   cleaned = cleaned.replace(/[?!.:]+$/g, '').trim();
 
   return cleaned || rawQuery.trim();
+}
+
+/**
+ * Checks whether a query contains time-sensitive or current-event keywords
+ */
+export function isTimeSensitiveQuery(query: string): boolean {
+  if (!query || typeof query !== 'string') return false;
+  const lower = query.toLowerCase();
+  return TIME_SENSITIVE_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
 /**
@@ -82,8 +96,7 @@ export function shouldPerformWebSearch(prompt: string, manualToggle: boolean): b
     return false;
   }
 
-  const lower = trimmed.toLowerCase();
-  return TIME_SENSITIVE_KEYWORDS.some((kw) => lower.includes(kw));
+  return isTimeSensitiveQuery(trimmed);
 }
 
 /**
@@ -100,109 +113,258 @@ function cleanDuckDuckGoUrl(rawUrl: string): string {
 }
 
 /**
- * Perform web search using DuckDuckGo Lite and Wikipedia APIs
+ * 1. Google News RSS Fetcher
+ * Real-time, fast, unblocked news and current events with publication dates.
+ */
+async function fetchGoogleNews(query: string, maxResults: number = 4): Promise<WebSearchResult[]> {
+  try {
+    const isRu = /[а-яА-ЯёЁ]/.test(query);
+    const hl = isRu ? 'ru' : 'en-US';
+    const gl = isRu ? 'RU' : 'US';
+    const ceid = isRu ? 'RU:ru' : 'US:en';
+    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${hl}&gl=${gl}&ceid=${ceid}`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4500);
+
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const items: WebSearchResult[] = [];
+    const chunks = xml.split('<item>');
+
+    for (let i = 1; i < chunks.length && items.length < maxResults; i++) {
+      const chunk = chunks[i];
+      const titleM = /<title>([\s\S]*?)<\/title>/.exec(chunk);
+      const linkM = /<link>([\s\S]*?)<\/link>/.exec(chunk);
+      const pubDateM = /<pubDate>([\s\S]*?)<\/pubDate>/.exec(chunk);
+      const sourceM = /<source[^>]*>([\s\S]*?)<\/source>/.exec(chunk);
+
+      if (titleM) {
+        let rawTitle = titleM[1]
+          .replace(/<[^>]+>/g, '')
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/&#39;/g, "'")
+          .trim();
+        const link = linkM ? linkM[1].trim() : '';
+        const sourceName = sourceM
+          ? sourceM[1].replace(/<[^>]+>/g, '').trim()
+          : 'Google News';
+
+        let formattedDate = '';
+        if (pubDateM) {
+          try {
+            const d = new Date(pubDateM[1]);
+            if (!isNaN(d.getTime())) {
+              formattedDate = d.toLocaleDateString('ru-RU', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              });
+            }
+          } catch {}
+        }
+
+        const snippet = formattedDate
+          ? `[${formattedDate}] Источник: ${sourceName}`
+          : `Источник: ${sourceName}`;
+
+        if (rawTitle && link) {
+          items.push({
+            title: rawTitle,
+            snippet,
+            url: link,
+            source: sourceName,
+          });
+        }
+      }
+    }
+
+    return items;
+  } catch (err: any) {
+    console.warn('[WebSearch] Google News fetch error:', err?.message);
+    return [];
+  }
+}
+
+/**
+ * 2. DuckDuckGo HTML Search Fetcher
+ * Organic web-wide search results across blogs, documentation, portals, and media.
+ */
+async function fetchDuckDuckGoHtml(query: string, maxResults: number = 4): Promise<WebSearchResult[]> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4500);
+
+    const res = await fetch('https://html.duckduckgo.com/html/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      body: `q=${encodeURIComponent(query)}`,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) return [];
+    const html = await res.text();
+
+    // Check for DDG bot challenge/anomaly
+    if (html.includes('anomaly-modal') || html.includes('challenge-form')) {
+      return [];
+    }
+
+    const items: WebSearchResult[] = [];
+    const chunks = html.split(/class=['"](?:result\s+results_links|result__body|links_main)/i);
+
+    for (let i = 1; i < chunks.length && items.length < maxResults; i++) {
+      const chunk = chunks[i];
+      const titleMatch = chunk.match(
+        /<a[^>]*class=['"][^'"]*result__a[^'"]*['"][^>]*href=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/a>/i
+      );
+      const snipMatch =
+        chunk.match(/<a[^>]*class=['"][^'"]*result__snippet[^'"]*['"][^>]*>([\s\S]*?)<\/a>/i) ||
+        chunk.match(/class=['"]result__snippet['"][^>]*>([\s\S]*?)<\/(?:a|td|div)>/i);
+
+      if (titleMatch) {
+        const rawUrl = titleMatch[1];
+        const cleanUrl = cleanDuckDuckGoUrl(rawUrl);
+        const title = titleMatch[2].replace(/<[^>]+>/g, '').trim();
+        const snippet = snipMatch ? snipMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+
+        if (title && !cleanUrl.includes('duckduckgo.com')) {
+          items.push({
+            title,
+            snippet,
+            url: cleanUrl,
+            source: 'Веб',
+          });
+        }
+      }
+    }
+
+    return items;
+  } catch (err: any) {
+    console.warn('[WebSearch] DuckDuckGo HTML query error:', err?.message);
+    return [];
+  }
+}
+
+/**
+ * 3. Wikipedia API Fetcher
+ * Used exclusively for academic and definitional queries, avoiding news pollution.
+ */
+async function fetchWikipedia(query: string, maxResults: number = 2): Promise<WebSearchResult[]> {
+  try {
+    const isRussian = /[а-яА-ЯёЁ]/.test(query);
+    const wikiLang = isRussian ? 'ru' : 'en';
+    const wikiUrl = `https://${wikiLang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+      query
+    )}&utf8=&format=json`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+
+    const wikiRes = await fetch(wikiUrl, {
+      headers: { 'User-Agent': 'SmartStudyHub/1.4 (academic app)' },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!wikiRes.ok) return [];
+    const data = await wikiRes.json();
+    const items = data?.query?.search || [];
+    const results: WebSearchResult[] = [];
+
+    for (const item of items) {
+      if (results.length >= maxResults) break;
+      if (
+        item.title &&
+        (item.title.includes('(значения)') || item.title.includes('(disambiguation)'))
+      ) {
+        continue;
+      }
+
+      const cleanSnippet = (item.snippet || '').replace(/<[^>]+>/g, '').trim();
+      if (cleanSnippet) {
+        results.push({
+          title: item.title,
+          snippet: cleanSnippet,
+          url: `https://${wikiLang}.wikipedia.org/wiki/${encodeURIComponent(
+            item.title.replace(/ /g, '_')
+          )}`,
+          source: 'Wikipedia',
+        });
+      }
+    }
+    return results;
+  } catch (err: any) {
+    console.warn('[WebSearch] Wikipedia query error:', err?.message);
+    return [];
+  }
+}
+
+/**
+ * Perform web search using multi-source cascade: Google News RSS, DuckDuckGo HTML, and Wikipedia
  */
 export async function searchWeb(query: string, maxResults: number = 4): Promise<WebSearchResult[]> {
   const sanitized = sanitizeSearchQuery(query);
   if (!sanitized) return [];
 
+  const timeSensitive = isTimeSensitiveQuery(query) || isTimeSensitiveQuery(sanitized);
   const results: WebSearchResult[] = [];
+  const seenUrls = new Set<string>();
 
-  // 1. DuckDuckGo Lite Search (Fast, organic, unblocked web-wide results)
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-
-    const ddgResponse = await fetch('https://lite.duckduckgo.com/lite/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      },
-      body: `q=${encodeURIComponent(sanitized)}`,
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (ddgResponse.ok) {
-      const html = await ddgResponse.text();
-      const rows = html.split('<tr>');
-
-      for (let i = 0; i < rows.length && results.length < maxResults; i++) {
-        const row = rows[i];
-        const linkMatch = row.match(
-          /<a[^>]*class=['"]result-link['"][^>]*href=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/a>/i
-        );
-
-        if (linkMatch) {
-          const rawUrl = linkMatch[1];
-          const cleanUrl = cleanDuckDuckGoUrl(rawUrl);
-          const title = linkMatch[2].replace(/<[^>]+>/g, '').trim();
-
-          const nextRow = rows[i + 1] || '';
-          const snipMatch = nextRow.match(
-            /<td[^>]*class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/i
-          );
-          const snippet = snipMatch ? snipMatch[1].replace(/<[^>]+>/g, '').trim() : '';
-
-          if (title && snippet && !cleanUrl.includes('duckduckgo.com')) {
-            results.push({
-              title,
-              snippet,
-              url: cleanUrl,
-              source: 'Web',
-            });
-          }
-        }
+  const addResults = (items: WebSearchResult[]) => {
+    for (const item of items) {
+      if (results.length >= maxResults) break;
+      const normalizedUrl = item.url.toLowerCase();
+      if (!seenUrls.has(normalizedUrl) && item.title) {
+        seenUrls.add(normalizedUrl);
+        results.push(item);
       }
     }
-  } catch (err: any) {
-    console.warn('[WebSearch] DuckDuckGo Lite query error:', err?.message);
-  }
+  };
 
-  // 2. Wikipedia Search (High-quality fallback if organic results were insufficient)
-  if (results.length < maxResults) {
-    try {
-      const isRussian = /[а-яА-ЯёЁ]/.test(sanitized);
-      const wikiLang = isRussian ? 'ru' : 'en';
-      const wikiUrl = `https://${wikiLang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
-        sanitized
-      )}&utf8=&format=json`;
+  if (timeSensitive) {
+    // 1. Time-sensitive query: Google News RSS is primary (accurate real-time sources with 2026 dates)
+    const [newsItems, ddgItems] = await Promise.all([
+      fetchGoogleNews(sanitized, maxResults),
+      fetchDuckDuckGoHtml(sanitized, 2),
+    ]);
+    addResults(newsItems);
+    addResults(ddgItems);
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4000);
+    // If still empty (e.g. niche query), try broader query
+    if (results.length === 0 && sanitized !== query.trim()) {
+      const fallbackNews = await fetchGoogleNews(query.trim(), maxResults);
+      addResults(fallbackNews);
+    }
+  } else {
+    // 2. General / Academic query: Organic web search + Google News + Wikipedia definition
+    const [ddgItems, newsItems] = await Promise.all([
+      fetchDuckDuckGoHtml(sanitized, 3),
+      fetchGoogleNews(sanitized, 2),
+    ]);
+    addResults(ddgItems);
+    addResults(newsItems);
 
-      const wikiRes = await fetch(wikiUrl, {
-        headers: { 'User-Agent': 'SmartStudyHub/1.4 (academic app)' },
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-
-      if (wikiRes.ok) {
-        const data = await wikiRes.json();
-        const items = data?.query?.search || [];
-
-        for (const item of items) {
-          if (results.length >= maxResults) break;
-          // Skip disambiguation pages
-          if (item.title && (item.title.includes('(значения)') || item.title.includes('(disambiguation)'))) {
-            continue;
-          }
-
-          const cleanSnippet = (item.snippet || '').replace(/<[^>]+>/g, '').trim();
-          if (cleanSnippet && !results.some((r) => r.title === item.title)) {
-            results.push({
-              title: item.title,
-              snippet: cleanSnippet,
-              url: `https://${wikiLang}.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`,
-              source: 'Wikipedia',
-            });
-          }
-        }
-      }
-    } catch (err: any) {
-      console.warn('[WebSearch] Wikipedia query error:', err?.message);
+    // If organic search yielded < 2 results, supplement with Wikipedia
+    if (results.length < 2) {
+      const wikiItems = await fetchWikipedia(sanitized, 2);
+      addResults(wikiItems);
     }
   }
 
@@ -215,22 +377,37 @@ export async function searchWeb(query: string, maxResults: number = 4): Promise<
 export function buildWebSearchPromptContext(query: string, results: WebSearchResult[]): string {
   if (!results || results.length === 0) return '';
 
+  const now = new Date();
+  const year = now.getFullYear();
+  const monthNames = [
+    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+  ];
+  const dayNames = [
+    'воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'
+  ];
+  const dateStr = `${now.getDate()} ${monthNames[now.getMonth()]} ${year} года (${dayNames[now.getDay()]})`;
+
   const formattedSources = results
     .map(
       (r, i) =>
-        `[${i + 1}] "${r.title}" (${r.source})\nСсылка: ${r.url}\nИнформация: ${r.snippet}`
+        `[Источник ${i + 1}]: "${r.title}" (${r.source})\nСсылка: ${r.url}\nИнформация: ${r.snippet}`
     )
     .join('\n\n');
 
   return `
 [АКТУАЛЬНЫЕ ДАННЫЕ ИЗ ВЕБ-ПОИСКА В СЕТИ]:
-Поисковый запрос: "${sanitizeSearchQuery(query)}"
-Найденные актуальные источники:
+Поисковый запрос пользователя: "${sanitizeSearchQuery(query)}"
+Текущая дата в реальном мире: ${dateStr}.
+Текущий год: ${year} год.
+
+Найденные актуальные источники из интернета:
 ${formattedSources}
 
 Инструкция по использованию веб-поиска:
 1. Используй эти актуальные факты и данные при ответе на вопрос пользователя.
-2. Отвечай прямо, точно и структурированно на русском языке.
-3. При необходимости сошлись на упомянутые источники или факты.
+2. ВНИМАНИЕ: реальный мир сейчас находится в ${year} году. Ни в коем случае не утверждай, что сейчас 2023, 2024 или иной прошедший год. Не цитируй устаревшие архивные данные, если найдены свежие факты.
+3. Отвечай прямо, точно, современно и структурированно на русском языке.
+4. Если пользователь спрашивает о текущих событиях, персоналиях, курсах, релизах или новостях — опирайся строго на предоставленные результаты поиска.
 `;
 }
