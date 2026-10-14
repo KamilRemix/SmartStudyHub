@@ -16,6 +16,7 @@ import {
   Dimensions,
   ScrollView,
   TouchableWithoutFeedback,
+  TouchableOpacity,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -116,19 +117,23 @@ export const AIAssistantScreen: React.FC = () => {
   // ─── Init ────────────────────────────────────────────────────────────────
   useEffect(() => {
     async function init() {
-      const allSessions = await loadAllChatSessions();
-      setSessions(allSessions);
-      const savedActiveId = await getActiveSessionId();
-      const current = allSessions.find((s) => s.id === savedActiveId) || allSessions[0];
-      if (current) {
-        setActiveSessionIdState(current.id);
-        setMessages(current.messages || []);
+      try {
+        const allSessions = await loadAllChatSessions();
+        setSessions(allSessions);
+        const savedActiveId = await getActiveSessionId();
+        const current = allSessions.find((s) => s.id === savedActiveId) || allSessions[0];
+        if (current) {
+          setActiveSessionIdState(current.id);
+          setMessages(current.messages || []);
+        }
+        const p = await getPersonalization();
+        setPersonalization(p);
+        const prov = await getSelectedProvider();
+        setSelectedProviderState(prov);
+        pingAllProviders(false).catch(() => {});
+      } catch (err) {
+        console.warn('[AIAssistantScreen] Init error:', err);
       }
-      const p = await getPersonalization();
-      setPersonalization(p);
-      const prov = await getSelectedProvider();
-      setSelectedProviderState(prov);
-      pingAllProviders(false).catch(() => {});
     }
     init();
   }, []);
@@ -1292,7 +1297,11 @@ const styles = StyleSheet.create({
 
   // ── Drawer ──
   drawerBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.48)',
     zIndex: 10,
   },
