@@ -17,6 +17,7 @@ import {
   ScrollView,
   TouchableWithoutFeedback,
   TouchableOpacity,
+  PanResponder,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -43,6 +44,7 @@ import { pingAllProviders } from '../../../services/aiProviderHealthService';
 import {
   ChatSession,
   loadAllChatSessions,
+  saveAllChatSessions,
   createNewChatSession,
   updateSessionMessages,
   deleteChatSession,
@@ -52,6 +54,7 @@ import {
 import { ChatMessageRenderer } from '../components/ChatMessageRenderer';
 import { PersonalizationModal } from '../components/PersonalizationModal';
 import { ModelSelectorModal } from '../components/ModelSelectorModal';
+import { AISettingsModal } from '../components/AISettingsModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 340);
@@ -100,12 +103,14 @@ export const AIAssistantScreen: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showPersonalizationModal, setShowPersonalizationModal] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAttachModal, setShowAttachModal] = useState(false);
   const [selectedProvider, setSelectedProviderState] = useState<AIProviderId>('auto');
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [searchQueryStatus, setSearchQueryStatus] = useState<string | null>(null);
   const [personalization, setPersonalization] = useState<AIPersonalization>(DEFAULT_PERSONALIZATION);
   const [attachedImage, setAttachedImage] = useState<ChatImageAttachment | null>(null);
+  const [drawerSearchQuery, setDrawerSearchQuery] = useState('');
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -138,18 +143,19 @@ export const AIAssistantScreen: React.FC = () => {
     init();
   }, []);
 
-  // ─── Drawer animation ────────────────────────────────────────────────────
+  // ─── Drawer animation (Fluid Spring) ─────────────────────────────────────
   const openDrawer = useCallback(() => {
     setDrawerOpen(true);
     Animated.parallel([
-      Animated.timing(drawerAnim, {
+      Animated.spring(drawerAnim, {
         toValue: 0,
-        duration: 260,
+        friction: 8,
+        tension: 80,
         useNativeDriver: true,
       }),
       Animated.timing(backdropAnim, {
         toValue: 1,
-        duration: 260,
+        duration: 220,
         useNativeDriver: true,
       }),
     ]).start();
@@ -164,11 +170,47 @@ export const AIAssistantScreen: React.FC = () => {
       }),
       Animated.timing(backdropAnim, {
         toValue: 0,
-        duration: 220,
+        duration: 200,
         useNativeDriver: true,
       }),
     ]).start(() => setDrawerOpen(false));
   }, [drawerAnim, backdropAnim]);
+
+  // ─── Swipe Gestures (PanResponder) ───────────────────────────────────────
+  // Swipe right on main screen to open drawer
+  const mainPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        return (
+          !drawerOpen &&
+          gesture.dx > 25 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.8
+        );
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx > 45 || gesture.vx > 0.3) {
+          openDrawer();
+        }
+      },
+    })
+  ).current;
+
+  // Swipe left anywhere on open drawer panel to close
+  const drawerPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        return (
+          gesture.dx < -15 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy)
+        );
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx < -35 || gesture.vx < -0.3) {
+          closeDrawer();
+        }
+      },
+    })
+  ).current;
 
   // ─── Handlers ────────────────────────────────────────────────────────────
   const handleSelectProvider = async (providerId: AIProviderId) => {
@@ -334,14 +376,36 @@ export const AIAssistantScreen: React.FC = () => {
 
   const isSendActive = (inputText.trim().length > 0 || attachedImage !== null) && !isLoading;
 
-  // ─── Drawer sessions grouped by date ─────────────────────────────────────
+  // ─── Clear All Sessions ──────────────────────────────────────────────────
+  const handleClearAllSessions = async () => {
+    try {
+      const newSession = await createNewChatSession();
+      await saveAllChatSessions([newSession]);
+      setSessions([newSession]);
+      setActiveSessionIdState(newSession.id);
+      setMessages(newSession.messages);
+      await setActiveSessionId(newSession.id);
+    } catch (e) {
+      console.warn('Error clearing sessions:', e);
+    }
+  };
+
+  // ─── Drawer sessions grouped by date (with search filter) ────────────────
   type DrawerItem =
     | { type: 'header'; label: string; key: string }
     | { type: 'session'; session: ChatSession; key: string };
 
+  const filteredSessions = sessions.filter((s) => {
+    if (!drawerSearchQuery.trim()) return true;
+    const q = drawerSearchQuery.toLowerCase();
+    const matchTitle = s.title?.toLowerCase().includes(q);
+    const matchMessages = s.messages?.some((m) => m.content?.toLowerCase().includes(q));
+    return matchTitle || matchMessages;
+  });
+
   const drawerItems: DrawerItem[] = [];
   let lastGroup = '';
-  sessions.forEach((s) => {
+  filteredSessions.forEach((s) => {
     const group = getDateGroup(s.updatedAt || s.createdAt);
     if (group !== lastGroup) {
       drawerItems.push({ type: 'header', label: group, key: `h_${group}` });
@@ -480,41 +544,74 @@ export const AIAssistantScreen: React.FC = () => {
   const renderDrawerItem = ({ item }: { item: DrawerItem }) => {
     if (item.type === 'header') {
       return (
-        <Text style={[styles.drawerGroupLabel, { color: colors.textColorSecondary }]}>
-          {item.label}
-        </Text>
+        <View style={styles.drawerGroupHeader}>
+          <Text style={[styles.drawerGroupLabel, { color: colors.textColorSecondary }]}>
+            {item.label}
+          </Text>
+          <View style={[styles.drawerGroupLine, { backgroundColor: colors.borderColor }]} />
+        </View>
       );
     }
     const { session } = item;
     const isActive = session.id === activeSessionId;
+    const lastSnippet =
+      session.messages && session.messages.length > 0
+        ? session.messages[session.messages.length - 1].content.replace(/\n/g, ' ').slice(0, 48)
+        : 'Новый диалог';
+
     return (
       <View
         style={[
           styles.drawerSessionItem,
           {
-            backgroundColor: isActive ? colors.primaryAccent + '12' : 'transparent',
-            borderColor: isActive ? colors.primaryAccent + '30' : 'transparent',
+            backgroundColor: isActive ? colors.primaryAccent + '15' : colors.surface,
+            borderColor: isActive ? colors.primaryAccent + '40' : colors.borderColor,
           },
         ]}
       >
+        {isActive && (
+          <View
+            style={[styles.drawerActiveIndicator, { backgroundColor: colors.primaryAccent }]}
+          />
+        )}
         <PressableScale
           style={styles.drawerSessionMain}
           onPress={() => handleSelectSession(session)}
         >
-          <Feather
-            name="message-square"
-            size={14}
-            color={isActive ? colors.primaryAccent : colors.textColorSecondary}
-          />
+          <View
+            style={[
+              styles.drawerSessionIconBox,
+              {
+                backgroundColor: isActive
+                  ? colors.primaryAccent + '22'
+                  : colors.componentBackground,
+              },
+            ]}
+          >
+            <Feather
+              name="message-square"
+              size={13}
+              color={isActive ? colors.primaryAccent : colors.textColorSecondary}
+            />
+          </View>
           <View style={styles.drawerSessionInfo}>
             <Text
               style={[
                 styles.drawerSessionTitle,
-                { color: isActive ? colors.primaryAccent : colors.textColor },
+                {
+                  color: isActive ? colors.primaryAccent : colors.textColor,
+                  fontFamily: isActive ? 'Inter_600SemiBold' : 'Inter_500Medium',
+                },
               ]}
               numberOfLines={1}
             >
               {session.title || 'Новый диалог'}
+            </Text>
+            <Text
+              style={[styles.drawerSessionSnippet, { color: colors.textColorSecondary }]}
+              numberOfLines={1}
+            >
+              {lastSnippet}
             </Text>
             <Text style={[styles.drawerSessionTime, { color: colors.textColorSecondary }]}>
               {formatTime(session.updatedAt || session.createdAt)}
@@ -525,6 +622,7 @@ export const AIAssistantScreen: React.FC = () => {
           style={styles.drawerDeleteBtn}
           onPress={() => handleDeleteSession(session.id)}
           accessibilityLabel="Удалить чат"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Feather name="trash-2" size={14} color={colors.textColorSecondary} />
         </PressableScale>
@@ -544,6 +642,7 @@ export const AIAssistantScreen: React.FC = () => {
         style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
+        {...mainPanResponder.panHandlers}
       >
         {/* ── Header ── */}
         <View
@@ -574,6 +673,7 @@ export const AIAssistantScreen: React.FC = () => {
               name={selectedProviderInfo.icon as any}
               size={13}
               color={colors.primaryAccent}
+              style={{ flexShrink: 0 }}
             />
             <Text
               style={[styles.modelCapsuleText, { color: colors.textColor }]}
@@ -581,7 +681,12 @@ export const AIAssistantScreen: React.FC = () => {
             >
               {selectedProviderInfo.name}
             </Text>
-            <Feather name="chevron-down" size={13} color={colors.textColorSecondary} />
+            <Feather
+              name="chevron-down"
+              size={13}
+              color={colors.textColorSecondary}
+              style={{ flexShrink: 0 }}
+            />
           </PressableScale>
 
           {/* Right: New chat */}
@@ -792,6 +897,7 @@ export const AIAssistantScreen: React.FC = () => {
 
           {/* Drawer panel */}
           <Animated.View
+            {...drawerPanResponder.panHandlers}
             style={[
               styles.drawer,
               {
@@ -813,18 +919,24 @@ export const AIAssistantScreen: React.FC = () => {
                     { backgroundColor: colors.primaryAccent + '16' },
                   ]}
                 >
-                  <Feather name="cpu" size={16} color={colors.primaryAccent} />
+                  <Feather name="message-square" size={16} color={colors.primaryAccent} />
                 </View>
-                <Text style={[styles.drawerTitle, { color: colors.textColor }]}>
-                  SmartStudy AI
-                </Text>
+                <View>
+                  <Text style={[styles.drawerTitle, { color: colors.textColor }]}>
+                    История диалогов
+                  </Text>
+                  <Text style={[styles.drawerSubtitle, { color: colors.textColorSecondary }]}>
+                    {sessions.length} {sessions.length === 1 ? 'диалог' : 'диалогов'}
+                  </Text>
+                </View>
               </View>
               <PressableScale
                 onPress={closeDrawer}
-                style={styles.drawerCloseBtn}
+                style={[styles.drawerCloseBtn, { backgroundColor: colors.surface }]}
                 accessibilityLabel="Закрыть меню"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Feather name="x" size={20} color={colors.textColorSecondary} />
+                <Feather name="x" size={18} color={colors.textColorSecondary} />
               </PressableScale>
             </View>
 
@@ -834,9 +946,33 @@ export const AIAssistantScreen: React.FC = () => {
                 style={[styles.drawerNewChatBtn, { backgroundColor: colors.primaryAccent }]}
                 onPress={handleNewChat}
               >
-                <Feather name="plus" size={16} color="#fff" />
+                <Feather name="plus" size={16} color="#ffffff" />
                 <Text style={styles.drawerNewChatText}>Новый чат</Text>
               </PressableScale>
+            </View>
+
+            {/* Search filter in drawer */}
+            <View style={styles.drawerSearchWrap}>
+              <View
+                style={[
+                  styles.drawerSearchBox,
+                  { backgroundColor: colors.surface, borderColor: colors.borderColor },
+                ]}
+              >
+                <Feather name="search" size={14} color={colors.textColorSecondary} />
+                <TextInput
+                  style={[styles.drawerSearchInput, { color: colors.textColor }]}
+                  placeholder="Поиск по диалогам..."
+                  placeholderTextColor={colors.textColorSecondary}
+                  value={drawerSearchQuery}
+                  onChangeText={setDrawerSearchQuery}
+                />
+                {drawerSearchQuery.length > 0 && (
+                  <PressableScale onPress={() => setDrawerSearchQuery('')} style={{ padding: 2 }}>
+                    <Feather name="x" size={13} color={colors.textColorSecondary} />
+                  </PressableScale>
+                )}
+              </View>
             </View>
 
             {/* Session list */}
@@ -851,13 +987,13 @@ export const AIAssistantScreen: React.FC = () => {
                 <View style={styles.drawerEmptyWrap}>
                   <Feather name="inbox" size={28} color={colors.textColorSecondary} />
                   <Text style={[styles.drawerEmptyText, { color: colors.textColorSecondary }]}>
-                    История пуста
+                    {drawerSearchQuery.trim() ? 'Ничего не найдено' : 'История пуста'}
                   </Text>
                 </View>
               }
             />
 
-            {/* Bottom profile block */}
+            {/* Bottom profile & settings block */}
             <View
               style={[
                 styles.drawerProfile,
@@ -904,32 +1040,23 @@ export const AIAssistantScreen: React.FC = () => {
                 )}
               </View>
 
-              {/* Personalization button */}
+              {/* Settings button */}
               <PressableScale
                 style={[
-                  styles.drawerProfileBtn,
+                  styles.drawerSettingsBtn,
                   {
-                    backgroundColor: hasActivePersonalization
-                      ? colors.primaryAccent + '14'
-                      : colors.surface,
-                    borderColor: hasActivePersonalization
-                      ? colors.primaryAccent + '40'
-                      : colors.borderColor,
+                    backgroundColor: colors.surface,
+                    borderColor: colors.borderColor,
                   },
                 ]}
                 onPress={() => {
                   closeDrawer();
-                  setTimeout(() => setShowPersonalizationModal(true), 280);
+                  setTimeout(() => setShowSettingsModal(true), 240);
                 }}
-                accessibilityLabel="Персонализация"
+                accessibilityLabel="Настройки ИИ"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Feather
-                  name="sliders"
-                  size={15}
-                  color={
-                    hasActivePersonalization ? colors.primaryAccent : colors.textColorSecondary
-                  }
-                />
+                <Feather name="settings" size={17} color={colors.textColor} />
               </PressableScale>
             </View>
           </Animated.View>
@@ -1048,6 +1175,20 @@ export const AIAssistantScreen: React.FC = () => {
         onSelectProvider={handleSelectProvider}
         onClose={() => setShowModelModal(false)}
       />
+
+      {/* AI Settings Modal */}
+      <AISettingsModal
+        visible={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        selectedProvider={selectedProvider}
+        onOpenModelSelector={() => setShowModelModal(true)}
+        onOpenPersonalization={() => setShowPersonalizationModal(true)}
+        hasActivePersonalization={hasActivePersonalization}
+        webSearchEnabled={webSearchEnabled}
+        onToggleWebSearch={setWebSearchEnabled}
+        onClearAllSessions={handleClearAllSessions}
+        totalSessionsCount={sessions.length}
+      />
     </SafeAreaView>
   );
 };
@@ -1077,18 +1218,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1,
     flex: 1,
-    marginHorizontal: 8,
-    maxWidth: '60%',
+    marginHorizontal: 6,
+    maxWidth: 240,
+    minWidth: 0,
   },
   modelCapsuleText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
-    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
 
   // ── Chat list ──
@@ -1327,55 +1470,101 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  drawerHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  drawerHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   drawerLogoWrap: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   drawerTitle: {
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 16,
+    fontSize: 15,
+  },
+  drawerSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    marginTop: 1,
   },
   drawerCloseBtn: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  drawerNewChatWrap: { paddingHorizontal: 14, paddingVertical: 12 },
+  drawerNewChatWrap: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6 },
   drawerNewChatBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 11,
-    borderRadius: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
   drawerNewChatText: {
-    color: '#fff',
+    color: '#ffffff',
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
+    fontSize: 13,
   },
-  drawerListContent: { paddingHorizontal: 10, paddingBottom: 16, gap: 2 },
+  drawerSearchWrap: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  drawerSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    height: 36,
+    gap: 8,
+  },
+  drawerSearchInput: {
+    flex: 1,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    padding: 0,
+  },
+  drawerListContent: { paddingHorizontal: 12, paddingBottom: 16, gap: 4 },
+  drawerGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 4,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
   drawerGroupLabel: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 11,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
-    paddingHorizontal: 4,
-    paddingTop: 12,
-    paddingBottom: 4,
+  },
+  drawerGroupLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
   },
   drawerSessionItem: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 10,
-    paddingVertical: 9,
+    paddingVertical: 10,
+    marginBottom: 4,
+    overflow: 'hidden',
+  },
+  drawerActiveIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 8,
+    bottom: 8,
+    width: 3.5,
+    borderTopRightRadius: 2,
+    borderBottomRightRadius: 2,
   },
   drawerSessionMain: {
     flex: 1,
@@ -1383,18 +1572,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  drawerSessionIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   drawerSessionInfo: { flex: 1 },
   drawerSessionTitle: {
-    fontFamily: 'Inter_500Medium',
     fontSize: 13,
     lineHeight: 18,
   },
-  drawerSessionTime: {
+  drawerSessionSnippet: {
     fontFamily: 'Inter_400Regular',
     fontSize: 11,
-    marginTop: 1,
+    marginTop: 2,
   },
-  drawerDeleteBtn: { padding: 6 },
+  drawerSessionTime: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 10,
+    marginTop: 2,
+  },
+  drawerDeleteBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+  },
   drawerEmptyWrap: {
     paddingVertical: 32,
     alignItems: 'center',
@@ -1405,7 +1611,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   drawerAvatar: {
@@ -1420,10 +1626,10 @@ const styles = StyleSheet.create({
   drawerAvatarText: { fontFamily: 'Poppins_600SemiBold', fontSize: 14 },
   drawerProfileName: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   drawerProfileEmail: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 1 },
-  drawerProfileBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+  drawerSettingsBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
+  Pressable,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
@@ -68,6 +69,13 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.backdrop}
       >
+        {/* Backdrop tap to dismiss */}
+        <Pressable
+          style={styles.backdropDismissArea}
+          onPress={onClose}
+          accessibilityLabel="Закрыть персонализацию"
+        />
+
         <View
           style={[
             styles.modalContent,
@@ -77,6 +85,11 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
             },
           ]}
         >
+          {/* Top handle bar */}
+          <View style={styles.handleWrap}>
+            <View style={[styles.handleBar, { backgroundColor: colors.borderColor }]} />
+          </View>
+
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
             <View style={styles.headerTitleRow}>
@@ -173,12 +186,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'flex-end',
   },
+  backdropDismissArea: {
+    flex: 1,
+  },
   modalContent: {
     maxHeight: '85%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: 1,
     overflow: 'hidden',
+  },
+  handleWrap: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  handleBar: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
   header: {
     flexDirection: 'row',

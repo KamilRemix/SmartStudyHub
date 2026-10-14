@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
@@ -201,7 +202,19 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
+        {/* Backdrop tap to dismiss */}
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Закрыть выбор модели"
+        />
+
         <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+          {/* Top handle bar */}
+          <View style={styles.handleWrap}>
+            <View style={[styles.handleBar, { backgroundColor: colors.borderColor }]} />
+          </View>
+
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
             <View style={styles.headerLeft}>
@@ -224,6 +237,7 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                 onPress={handleManualRefresh}
                 style={[styles.refreshBtn, { backgroundColor: colors.componentBackground }]}
                 accessibilityLabel="Обновить пинг"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 {isRefreshing ? (
                   <ActivityIndicator size={12} color={colors.primaryAccent} />
@@ -237,6 +251,7 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                 onPress={onClose}
                 style={[styles.closeBtn, { backgroundColor: colors.componentBackground }]}
                 accessibilityLabel="Закрыть"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Feather name="x" size={18} color={colors.textColorSecondary} />
               </PressableScale>
@@ -393,6 +408,16 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     overflow: 'hidden',
     elevation: 10,
+  },
+  handleWrap: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  handleBar: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
   header: {
     flexDirection: 'row',
