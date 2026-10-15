@@ -57,6 +57,7 @@ import {
   shouldPerformWebSearch,
   buildWebSearchPromptContext,
   extractSearchKeywords,
+  resolveConversationalQuery,
   WebSearchResult,
 } from './webSearchService';
 
@@ -314,19 +315,21 @@ export async function sendChatMessage(
     : baseInstruction;
 
   // Real-time Web Search Integration
+  // Resolves pronouns & ellipsis from history (e.g. "Сколько она стоит?" -> "Playdate Сколько она стоит?")
+  const contextualQuery = resolveConversationalQuery(newPrompt, history);
   let foundSources: WebSearchResult[] = [];
-  const doSearch = shouldPerformWebSearch(newPrompt, !!webSearchEnabled);
+  const doSearch = shouldPerformWebSearch(contextualQuery, !!webSearchEnabled);
   if (doSearch && !imageAttachment?.base64) {
     try {
-      const cleanKeywords = extractSearchKeywords(newPrompt);
-      onSearchStatus?.(cleanKeywords || newPrompt);
-      foundSources = await searchWeb(newPrompt, 4, (status) => {
+      const cleanKeywords = extractSearchKeywords(contextualQuery);
+      onSearchStatus?.(cleanKeywords || contextualQuery);
+      foundSources = await searchWeb(contextualQuery, 4, (status) => {
         // Strip prefix if any so status message looks clean
         const displayStatus = status.replace(/^Ищем:\s*/i, '');
         onSearchStatus?.(displayStatus);
       });
       if (foundSources.length > 0) {
-        const webContext = buildWebSearchPromptContext(newPrompt, foundSources);
+        const webContext = buildWebSearchPromptContext(contextualQuery, foundSources);
         systemInstruction = `${systemInstruction}\n${webContext}`;
       }
     } catch (err: any) {

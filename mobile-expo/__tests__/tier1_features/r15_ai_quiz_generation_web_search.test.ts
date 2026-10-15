@@ -5,6 +5,7 @@ import {
   extractSearchKeywords,
   extractReadableTextFromHtml,
   cleanDuckDuckGoUrl,
+  resolveConversationalQuery,
   WebSearchResult,
 } from '../../src/services/webSearchService';
 import {
@@ -74,6 +75,20 @@ describe('AI Quiz Generation Enhancements & Web Search Service', () => {
     test('unwraps DuckDuckGo uddg redirect links', () => {
       const uddgUrl = 'https://duckduckgo.com/l/?uddg=https%3A%2F%2Fopenai.com%2Findex%2Fhello-gpt-4o%2F&rut=...';
       expect(cleanDuckDuckGoUrl(uddgUrl)).toBe('https://openai.com/index/hello-gpt-4o/');
+    });
+
+    test('resolves conversational follow-ups and pronouns using prior dialogue history', () => {
+      const history = [
+        { role: 'user', content: 'Что такое OpenAI Sora?' },
+        { role: 'model', content: 'OpenAI Sora — это модель генерации видео...' },
+      ];
+      const resolved = resolveConversationalQuery('Когда её релиз для всех?', history);
+      expect(resolved).toContain('OpenAI Sora');
+      expect(resolved).toContain('Когда её релиз для всех?');
+
+      const keywords = extractSearchKeywords(resolved);
+      expect(keywords).toContain('OpenAI Sora');
+      expect(keywords).toContain('релиз');
     });
 
     test('extracts clean text from HTML without CSS or script leaks', () => {

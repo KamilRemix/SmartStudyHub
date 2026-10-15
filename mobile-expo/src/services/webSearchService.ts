@@ -744,9 +744,26 @@ async function fetchWikipedia(query: string, maxResults: number = 2): Promise<We
     });
     clearTimeout(timer);
 
-    if (!wikiRes.ok) return [];
-    const data = await wikiRes.json();
-    const searchItems = data?.query?.search || [];
+    let searchItems = wikiRes.ok ? (await wikiRes.json())?.query?.search || [] : [];
+    let effectiveLang = wikiLang;
+
+    // Fallback to English Wikipedia if Russian search returned 0 items and query has Latin terms
+    if (searchItems.length === 0 && wikiLang === 'ru' && /[a-zA-Z]{3,}/.test(query)) {
+      try {
+        const enUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+          query
+        )}&utf8=&format=json`;
+        const enRes = await fetch(enUrl, { headers: { 'User-Agent': 'SmartStudyHub/1.5 (academic app)' } });
+        if (enRes.ok) {
+          const enData = await enRes.json();
+          if (enData?.query?.search?.length > 0) {
+            searchItems = enData.query.search;
+            effectiveLang = 'en';
+          }
+        }
+      } catch {}
+    }
+
     const results: WebSearchResult[] = [];
 
     for (const item of searchItems) {
@@ -759,14 +776,14 @@ async function fetchWikipedia(query: string, maxResults: number = 2): Promise<We
       }
 
       const cleanSnippet = decodeHtmlEntities((item.snippet || '').replace(/<[^>]+>/g, '').trim());
-      const pageUrl = `https://${wikiLang}.wikipedia.org/wiki/${encodeURIComponent(
+      const pageUrl = `https://${effectiveLang}.wikipedia.org/wiki/${encodeURIComponent(
         item.title.replace(/ /g, '_')
       )}`;
 
       // Fetch clean plain-text lead extract from Wikipedia API directly
       let richContent = cleanSnippet;
       try {
-        const extractUrl = `https://${wikiLang}.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&titles=${encodeURIComponent(
+        const extractUrl = `https://${effectiveLang}.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&titles=${encodeURIComponent(
           item.title
         )}&format=json`;
         const extractRes = await fetch(extractUrl, {
@@ -970,4 +987,79 @@ ${formattedSources}
 3. Отвечай прямо, точно, современно и структурированно на русском языке. При необходимости ссылайся на источники в формате Markdown: [Название источника](URL).
 4. Если пользователь спрашивает о текущих событиях, персоналиях, курсах, релизах, новостях или содержимом сайтов — опирайся строго на предоставленные результаты поиска.
 `;
+}
+
+// Pronouns and reference particles indicating follow-up questions
+const PRONOUN_AND_ELLIPSIS_REGEX = /\b(он|она|оно|они|его|ее|их|ему|ей|им|нем|ней|них|это|этого|этому|этом|этот|эта|эти|эту|этих|туда|там|it|he|she|they|its|his|her|their|this|that)\b/i;
+
+/**
+ * Extracts the primary entity, product, or subject from the immediate prior conversation turns
+ */
+export function extractTopicFromHistory(history?: Array<{ role: string; content: string }>): string {
+  if (!history || !Array.isArray(history) || history.length === 0) return '';
+
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msg = history[i];
+    if (!msg || !msg.content || typeof msg.content !== 'string') continue;
+    const text = msg.content.trim();
+    if (text.length < 3) continue;
+
+    // 1. Look for English capitalized entity names (e.g. OpenAI Sora, Playdate, React 19)
+    const properNounMatches = text.match(/\b[A-Z][a-zA-Z0-9]*(?:\s+[A-Z0-9][a-zA-Z0-9]*)*\b/g);
+    if (properNounMatches && properNounMatches.length > 0) {
+      const candidates = properNounMatches.filter(
+        (p) =>
+          p.length > 2 &&
+          !['I', 'The', 'A', 'An', 'It', 'He', 'She', 'This', 'That', 'What', 'Where', 'When', 'Why', 'How'].includes(p)
+      );
+      if (candidates.length > 0) {
+        return candidates[0];
+      }
+    }
+
+    // 2. Look for Russian capitalized names/terms (e.g. Илон Маск, Джеймс Уэбб)
+    const ruMatches = text.match(/\b[А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ][а-яё]+)*\b/g);
+    if (ruMatches && ruMatches.length > 0) {
+      const candidates = ruMatches.filter(
+        (m) =>
+          m.length > 3 &&
+          !['Привет', 'Скажи', 'Подскажи', 'Пожалуйста', 'Спасибо', 'Здравствуйте', 'Добрый'].includes(m)
+      );
+      if (candidates.length > 0) {
+        return candidates[0];
+      }
+    }
+
+    // 3. If user message was short and declarative, use clean keywords of that message
+    if (msg.role === 'user' && text.length < 60) {
+      const clean = text.replace(/[?!:;.]+$/g, '').trim();
+      if (clean.length > 2) {
+        return clean;
+      }
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Resolves conversational follow-up questions (e.g. "Где её купить?", "Сколько он стоит?", "Когда релиз?")
+ * using the immediate prior dialogue history to identify the target subject or entity.
+ */
+export function resolveConversationalQuery(
+  newPrompt: string,
+  history?: Array<{ role: string; content: string }>
+): string {
+  if (!newPrompt || typeof newPrompt !== 'string') return '';
+  const trimmed = newPrompt.trim();
+  const wordCount = trimmed.split(/\s+/).length;
+  const hasPronoun = PRONOUN_AND_ELLIPSIS_REGEX.test(trimmed);
+
+  if ((wordCount <= 6 || hasPronoun) && history && history.length > 0) {
+    const topic = extractTopicFromHistory(history);
+    if (topic && !trimmed.toLowerCase().includes(topic.toLowerCase())) {
+      return `${topic} ${trimmed}`;
+    }
+  }
+  return trimmed;
 }
