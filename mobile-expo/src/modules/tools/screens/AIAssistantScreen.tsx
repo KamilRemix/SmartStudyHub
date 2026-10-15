@@ -746,7 +746,9 @@ export const AIAssistantScreen: React.FC = () => {
               style={[styles.searchStatusText, { color: colors.textColor }]}
               numberOfLines={1}
             >
-              Ищем в интернете: «{searchQueryStatus}»
+              {searchQueryStatus.startsWith('Читаем сайт')
+                ? searchQueryStatus
+                : `Ищем в интернете: «${searchQueryStatus}»`}
             </Text>
           </View>
         )}

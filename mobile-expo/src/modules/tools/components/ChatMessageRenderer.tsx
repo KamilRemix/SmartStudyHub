@@ -97,10 +97,11 @@ export function renderInlineSpans(
   rawLine: string,
   textColor: string,
   baseStyle?: any,
-  keyPrefix = 'span'
+  keyPrefix = 'span',
+  primaryAccent?: string
 ): React.ReactNode[] {
   const inlineRegex =
-    /(`([^`]+)`|\$([^$\n]+)\$|\\\(([^\n\\]+)\\\)|\*\*\*([^*]+)\*\*\*|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|_([^_\n]+)_|~~([^~]+)~~)/g;
+    /(\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)|https?:\/\/[^\s<>"'{}|\\^`]+|`([^`]+)`|\$([^$\n]+)\$|\\\(([^\n\\]+)\\\)|\*\*\*([^*]+)\*\*\*|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|_([^_\n]+)_|~~([^~]+)~~)/g;
 
   const spans: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -119,9 +120,35 @@ export function renderInlineSpans(
     const fullMatch = match[0];
     const matchKey = `${keyPrefix}-tok-${match.index}`;
 
-    if (fullMatch.startsWith('`')) {
+    if (fullMatch.startsWith('[') && match[2] && match[3]) {
+      // Markdown link [text](url)
+      const linkText = match[2];
+      const linkUrl = match[3];
+      spans.push(
+        <Text
+          key={matchKey}
+          style={[styles.inlineLink, { color: primaryAccent || '#3b82f6' }, baseStyle]}
+          onPress={() => Linking.openURL(linkUrl).catch(() => {})}
+          accessibilityRole="link"
+        >
+          {linkText}
+        </Text>
+      );
+    } else if (fullMatch.startsWith('http://') || fullMatch.startsWith('https://')) {
+      // Bare URL
+      spans.push(
+        <Text
+          key={matchKey}
+          style={[styles.inlineLink, { color: primaryAccent || '#3b82f6' }, baseStyle]}
+          onPress={() => Linking.openURL(fullMatch).catch(() => {})}
+          accessibilityRole="link"
+        >
+          {fullMatch}
+        </Text>
+      );
+    } else if (fullMatch.startsWith('`')) {
       // Inline code
-      const codeSnippet = match[2];
+      const codeSnippet = match[4];
       spans.push(
         <Text key={matchKey} style={styles.inlineCode}>
           {codeSnippet}
@@ -129,7 +156,7 @@ export function renderInlineSpans(
       );
     } else if (fullMatch.startsWith('$') || fullMatch.startsWith('\\(')) {
       // Inline math
-      const mathSnippet = match[3] || match[4] || fullMatch;
+      const mathSnippet = match[5] || match[6] || fullMatch;
       const readable = formatLatexToReadable(mathSnippet);
       spans.push(
         <Text key={matchKey} style={styles.inlineMath}>
@@ -138,7 +165,7 @@ export function renderInlineSpans(
       );
     } else if (fullMatch.startsWith('***')) {
       // Bold Italic
-      const boldItalicText = match[5];
+      const boldItalicText = match[7];
       spans.push(
         <Text key={matchKey} style={[styles.boldItalicText, { color: textColor }, baseStyle]}>
           {boldItalicText}
@@ -146,7 +173,7 @@ export function renderInlineSpans(
       );
     } else if (fullMatch.startsWith('**') || fullMatch.startsWith('__')) {
       // Bold
-      const boldText = match[6] || match[7];
+      const boldText = match[8] || match[9];
       spans.push(
         <Text key={matchKey} style={[styles.boldText, { color: textColor }, baseStyle]}>
           {boldText}
@@ -154,7 +181,7 @@ export function renderInlineSpans(
       );
     } else if (fullMatch.startsWith('*') || fullMatch.startsWith('_')) {
       // Italic
-      const italicText = match[8] || match[9];
+      const italicText = match[10] || match[11];
       spans.push(
         <Text key={matchKey} style={[styles.italicText, { color: textColor }, baseStyle]}>
           {italicText}
@@ -162,7 +189,7 @@ export function renderInlineSpans(
       );
     } else if (fullMatch.startsWith('~~')) {
       // Strikethrough
-      const strikeText = match[10];
+      const strikeText = match[12];
       spans.push(
         <Text key={matchKey} style={[styles.strikeText, { color: textColor }, baseStyle]}>
           {strikeText}
@@ -233,7 +260,7 @@ export const MarkdownTextRenderer: React.FC<MarkdownTextRendererProps> = ({
     if (h1Match) {
       elements.push(
         <View key={`h1-${i}`} style={styles.h1Wrapper}>
-          <Text selectable>{renderInlineSpans(h1Match[1], textColor, styles.h1Text, `h1-${i}`)}</Text>
+          <Text selectable>{renderInlineSpans(h1Match[1], textColor, styles.h1Text, `h1-${i}`, primaryAccent)}</Text>
         </View>
       );
       continue;
@@ -243,7 +270,7 @@ export const MarkdownTextRenderer: React.FC<MarkdownTextRendererProps> = ({
     if (h2Match) {
       elements.push(
         <View key={`h2-${i}`} style={styles.h2Wrapper}>
-          <Text selectable>{renderInlineSpans(h2Match[1], textColor, styles.h2Text, `h2-${i}`)}</Text>
+          <Text selectable>{renderInlineSpans(h2Match[1], textColor, styles.h2Text, `h2-${i}`, primaryAccent)}</Text>
         </View>
       );
       continue;
@@ -253,7 +280,7 @@ export const MarkdownTextRenderer: React.FC<MarkdownTextRendererProps> = ({
     if (h3Match) {
       elements.push(
         <View key={`h3-${i}`} style={styles.h3Wrapper}>
-          <Text selectable>{renderInlineSpans(h3Match[1], textColor, styles.h3Text, `h3-${i}`)}</Text>
+          <Text selectable>{renderInlineSpans(h3Match[1], textColor, styles.h3Text, `h3-${i}`, primaryAccent)}</Text>
         </View>
       );
       continue;
@@ -263,7 +290,7 @@ export const MarkdownTextRenderer: React.FC<MarkdownTextRendererProps> = ({
     if (h4Match) {
       elements.push(
         <View key={`h4-${i}`} style={styles.h4Wrapper}>
-          <Text selectable>{renderInlineSpans(h4Match[1], textColor, styles.h4Text, `h4-${i}`)}</Text>
+          <Text selectable>{renderInlineSpans(h4Match[1], textColor, styles.h4Text, `h4-${i}`, primaryAccent)}</Text>
         </View>
       );
       continue;
@@ -275,7 +302,7 @@ export const MarkdownTextRenderer: React.FC<MarkdownTextRendererProps> = ({
       elements.push(
         <View key={`quote-${i}`} style={[styles.blockquote, { borderLeftColor: primaryAccent, backgroundColor: primaryAccent + '10' }]}>
           <Text selectable style={styles.blockquoteText}>
-            {renderInlineSpans(quoteMatch[1], textColor, styles.italicText, `quote-${i}`)}
+            {renderInlineSpans(quoteMatch[1], textColor, styles.italicText, `quote-${i}`, primaryAccent)}
           </Text>
         </View>
       );
@@ -291,7 +318,7 @@ export const MarkdownTextRenderer: React.FC<MarkdownTextRendererProps> = ({
           <View style={[styles.bulletDot, { backgroundColor: primaryAccent }]} />
           <View style={styles.listItemTextContainer}>
             <Text selectable style={[styles.bodyText, { color: textColor }]}>
-              {renderInlineSpans(bulletMatch[2], textColor, undefined, `bullet-${i}`)}
+              {renderInlineSpans(bulletMatch[2], textColor, undefined, `bullet-${i}`, primaryAccent)}
             </Text>
           </View>
         </View>
@@ -309,7 +336,7 @@ export const MarkdownTextRenderer: React.FC<MarkdownTextRendererProps> = ({
           <Text style={[styles.numberPrefix, { color: primaryAccent }]}>{numberStr}.</Text>
           <View style={styles.listItemTextContainer}>
             <Text selectable style={[styles.bodyText, { color: textColor }]}>
-              {renderInlineSpans(numberedMatch[3], textColor, undefined, `num-${i}`)}
+              {renderInlineSpans(numberedMatch[3], textColor, undefined, `num-${i}`, primaryAccent)}
             </Text>
           </View>
         </View>
@@ -321,7 +348,7 @@ export const MarkdownTextRenderer: React.FC<MarkdownTextRendererProps> = ({
     elements.push(
       <View key={`p-${i}`} style={styles.paragraphLine}>
         <Text selectable style={[styles.bodyText, { color: textColor }]}>
-          {renderInlineSpans(line, textColor, undefined, `p-${i}`)}
+          {renderInlineSpans(line, textColor, undefined, `p-${i}`, primaryAccent)}
         </Text>
       </View>
     );
@@ -509,6 +536,10 @@ const styles = StyleSheet.create({
   },
   strikeText: {
     textDecorationLine: 'line-through',
+  },
+  inlineLink: {
+    textDecorationLine: 'underline',
+    fontFamily: 'Inter_500Medium',
   },
   inlineCode: {
     fontFamily: 'Menlo',

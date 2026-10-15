@@ -44,11 +44,10 @@ export const OPENROUTER_FREE_MODELS = [
 
 // Priority Gemini candidate models
 export const GEMINI_CANDIDATE_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-flash-lite-latest',
   'gemini-3.8-flash',
   'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
   'gemini-flash-latest',
   'gemini-2.5-pro',
 ];
@@ -57,6 +56,7 @@ import {
   searchWeb,
   shouldPerformWebSearch,
   buildWebSearchPromptContext,
+  extractSearchKeywords,
   WebSearchResult,
 } from './webSearchService';
 
@@ -318,8 +318,13 @@ export async function sendChatMessage(
   const doSearch = shouldPerformWebSearch(newPrompt, !!webSearchEnabled);
   if (doSearch && !imageAttachment?.base64) {
     try {
-      onSearchStatus?.(newPrompt);
-      foundSources = await searchWeb(newPrompt, 4);
+      const cleanKeywords = extractSearchKeywords(newPrompt);
+      onSearchStatus?.(cleanKeywords || newPrompt);
+      foundSources = await searchWeb(newPrompt, 4, (status) => {
+        // Strip prefix if any so status message looks clean
+        const displayStatus = status.replace(/^Ищем:\s*/i, '');
+        onSearchStatus?.(displayStatus);
+      });
       if (foundSources.length > 0) {
         const webContext = buildWebSearchPromptContext(newPrompt, foundSources);
         systemInstruction = `${systemInstruction}\n${webContext}`;
@@ -357,9 +362,7 @@ export async function sendChatMessage(
 
   const promptForModel =
     foundSources.length > 0
-      ? `${newPrompt}\n\n[Актуальные данные из поиска в сети]:\n${foundSources
-          .map((s) => `• ${s.title}: ${s.snippet}`)
-          .join('\n')}`
+      ? `${newPrompt}\n\n[Актуальные проверенные данные из поиска в сети подключены к системному контексту. Опирайся на факты текущего 2026 года].`
       : newPrompt;
 
   const userParts: any[] = [];

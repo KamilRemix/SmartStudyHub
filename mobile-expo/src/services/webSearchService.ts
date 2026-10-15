@@ -1,7 +1,10 @@
 /**
- * Web Search Service
- * Real-time web search integration using Google News RSS, DuckDuckGo HTML, and Wikipedia.
- * Provides live internet knowledge for AI models with zero API key requirement.
+ * Web Search & Real-Time Web Page Reader Service
+ * 
+ * Provides live internet knowledge, intelligent query extraction, multi-engine
+ * search cascade (DuckDuckGo Lite, DuckDuckGo HTML, Google News RSS, Wikipedia API,
+ * DuckDuckGo Instant Answers), and robust direct web page content scraping
+ * for AI models with zero API key requirements.
  */
 
 export interface WebSearchResult {
@@ -9,42 +12,134 @@ export interface WebSearchResult {
   snippet: string;
   url: string;
   source: string;
+  content?: string; // Full or readable page content extracted from website
 }
 
-// Temporal and news detection keywords
-const TIME_SENSITIVE_KEYWORDS = [
+// Broad keywords and stems that indicate the user wants current or real-world information
+const REAL_WORLD_INTENT_STEMS = [
+  // Time and currency
   'сегодня',
   'вчера',
   'сейчас',
-  'новости',
-  'новость',
-  'последние',
-  'актуально',
-  'актуальные',
+  'недавно',
+  'последн',
+  'свеж',
+  'актуальн',
+  'текущ',
+  'нынешн',
   'в этом году',
+  'в текущем году',
   '2024',
   '2025',
   '2026',
   '2027',
-  'курс валют',
-  'курс доллара',
-  'курс евро',
-  'погода',
-  'кто сейчас',
-  'что произошло',
-  'что случилось',
-  'погугли',
-  'найди в интернете',
-  'поиск в сети',
-  'поиск в интернете',
-  'свежие данные',
-  'выборы',
+  '2028',
+  // News, releases, events
+  'новост',
+  'событи',
+  'произошл',
+  'случилось',
+  'релиз',
+  'вышел',
+  'вышла',
+  'вышло',
+  'выйдет',
+  'выпустил',
+  'анонс',
+  'презентац',
+  'обновлен',
+  'верси',
+  'патч',
+  // Politics, society, law (specific to avoid matching Ohm's law, Newton's law, etc.)
   'президент',
-  'latest news',
-  'today',
-  'current',
-  'who is currently',
+  'премьер',
+  'министр',
+  'выбор',
+  'политик',
+  'законопроект',
+  'новый закон',
+  'приняли закон',
+  'законодательств',
+  'поправки в закон',
+  'указ',
+  'правительств',
+  'санкци',
+  'переговор',
+  // Sports, competitions, culture
+  'чемпион',
+  'победител',
+  'победил',
+  'выиграл',
+  'турнир',
+  'матч',
+  'лиг',
+  'счет',
+  'олимпиад',
+  'кубок',
+  'оскар',
+  'евровиден',
+  'концерт',
+  'фильм',
+  'сериал',
+  'рейтинг',
+  // Economics, finance, weather
+  'курс',
+  'доллар',
+  'евро',
+  'биткоин',
+  'крипт',
+  'акци',
+  'цена',
+  'стоимост',
+  'погод',
+  'температур',
+  'прогноз',
+  // Search verbs & online references
+  'найди',
+  'поищи',
+  'погугли',
+  'в интернете',
+  'в сети',
+  'на сайте',
+  'ссылк',
+  'сайте',
+  'инфо',
+  'статистик',
+  'кто такой',
+  'что такое',
+  'кто сейчас',
+  'где сейчас',
+  'чем занимается',
+  'почему закрыли',
+  'расписание',
+  'афиша',
+  'статус',
+  'состояние',
+  'ситуаци',
+  'инцидент',
+  'происшеств',
+  // English stems
+  'latest',
   'recent',
+  'news',
+  'current',
+  'today',
+  'yesterday',
+  'who is',
+  'what is the latest',
+  'when is',
+  'how much is',
+  'price',
+  'weather',
+  'release',
+  'score',
+  'winner',
+  'won',
+  'champion',
+  'schedule',
+  'events',
+  'happen',
+  'incident',
 ];
 
 // Patterns where the user is only asking about the clock/calendar
@@ -55,66 +150,501 @@ const PURE_CLOCK_PATTERNS = [
   /^what (year|day|time) is it\??$/i,
 ];
 
+// Matches full URLs with protocol
+const URL_WITH_PROTO_REGEX = /https?:\/\/[^\s<>"'{}|\\^`]+/gi;
+
+// Matches bare web domains (e.g. habr.com, lenta.ru, en.wikipedia.org/wiki/..., github.com/user/repo)
+const BARE_DOMAIN_REGEX = /\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:com|org|net|edu|gov|io|ai|ru|me|app|dev|co|info|biz|ua|kz|by|рф)(?:\/[^\s<>"'{}|\\^`]*)?/gi;
+
 /**
- * Strips conversational fluff and prefixes so the search engine gets clean keywords
+ * Extracts all valid HTTP/HTTPS URLs and bare domain names from text, normalizing to https://
  */
-export function sanitizeSearchQuery(rawQuery: string): string {
+export function extractUrlsFromText(text: string): string[] {
+  if (!text || typeof text !== 'string') return [];
+  const matches: string[] = [];
+
+  // 1. Matches with protocol
+  const fullUrls = text.match(URL_WITH_PROTO_REGEX) || [];
+  for (const url of fullUrls) {
+    matches.push(url.trim());
+  }
+
+  // 2. Bare domain matches without protocol
+  const bareMatches = text.match(BARE_DOMAIN_REGEX) || [];
+  for (const bare of bareMatches) {
+    const trimmed = bare.replace(/[.,;:!?)]+$/, '').trim();
+    if (trimmed.length > 3 && !matches.some((u) => u.includes(trimmed))) {
+      matches.push(`https://${trimmed}`);
+    }
+  }
+
+  return Array.from(new Set(matches));
+}
+
+// Common Russian conversational stopwords and low-signal filler words
+const CONVERSATIONAL_STOPWORDS = new Set([
+  'и', 'в', 'во', 'не', 'что', 'он', 'на', 'я', 'с', 'со', 'как', 'а', 'то', 'все', 'она',
+  'так', 'его', 'но', 'да', 'ты', 'к', 'ко', 'у', 'же', 'вы', 'за', 'бы', 'по', 'только',
+  'ее', 'мне', 'было', 'вот', 'от', 'меня', 'еще', 'нет', 'о', 'об', 'из', 'ему', 'теперь',
+  'когда', 'даже', 'ну', 'вдруг', 'ли', 'если', 'уже', 'или', 'ни', 'быть', 'был', 'него',
+  'до', 'вас', 'нибудь', 'опять', 'уж', 'вам', 'ведь', 'там', 'потом', 'себя', 'ничего',
+  'ей', 'может', 'они', 'тут', 'где', 'есть', 'надо', 'ней', 'для', 'мы', 'тебя', 'их',
+  'чем', 'была', 'сам', 'чтоб', 'без', 'будто', 'чего', 'раз', 'тоже', 'себе', 'под',
+  'будет', 'ж', 'тогда', 'кто', 'этот', 'того', 'потому', 'этого', 'какой', 'какая', 'какие',
+  'каком', 'какую', 'каких', 'который', 'которая', 'которое', 'которые', 'кем', 'чем', 'кому',
+  'чему', 'ком', 'про', 'при', 'расскажи', 'подскажи', 'пожалуйста', 'привет', 'здравствуй',
+  'здравствуйте', 'можешь', 'помоги', 'найди', 'поищи', 'погугли', 'интернете', 'сети',
+  'сайте', 'сайте', 'гугл', 'яндекс', 'вопрос', 'знаешь', 'думаешь', 'статью', 'почитай',
+  'расскажи-ка', 'поясни', 'проясни', 'загляни',
+]);
+
+/**
+ * Strips conversational fluff, greetings, question fillers, and prepositions so search engines
+ * get concise, high-signal keywords that return real results instead of junk.
+ */
+export function extractSearchKeywords(rawQuery: string): string {
   if (!rawQuery || typeof rawQuery !== 'string') return '';
-  let cleaned = rawQuery.trim();
+  let q = rawQuery.trim();
 
-  // Remove conversational greetings and question starters
-  cleaned = cleaned.replace(
-    /^(пожалуйста|скажи( мне)?|подскажи|найди в интернете|поиск в сети|поиск в интернете|погугли|что такое|кто такой|расскажи о|расскажи про|что ты думаешь о)\s+/i,
-    ''
-  );
-  // Remove punctuation at the end
-  cleaned = cleaned.replace(/[?!.:]+$/g, '').trim();
+  // Strip URLs from search keywords (they are handled directly by the web page reader)
+  q = q.replace(URL_WITH_PROTO_REGEX, ' ');
+  q = q.replace(BARE_DOMAIN_REGEX, ' ');
 
-  return cleaned || rawQuery.trim();
+  // Multi-pass conversational prefix stripping
+  let prev = '';
+  for (let pass = 0; pass < 5 && prev !== q; pass++) {
+    prev = q;
+
+    // Strip greetings with trailing punctuation/space
+    q = q.replace(
+      /^(привет(ствую)?(\s+всем)?|здравствуй(те)?|добрый\s+(день|вечер|утро)|хай|салют|hello|hi|hey)[\s,!.-]*/gi,
+      ''
+    );
+
+    // Strip polite & conversational requests
+    q = q.replace(
+      /^(пожалуйста|можешь(\s+ли)?(\s+ты)?(\s+пожалуйста)?|скажи(\s+мне)?|подскажи(\s+мне)?|расскажи(\s+мне)?(\s+(о|про))?|напиши(\s+мне)?|помоги(\s+мне)?|дай\s+мне\s+знать|объясни(\s+мне)?|что\s+ты\s+думаешь\s+(о|про)|что\s+ты\s+знаешь\s+(о|про)|can\s+you(\s+please)?|please|tell\s+me(\s+about)?|what\s+do\s+you\s+know\s+about)[\s,!.-]*/gi,
+      ''
+    );
+
+    // Strip search command prefixes
+    q = q.replace(
+      /^(найди(\s+мне)?(\s+в\s+(интернете|сети))?|поищи(\s+в\s+(интернете|сети))?|погугли(ть|шь)?(\s+мне)?|поиск\s+в\s+(интернете|сети)|посмотри\s+в\s+(интернете|сети)|прогугли(ть)?|пробей(\s+по\s+базе)?|search(\s+the\s+web|\s+for|\s+online)?|google(\s+it)?|look\s*up)[\s,!.-]*/gi,
+      ''
+    );
+
+    // Strip question conversational starters
+    q = q.replace(/^(а\s+|и\s+|но\s+|кстати\s*,\s*|слушай\s*,\s*|скажи\s*,\s*|загляни\s+(на|в)\s*)/gi, '');
+  }
+
+  // Remove trailing question marks, dots, exclamation
+  q = q.replace(/[?!:;.]+$/g, '').trim();
+
+  // If query is long (conversational question), filter out low-signal stopwords
+  const tokens = q.split(/\s+/).filter(Boolean);
+  if (tokens.length > 3) {
+    const filteredTokens = tokens.filter((t) => {
+      const clean = t.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '');
+      return clean.length > 0 && !CONVERSATIONAL_STOPWORDS.has(clean);
+    });
+    // Keep filtered terms if we have enough informative keywords left
+    if (filteredTokens.length >= 2) {
+      q = filteredTokens.join(' ');
+    }
+  }
+
+  // If query is about current/latest status and doesn't contain a year, append current year for freshness
+  const lower = q.toLowerCase();
+  const currentYear = new Date().getFullYear().toString();
+  const mentionsCurrentTime =
+    lower.includes('сейчас') ||
+    lower.includes('последн') ||
+    lower.includes('актуальн') ||
+    lower.includes('свеж') ||
+    lower.includes('в этом году') ||
+    lower.includes('сегодня') ||
+    lower.includes('latest') ||
+    lower.includes('current');
+
+  const hasYear = /\b20\d\d\b/.test(q);
+  if (mentionsCurrentTime && !hasYear && q.length > 5) {
+    q = `${q} ${currentYear}`;
+  }
+
+  return q.trim() || rawQuery.trim();
 }
 
 /**
- * Checks whether a query contains time-sensitive or current-event keywords
+ * Backward compatibility alias for sanitizeSearchQuery
+ */
+export const sanitizeSearchQuery = extractSearchKeywords;
+
+/**
+ * Checks whether a query contains time-sensitive, news, or real-world factual keywords
  */
 export function isTimeSensitiveQuery(query: string): boolean {
   if (!query || typeof query !== 'string') return false;
   const lower = query.toLowerCase();
-  return TIME_SENSITIVE_KEYWORDS.some((kw) => lower.includes(kw));
+  return REAL_WORLD_INTENT_STEMS.some((stem) => lower.includes(stem));
 }
 
 /**
- * Determines whether a query should trigger web search.
- * Triggers if manually enabled or if query contains time-sensitive keywords.
+ * Determines whether a query should trigger web search or website fetching.
+ * Triggers if manual toggle is on, if URLs or domain names are present, or if real-world intent is detected.
  */
 export function shouldPerformWebSearch(prompt: string, manualToggle: boolean): boolean {
   if (manualToggle) return true;
   if (!prompt || typeof prompt !== 'string') return false;
 
   const trimmed = prompt.trim();
-  // If the query is just asking for the clock/year, system prompt already knows this with 100% precision
+  // If the query is just asking for the clock/calendar, system prompt already knows this with 100% precision
   if (PURE_CLOCK_PATTERNS.some((p) => p.test(trimmed))) {
     return false;
+  }
+
+  // Check for direct URLs or domains in prompt
+  if (extractUrlsFromText(trimmed).length > 0) {
+    return true;
   }
 
   return isTimeSensitiveQuery(trimmed);
 }
 
 /**
- * Clean URL from DuckDuckGo redirect format
+ * Clean URL from DuckDuckGo redirect format (uddg=...)
  */
-function cleanDuckDuckGoUrl(rawUrl: string): string {
+export function cleanDuckDuckGoUrl(rawUrl: string): string {
   try {
     const uddgMatch = /[?&]uddg=([^&]+)/.exec(rawUrl);
     if (uddgMatch) {
       return decodeURIComponent(uddgMatch[1]);
+    }
+    // Relative protocol // -> https://
+    if (rawUrl.startsWith('//')) {
+      return `https:${rawUrl}`;
     }
   } catch {}
   return rawUrl;
 }
 
 /**
- * 1. Google News RSS Fetcher
- * Real-time, fast, unblocked news and current events with publication dates.
+ * Extracts readable domain name from URL
+ */
+export function getHostnameFromUrl(urlStr: string): string {
+  try {
+    const u = new URL(urlStr);
+    return u.hostname.replace(/^www\./i, '');
+  } catch {
+    return 'Веб-источник';
+  }
+}
+
+/**
+ * Decodes all HTML entities including named, decimal, and hex entities
+ */
+export function decodeHtmlEntities(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&mdash;/g, '—')
+    .replace(/&ndash;/g, '–')
+    .replace(/&laquo;/g, '«')
+    .replace(/&raquo;/g, '»')
+    .replace(/&hellip;/g, '…')
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+/**
+ * Strips HTML tags, navigation, headers, footers, scripts, and extracts clean article text
+ * without leaking CSS stylesheets or JavaScript code into the model context.
+ */
+export function extractReadableTextFromHtml(html: string): { title: string; metaDesc: string; content: string } {
+  if (!html) return { title: '', metaDesc: '', content: '' };
+
+  // 1. Globally strip dangerous and layout-only tags FIRST so they never leak into <article> or <main>
+  const cleanHtml = html
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+    .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, ' ')
+    .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, ' ')
+    .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
+    .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
+    .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
+    .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, ' ')
+    .replace(/<template\b[^<]*(?:(?!<\/template>)<[^<]*)*<\/template>/gi, ' ')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, ' ');
+
+  // 2. Extract meta description
+  const metaDescMatch =
+    cleanHtml.match(/<meta[^>]*name=['"]description['"][^>]*content=['"]([^'"]+)['"]/i) ||
+    cleanHtml.match(/<meta[^>]*content=['"]([^'"]+)['"][^>]*name=['"]description['"]/i) ||
+    cleanHtml.match(/<meta[^>]*property=['"]og:description['"][^>]*content=['"]([^'"]+)['"]/i);
+  const metaDesc = metaDescMatch
+    ? decodeHtmlEntities(metaDescMatch[1].replace(/<[^>]+>/g, '').trim())
+    : '';
+
+  // 3. Extract page title
+  const titleMatch = cleanHtml.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const title = titleMatch
+    ? decodeHtmlEntities(titleMatch[1].replace(/<[^>]+>/g, '').trim())
+    : '';
+
+  // 4. Focus on <article> or <main> or main content container in already sanitized cleanHtml
+  const articleMatch =
+    cleanHtml.match(/<article[^>]*>([\s\S]*?)<\/article>/i) ||
+    cleanHtml.match(/<main[^>]*>([\s\S]*?)<\/main>/i) ||
+    cleanHtml.match(/<div[^>]*id=['"](?:mw-content-text|article-body|post-content)['"][^>]*>([\s\S]*?)<\/div>/i) ||
+    cleanHtml.match(/<div[^>]*role=['"]main['"][^>]*>([\s\S]*?)<\/div>/i);
+  const targetHtml = articleMatch ? articleMatch[1] : cleanHtml;
+
+  // 5. Convert line breaks & block elements
+  let bodyText = targetHtml
+    .replace(/<\/(p|div|h[1-6]|li|tr|section|blockquote)>/gi, '\n\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ');
+
+  // 6. Decode entities
+  bodyText = decodeHtmlEntities(bodyText);
+
+  // 7. Strip leftover CSS/JS syntax artifacts
+  bodyText = bodyText
+    .replace(/@[a-zA-Z-]+\s*\{[^}]*\}/g, ' ')
+    .replace(/\{[^{}]*\}/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  // 8. Filter high-signal sentences/paragraphs (excluding short menu items, cookie notices)
+  const paragraphs = bodyText
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/\s+/g, ' ').trim())
+    .filter((p) => {
+      const lower = p.toLowerCase();
+      return (
+        p.length >= 25 &&
+        !lower.includes('cookie') &&
+        !lower.includes('политика конфиденциальности') &&
+        !lower.includes('privacy policy') &&
+        !lower.includes('все права защищены') &&
+        !lower.includes('terms of service') &&
+        !lower.includes('пользовательское соглашение')
+      );
+    });
+
+  // Collect up to ~5500 characters of meaningful content
+  let content = '';
+  for (const para of paragraphs) {
+    if (content.length + para.length > 5500) break;
+    content += (content ? '\n\n' : '') + para;
+  }
+
+  return { title, metaDesc, content };
+}
+
+/**
+ * 0. Web Page Reader / Fetcher
+ * Visits any web page URL, follows redirects, cleans HTML, and returns readable content.
+ */
+export async function fetchWebPageContent(
+  url: string,
+  timeoutMs: number = 5500
+): Promise<{ title: string; snippet: string; content: string; url: string; source: string } | null> {
+  try {
+    let targetUrl = url.trim();
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = `https://${targetUrl}`;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const res = await fetch(targetUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ru,en;q=0.9',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) return null;
+    const html = await res.text();
+    const parsed = extractReadableTextFromHtml(html);
+
+    const source = getHostnameFromUrl(targetUrl);
+    const title = parsed.title || source;
+    const snippet = parsed.metaDesc || parsed.content.substring(0, 220).trim();
+
+    if (!parsed.content && !snippet) return null;
+
+    return {
+      title,
+      snippet,
+      content: parsed.content || snippet,
+      url: targetUrl,
+      source,
+    };
+  } catch (err: any) {
+    console.warn('[WebSearch] fetchWebPageContent error for', url, err?.message);
+    return null;
+  }
+}
+
+/**
+ * 1. DuckDuckGo Lite Search Fetcher
+ * Fast, pure HTML search results with direct links and rich informative snippets.
+ * Uses attribute-order agnostic regex to reliably parse DDG Lite tables.
+ */
+async function fetchDuckDuckGoLite(query: string, maxResults: number = 4): Promise<WebSearchResult[]> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4500);
+
+    const res = await fetch('https://lite.duckduckgo.com/lite/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+      body: `q=${encodeURIComponent(query)}`,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) return [];
+    const html = await res.text();
+
+    const items: WebSearchResult[] = [];
+
+    // Attribute-order agnostic regex: matches <a ... class='result-link' ... href='...'> regardless of attribute order
+    const linkRegex = /<a\b(?=[^>]*\bclass=['"][^'"]*result-link[^'"]*['"])(?=[^>]*\bhref=['"]([^'"]+)['"])[^>]*>([\s\S]*?)<\/a>/gi;
+    const snippetRegex = /<td\b[^>]*\bclass=['"][^'"]*result-snippet[^'"]*['"][^>]*>([\s\S]*?)<\/td>/gi;
+
+    const linkMatches = [...html.matchAll(linkRegex)];
+    const snippetMatches = [...html.matchAll(snippetRegex)];
+
+    for (let i = 0; i < linkMatches.length && items.length < maxResults; i++) {
+      const rawUrl = linkMatches[i][1];
+      const cleanUrl = cleanDuckDuckGoUrl(rawUrl);
+      const title = decodeHtmlEntities(linkMatches[i][2].replace(/<[^>]+>/g, '').trim());
+      const snippet = snippetMatches[i]
+        ? decodeHtmlEntities(snippetMatches[i][1].replace(/<[^>]+>/g, '').trim())
+        : '';
+
+      if (title && cleanUrl && !cleanUrl.includes('duckduckgo.com')) {
+        items.push({
+          title,
+          snippet,
+          url: cleanUrl,
+          source: getHostnameFromUrl(cleanUrl),
+        });
+      }
+    }
+
+    return items;
+  } catch (err: any) {
+    console.warn('[WebSearch] DuckDuckGo Lite query error:', err?.message);
+    return [];
+  }
+}
+
+/**
+ * 2. DuckDuckGo HTML Fallback Search Fetcher
+ * Used when DDG Lite is unavailable or empty.
+ */
+async function fetchDuckDuckGoHtml(query: string, maxResults: number = 4): Promise<WebSearchResult[]> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4500);
+
+    const res = await fetch('https://html.duckduckgo.com/html/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+      body: `q=${encodeURIComponent(query)}`,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) return [];
+    const html = await res.text();
+
+    const titleMatches = [...html.matchAll(/<a\b[^>]*class=['"][^'"]*result__a[^'"]*['"][^>]*href=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/a>/gi)];
+    const snippetMatches = [...html.matchAll(/<a\b[^>]*class=['"][^'"]*result__snippet[^'"]*['"][^>]*>([\s\S]*?)<\/a>/gi)];
+
+    const items: WebSearchResult[] = [];
+    for (let i = 0; i < titleMatches.length && items.length < maxResults; i++) {
+      const rawUrl = titleMatches[i][1];
+      const cleanUrl = cleanDuckDuckGoUrl(rawUrl);
+      const title = decodeHtmlEntities(titleMatches[i][2].replace(/<[^>]+>/g, '').trim());
+      const snippet = snippetMatches[i]
+        ? decodeHtmlEntities(snippetMatches[i][1].replace(/<[^>]+>/g, '').trim())
+        : '';
+
+      if (title && cleanUrl && !cleanUrl.includes('duckduckgo.com')) {
+        items.push({
+          title,
+          snippet,
+          url: cleanUrl,
+          source: getHostnameFromUrl(cleanUrl),
+        });
+      }
+    }
+    return items;
+  } catch (err: any) {
+    console.warn('[WebSearch] DuckDuckGo HTML query error:', err?.message);
+    return [];
+  }
+}
+
+/**
+ * 3. DuckDuckGo Instant Answers API
+ * Fast factual answers, abstracts, and related topics
+ */
+async function fetchDuckDuckGoInstantAnswer(query: string): Promise<WebSearchResult | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+
+    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.Abstract && data.AbstractURL) {
+      return {
+        title: data.Heading || query,
+        snippet: data.Abstract,
+        url: data.AbstractURL,
+        source: data.AbstractSource || 'DuckDuckGo Instant Answer',
+        content: data.Abstract,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 4. Google News RSS Fetcher
+ * Real-time news, articles, and current events with publication dates.
  */
 async function fetchGoogleNews(query: string, maxResults: number = 4): Promise<WebSearchResult[]> {
   try {
@@ -147,17 +677,13 @@ async function fetchGoogleNews(query: string, maxResults: number = 4): Promise<W
       const linkM = /<link>([\s\S]*?)<\/link>/.exec(chunk);
       const pubDateM = /<pubDate>([\s\S]*?)<\/pubDate>/.exec(chunk);
       const sourceM = /<source[^>]*>([\s\S]*?)<\/source>/.exec(chunk);
+      const descM = /<description>([\s\S]*?)<\/description>/.exec(chunk);
 
       if (titleM) {
-        let rawTitle = titleM[1]
-          .replace(/<[^>]+>/g, '')
-          .replace(/&quot;/g, '"')
-          .replace(/&amp;/g, '&')
-          .replace(/&#39;/g, "'")
-          .trim();
+        const rawTitle = decodeHtmlEntities(titleM[1].replace(/<[^>]+>/g, '').trim());
         const link = linkM ? linkM[1].trim() : '';
         const sourceName = sourceM
-          ? sourceM[1].replace(/<[^>]+>/g, '').trim()
+          ? decodeHtmlEntities(sourceM[1].replace(/<[^>]+>/g, '').trim())
           : 'Google News';
 
         let formattedDate = '';
@@ -174,9 +700,10 @@ async function fetchGoogleNews(query: string, maxResults: number = 4): Promise<W
           } catch {}
         }
 
+        const rawDesc = descM ? decodeHtmlEntities(descM[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) : '';
         const snippet = formattedDate
-          ? `[${formattedDate}] Источник: ${sourceName}`
-          : `Источник: ${sourceName}`;
+          ? `[${formattedDate}] ${sourceName}: ${rawDesc || rawTitle}`
+          : `${sourceName}: ${rawDesc || rawTitle}`;
 
         if (rawTitle && link) {
           items.push({
@@ -197,74 +724,8 @@ async function fetchGoogleNews(query: string, maxResults: number = 4): Promise<W
 }
 
 /**
- * 2. DuckDuckGo HTML Search Fetcher
- * Organic web-wide search results across blogs, documentation, portals, and media.
- */
-async function fetchDuckDuckGoHtml(query: string, maxResults: number = 4): Promise<WebSearchResult[]> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4500);
-
-    const res = await fetch('https://html.duckduckgo.com/html/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-      body: `q=${encodeURIComponent(query)}`,
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (!res.ok) return [];
-    const html = await res.text();
-
-    // Check for DDG bot challenge/anomaly
-    if (html.includes('anomaly-modal') || html.includes('challenge-form')) {
-      return [];
-    }
-
-    const items: WebSearchResult[] = [];
-    const chunks = html.split(/class=['"](?:result\s+results_links|result__body|links_main)/i);
-
-    for (let i = 1; i < chunks.length && items.length < maxResults; i++) {
-      const chunk = chunks[i];
-      const titleMatch = chunk.match(
-        /<a[^>]*class=['"][^'"]*result__a[^'"]*['"][^>]*href=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/a>/i
-      );
-      const snipMatch =
-        chunk.match(/<a[^>]*class=['"][^'"]*result__snippet[^'"]*['"][^>]*>([\s\S]*?)<\/a>/i) ||
-        chunk.match(/class=['"]result__snippet['"][^>]*>([\s\S]*?)<\/(?:a|td|div)>/i);
-
-      if (titleMatch) {
-        const rawUrl = titleMatch[1];
-        const cleanUrl = cleanDuckDuckGoUrl(rawUrl);
-        const title = titleMatch[2].replace(/<[^>]+>/g, '').trim();
-        const snippet = snipMatch ? snipMatch[1].replace(/<[^>]+>/g, '').trim() : '';
-
-        if (title && !cleanUrl.includes('duckduckgo.com')) {
-          items.push({
-            title,
-            snippet,
-            url: cleanUrl,
-            source: 'Веб',
-          });
-        }
-      }
-    }
-
-    return items;
-  } catch (err: any) {
-    console.warn('[WebSearch] DuckDuckGo HTML query error:', err?.message);
-    return [];
-  }
-}
-
-/**
- * 3. Wikipedia API Fetcher
- * Used exclusively for academic and definitional queries, avoiding news pollution.
+ * 5. Wikipedia API Fetcher with Rich Extract Support
+ * Used for encyclopedic, biographical, scientific, and definitional queries.
  */
 async function fetchWikipedia(query: string, maxResults: number = 2): Promise<WebSearchResult[]> {
   try {
@@ -278,17 +739,17 @@ async function fetchWikipedia(query: string, maxResults: number = 2): Promise<We
     const timer = setTimeout(() => controller.abort(), 3500);
 
     const wikiRes = await fetch(wikiUrl, {
-      headers: { 'User-Agent': 'SmartStudyHub/1.4 (academic app)' },
+      headers: { 'User-Agent': 'SmartStudyHub/1.5 (academic app)' },
       signal: controller.signal,
     });
     clearTimeout(timer);
 
     if (!wikiRes.ok) return [];
     const data = await wikiRes.json();
-    const items = data?.query?.search || [];
+    const searchItems = data?.query?.search || [];
     const results: WebSearchResult[] = [];
 
-    for (const item of items) {
+    for (const item of searchItems) {
       if (results.length >= maxResults) break;
       if (
         item.title &&
@@ -297,15 +758,37 @@ async function fetchWikipedia(query: string, maxResults: number = 2): Promise<We
         continue;
       }
 
-      const cleanSnippet = (item.snippet || '').replace(/<[^>]+>/g, '').trim();
-      if (cleanSnippet) {
+      const cleanSnippet = decodeHtmlEntities((item.snippet || '').replace(/<[^>]+>/g, '').trim());
+      const pageUrl = `https://${wikiLang}.wikipedia.org/wiki/${encodeURIComponent(
+        item.title.replace(/ /g, '_')
+      )}`;
+
+      // Fetch clean plain-text lead extract from Wikipedia API directly
+      let richContent = cleanSnippet;
+      try {
+        const extractUrl = `https://${wikiLang}.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&titles=${encodeURIComponent(
+          item.title
+        )}&format=json`;
+        const extractRes = await fetch(extractUrl, {
+          headers: { 'User-Agent': 'SmartStudyHub/1.5 (academic app)' },
+        });
+        if (extractRes.ok) {
+          const extractData = await extractRes.json();
+          const pages = extractData?.query?.pages || {};
+          const firstPage = Object.values(pages)[0] as any;
+          if (firstPage?.extract) {
+            richContent = firstPage.extract.trim();
+          }
+        }
+      } catch {}
+
+      if (cleanSnippet || richContent) {
         results.push({
           title: item.title,
-          snippet: cleanSnippet,
-          url: `https://${wikiLang}.wikipedia.org/wiki/${encodeURIComponent(
-            item.title.replace(/ /g, '_')
-          )}`,
+          snippet: cleanSnippet || richContent.substring(0, 180),
+          url: pageUrl,
           source: 'Wikipedia',
+          content: richContent,
         });
       }
     }
@@ -317,13 +800,17 @@ async function fetchWikipedia(query: string, maxResults: number = 2): Promise<We
 }
 
 /**
- * Perform web search using multi-source cascade: Google News RSS, DuckDuckGo HTML, and Wikipedia
+ * Perform web search using multi-source cascade & live page reading:
+ * 1. Extracts direct URLs / bare domains from query and fetches them directly.
+ * 2. Cleans conversational fluff into laser-targeted search keywords.
+ * 3. Queries DuckDuckGo Lite (with HTML & Instant Answers fallback), Google News RSS, and Wikipedia.
+ * 4. Automatically reads full readable content from top search results.
  */
-export async function searchWeb(query: string, maxResults: number = 4): Promise<WebSearchResult[]> {
-  const sanitized = sanitizeSearchQuery(query);
-  if (!sanitized) return [];
-
-  const timeSensitive = isTimeSensitiveQuery(query) || isTimeSensitiveQuery(sanitized);
+export async function searchWeb(
+  query: string,
+  maxResults: number = 4,
+  onStatus?: (status: string) => void
+): Promise<WebSearchResult[]> {
   const results: WebSearchResult[] = [];
   const seenUrls = new Set<string>();
 
@@ -338,41 +825,111 @@ export async function searchWeb(query: string, maxResults: number = 4): Promise<
     }
   };
 
-  if (timeSensitive) {
-    // 1. Time-sensitive query: Google News RSS is primary (accurate real-time sources with 2026 dates)
-    const [newsItems, ddgItems] = await Promise.all([
-      fetchGoogleNews(sanitized, maxResults),
-      fetchDuckDuckGoHtml(sanitized, 2),
-    ]);
-    addResults(newsItems);
-    addResults(ddgItems);
+  // 1. Direct URL check: if the user included a link or website domain, directly read it
+  const directUrls = extractUrlsFromText(query);
+  if (directUrls.length > 0) {
+    for (const url of directUrls.slice(0, 2)) {
+      onStatus?.(`Читаем сайт: ${getHostnameFromUrl(url)}`);
+      const page = await fetchWebPageContent(url, 5000);
+      if (page) {
+        addResults([
+          {
+            title: page.title,
+            snippet: page.snippet,
+            url: page.url,
+            source: page.source,
+            content: page.content,
+          },
+        ]);
+      }
+    }
+    // If the prompt was only a URL or request to read it, return the page directly
+    const remainingText = query
+      .replace(URL_WITH_PROTO_REGEX, '')
+      .replace(BARE_DOMAIN_REGEX, '')
+      .trim();
+    if (results.length > 0 && remainingText.length < 25) {
+      return results;
+    }
+  }
 
-    // If still empty (e.g. niche query), try broader query
-    if (results.length === 0 && sanitized !== query.trim()) {
+  // 2. Clean conversational fluff into focused keywords
+  const cleanKeywords = extractSearchKeywords(query);
+  if (!cleanKeywords) return results;
+
+  onStatus?.(`Ищем: ${cleanKeywords}`);
+
+  const timeSensitive = isTimeSensitiveQuery(query) || isTimeSensitiveQuery(cleanKeywords);
+
+  if (timeSensitive) {
+    // Current events / news cascade: DuckDuckGo Lite + Google News RSS
+    let ddgItems = await fetchDuckDuckGoLite(cleanKeywords, maxResults);
+    if (ddgItems.length === 0) {
+      ddgItems = await fetchDuckDuckGoHtml(cleanKeywords, maxResults);
+    }
+    const newsItems = await fetchGoogleNews(cleanKeywords, 2);
+
+    addResults(ddgItems);
+    addResults(newsItems);
+
+    // If still empty, fallback to raw query or broader news search
+    if (results.length === 0 && cleanKeywords !== query.trim()) {
       const fallbackNews = await fetchGoogleNews(query.trim(), maxResults);
       addResults(fallbackNews);
     }
   } else {
-    // 2. General / Academic query: Organic web search + Google News + Wikipedia definition
-    const [ddgItems, newsItems] = await Promise.all([
-      fetchDuckDuckGoHtml(sanitized, 3),
-      fetchGoogleNews(sanitized, 2),
+    // General or academic cascade: DuckDuckGo Lite + Wikipedia + Instant Answers + Google News
+    const [ddgLiteItems, wikiItems, instantAnswer] = await Promise.all([
+      fetchDuckDuckGoLite(cleanKeywords, 3),
+      fetchWikipedia(cleanKeywords, 2),
+      fetchDuckDuckGoInstantAnswer(cleanKeywords),
     ]);
-    addResults(ddgItems);
-    addResults(newsItems);
 
-    // If organic search yielded < 2 results, supplement with Wikipedia
-    if (results.length < 2) {
-      const wikiItems = await fetchWikipedia(sanitized, 2);
-      addResults(wikiItems);
+    if (instantAnswer) {
+      addResults([instantAnswer]);
     }
+
+    let ddgItems = ddgLiteItems;
+    if (ddgItems.length === 0) {
+      ddgItems = await fetchDuckDuckGoHtml(cleanKeywords, 3);
+    }
+
+    addResults(ddgItems);
+    addResults(wikiItems);
+
+    if (results.length < 2) {
+      const newsItems = await fetchGoogleNews(cleanKeywords, 2);
+      addResults(newsItems);
+    }
+  }
+
+  // 3. Deep Page Reader: For top results with snippets, fetch full article body if not yet fetched
+  const readableCandidates = results.filter(
+    (r) => !r.content && r.url.startsWith('http') && !r.url.includes('news.google.com/rss/articles')
+  );
+
+  if (readableCandidates.length > 0) {
+    const toFetch = readableCandidates.slice(0, 2);
+    await Promise.all(
+      toFetch.map(async (candidate) => {
+        try {
+          const page = await fetchWebPageContent(candidate.url, 4000);
+          if (page && page.content) {
+            candidate.content = page.content;
+            if (page.title && page.title.length > candidate.title.length) {
+              candidate.title = page.title;
+            }
+          }
+        } catch {}
+      })
+    );
   }
 
   return results;
 }
 
 /**
- * Builds formatted system prompt additions based on search results
+ * Builds formatted system prompt additions based on rich search results and page content
  */
 export function buildWebSearchPromptContext(query: string, results: WebSearchResult[]): string {
   if (!results || results.length === 0) return '';
@@ -381,33 +938,36 @@ export function buildWebSearchPromptContext(query: string, results: WebSearchRes
   const year = now.getFullYear();
   const monthNames = [
     'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
   ];
   const dayNames = [
-    'воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'
+    'воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота',
   ];
   const dateStr = `${now.getDate()} ${monthNames[now.getMonth()]} ${year} года (${dayNames[now.getDay()]})`;
 
   const formattedSources = results
-    .map(
-      (r, i) =>
-        `[Источник ${i + 1}]: "${r.title}" (${r.source})\nСсылка: ${r.url}\nИнформация: ${r.snippet}`
-    )
+    .map((r, i) => {
+      let block = `[Источник ${i + 1}]: "${r.title}" (${r.source})\nСсылка: ${r.url}\nКратко: ${r.snippet}`;
+      if (r.content && r.content.trim().length > 0) {
+        block += `\nВыдержка из текста страницы:\n"""\n${r.content.trim()}\n"""`;
+      }
+      return block;
+    })
     .join('\n\n');
 
   return `
-[АКТУАЛЬНЫЕ ДАННЫЕ ИЗ ВЕБ-ПОИСКА В СЕТИ]:
-Поисковый запрос пользователя: "${sanitizeSearchQuery(query)}"
+[АКТУАЛЬНЫЕ ДАННЫЕ ИЗ ВЕБ-ПОИСКА В СЕТИ И ИНТЕРНЕТ-СТРАНИЦ]:
+Поисковый запрос пользователя: "${extractSearchKeywords(query)}"
 Текущая дата в реальном мире: ${dateStr}.
 Текущий год: ${year} год.
 
-Найденные актуальные источники из интернета:
+Найденные актуальные источники и выдержки из материалов:
 ${formattedSources}
 
 Инструкция по использованию веб-поиска:
-1. Используй эти актуальные факты и данные при ответе на вопрос пользователя.
+1. Используй эти актуальные факты, цитаты, цифры и данные при ответе на вопрос пользователя.
 2. ВНИМАНИЕ: реальный мир сейчас находится в ${year} году. Ни в коем случае не утверждай, что сейчас 2023, 2024 или иной прошедший год. Не цитируй устаревшие архивные данные, если найдены свежие факты.
-3. Отвечай прямо, точно, современно и структурированно на русском языке.
-4. Если пользователь спрашивает о текущих событиях, персоналиях, курсах, релизах или новостях — опирайся строго на предоставленные результаты поиска.
+3. Отвечай прямо, точно, современно и структурированно на русском языке. При необходимости ссылайся на источники в формате Markdown: [Название источника](URL).
+4. Если пользователь спрашивает о текущих событиях, персоналиях, курсах, релизах, новостях или содержимом сайтов — опирайся строго на предоставленные результаты поиска.
 `;
 }

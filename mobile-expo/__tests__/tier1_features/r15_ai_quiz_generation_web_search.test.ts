@@ -1,6 +1,10 @@
 import {
   shouldPerformWebSearch,
   buildWebSearchPromptContext,
+  extractUrlsFromText,
+  extractSearchKeywords,
+  extractReadableTextFromHtml,
+  cleanDuckDuckGoUrl,
   WebSearchResult,
 } from '../../src/services/webSearchService';
 import {
@@ -45,6 +49,61 @@ describe('AI Quiz Generation Enhancements & Web Search Service', () => {
       expect(context).toContain('Запуск квантового процессора 2026');
       expect(context).toContain('https://example.com/quantum-2026');
       expect(context).toContain('1000-кубитный процессор');
+    });
+
+    test('extracts and normalizes URLs including bare domains', () => {
+      const urls1 = extractUrlsFromText('Зайди на habr.com/ru/articles/793574/ и расскажи суть');
+      expect(urls1).toContain('https://habr.com/ru/articles/793574/');
+
+      const urls2 = extractUrlsFromText('Посмотри lenta.ru и https://github.com/facebook/react');
+      expect(urls2).toContain('https://lenta.ru');
+      expect(urls2).toContain('https://github.com/facebook/react');
+    });
+
+    test('cleans conversational fluff into laser-targeted search keywords', () => {
+      const kw1 = extractSearchKeywords('Привет! Подскажи пожалуйста, кто сейчас чемпион мира по шахматам?');
+      expect(kw1).toContain('чемпион');
+      expect(kw1).toContain('шахматам');
+      expect(kw1).not.toContain('Привет');
+      expect(kw1).not.toContain('пожалуйста');
+
+      const kw2 = extractSearchKeywords('Вышел ли уже новый React 19?');
+      expect(kw2).toContain('React 19');
+    });
+
+    test('unwraps DuckDuckGo uddg redirect links', () => {
+      const uddgUrl = 'https://duckduckgo.com/l/?uddg=https%3A%2F%2Fopenai.com%2Findex%2Fhello-gpt-4o%2F&rut=...';
+      expect(cleanDuckDuckGoUrl(uddgUrl)).toBe('https://openai.com/index/hello-gpt-4o/');
+    });
+
+    test('extracts clean text from HTML without CSS or script leaks', () => {
+      const html = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>body { color: red; } @media (min-width: 640px) { .box { width: 100px; } }</style>
+            <script>console.log("secret tracker");</script>
+          </head>
+          <body>
+            <header><nav><a href="/">Home</a></nav></header>
+            <main>
+              <article>
+                <h1>Запуск нового научного спутника</h1>
+                <p>Ученые успешно вывели на орбиту новый исследовательский аппарат для мониторинга климата Земли.</p>
+                <p>Миссия рассчитана на пять лет непрерывных климатических измерений.</p>
+              </article>
+            </main>
+            <footer>Все права защищены 2026</footer>
+          </body>
+        </html>
+      `;
+      const parsed = extractReadableTextFromHtml(html);
+      expect(parsed.title).toBe('');
+      expect(parsed.content).toContain('Запуск нового научного спутника');
+      expect(parsed.content).toContain('Ученые успешно вывели на орбиту');
+      expect(parsed.content).not.toContain('@media');
+      expect(parsed.content).not.toContain('secret tracker');
+      expect(parsed.content).not.toContain('color: red');
     });
   });
 
