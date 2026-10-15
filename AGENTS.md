@@ -55,3 +55,9 @@
 - Hide VK button for: Ukraine (UA) and all non-CIS countries with non-Russian language.
 - On Android: if installed from RuStore (ru.vk.store), always show VK button regardless of region.
 - The CIS country list is defined in CIS_COUNTRY_CODES constant. Ukraine is explicitly excluded.
+
+## AI Assistant & Web Search
+- Все запросы веб-поиска должны быть предварительно очищены от разговорного мусора и стоп-слов: поисковикам отправляются исключительно ключевые термины, имена, версии и актуальные даты (запрещено копировать весь сырой промпт пользователя).
+- Парсинг HTML веб-страниц обязан полностью вырезать теги `<script>`, `<style>`, `<svg>`, `<noscript>`, `<nav>`, `<aside>`, стили `@media` и служебные блоки до извлечения текста статьи, исключая любую утечку CSS/JS в контекст модели.
+- Ссылки и домены без протокола (например, `habr.com`, `lenta.ru`, `wikipedia.org/wiki/...`) обязаны автоматически распознаваться и нормализоваться к `https://`.
+- В чате модели Markdown-ссылки `[Текст](url)` и прямые ссылки обязаны рендериться кликабельными компонентами с переходом по клику через `Linking.openURL`.
