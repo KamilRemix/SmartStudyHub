@@ -5,6 +5,7 @@ import {
   extractSearchKeywords,
   extractReadableTextFromHtml,
   cleanDuckDuckGoUrl,
+  normalizeWebUrl,
   resolveConversationalQuery,
   WebSearchResult,
 } from '../../src/services/webSearchService';
@@ -89,6 +90,62 @@ describe('AI Quiz Generation Enhancements & Web Search Service', () => {
       const keywords = extractSearchKeywords(resolved);
       expect(keywords).toContain('OpenAI Sora');
       expect(keywords).toContain('релиз');
+    });
+
+    test('normalizes Google redirects and converts Google Docs / Sheets / Slides to export endpoints', () => {
+      // 1. Google Search redirect
+      const googleRedirect =
+        'https://www.google.com/url?q=https://react.dev/blog/2024/12/05/react-19&sa=U&ved=2ahUKEwj123';
+      expect(normalizeWebUrl(googleRedirect)).toBe('https://react.dev/blog/2024/12/05/react-19');
+
+      // 2. Google Docs
+      const gDoc = 'https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing';
+      expect(normalizeWebUrl(gDoc)).toBe(
+        'https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/export?format=txt'
+      );
+
+      // 3. Google Sheets
+      const gSheet = 'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit#gid=0';
+      expect(normalizeWebUrl(gSheet)).toBe(
+        'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/export?format=csv'
+      );
+
+      // 4. Google Slides
+      const gSlide = 'https://docs.google.com/presentation/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit';
+      expect(normalizeWebUrl(gSlide)).toBe(
+        'https://docs.google.com/presentation/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/export/txt'
+      );
+    });
+
+    test('builds dedicated user link prompt context when query contains direct URL', () => {
+      const mockResult: WebSearchResult[] = [
+        {
+          title: 'Лекция по физике: Термодинамика',
+          snippet: 'Первое начало термодинамики и изопроцессы.',
+          content: 'Полный текст лекции: количество теплоты, переданное системе, идет на изменение внутренней энергии.',
+          url: 'https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/export?format=txt',
+          source: 'docs.google.com',
+        },
+      ];
+
+      const userPrompt = 'https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit прочитай этот документ и расскажи суть';
+      const context = buildWebSearchPromptContext(userPrompt, mockResult);
+
+      expect(context).toContain('[СОДЕРЖИМОЕ СТРАНИЦ ПО ССЫЛКЕ ПОЛЬЗОВАТЕЛЯ]');
+      expect(context).toContain('Внимательно изучи прочитанный текст выше');
+      expect(context).toContain('Лекция по физике: Термодинамика');
+      expect(context).toContain('Полный текст лекции');
+    });
+
+    test('recovers link from history when user follows up with question about the link', () => {
+      const history = [
+        { role: 'user', content: 'https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit' },
+        { role: 'model', content: 'Я прочитал этот документ. Что вы хотите узнать?' },
+      ];
+
+      const resolved = resolveConversationalQuery('что в ней написано?', history);
+      expect(resolved).toContain('https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit');
+      expect(shouldPerformWebSearch(resolved, false)).toBe(true);
     });
 
     test('extracts clean text from HTML without CSS or script leaks', () => {

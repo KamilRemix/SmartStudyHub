@@ -57,6 +57,8 @@ import {
   shouldPerformWebSearch,
   buildWebSearchPromptContext,
   extractSearchKeywords,
+  extractUrlsFromText,
+  getHostnameFromUrl,
   resolveConversationalQuery,
   WebSearchResult,
 } from './webSearchService';
@@ -321,8 +323,13 @@ export async function sendChatMessage(
   const doSearch = shouldPerformWebSearch(contextualQuery, !!webSearchEnabled);
   if (doSearch && !imageAttachment?.base64) {
     try {
-      const cleanKeywords = extractSearchKeywords(contextualQuery);
-      onSearchStatus?.(cleanKeywords || contextualQuery);
+      const directUrls = extractUrlsFromText(contextualQuery);
+      if (directUrls.length > 0) {
+        onSearchStatus?.(`Читаем страницу: ${getHostnameFromUrl(directUrls[0])}`);
+      } else {
+        const cleanKeywords = extractSearchKeywords(contextualQuery);
+        onSearchStatus?.(cleanKeywords || contextualQuery);
+      }
       foundSources = await searchWeb(contextualQuery, 4, (status) => {
         // Strip prefix if any so status message looks clean
         const displayStatus = status.replace(/^Ищем:\s*/i, '');

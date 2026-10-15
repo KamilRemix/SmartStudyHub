@@ -311,20 +311,72 @@ export function shouldPerformWebSearch(prompt: string, manualToggle: boolean): b
 }
 
 /**
+ * Normalizes input URL, unwrapping search redirects (Google, DuckDuckGo, Yandex)
+ * and converting Google Docs/Sheets view links into clean export endpoints for reading.
+ */
+export function normalizeWebUrl(rawUrl: string): string {
+  let url = rawUrl.trim();
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = `https://${url}`;
+  }
+
+  try {
+    const parsed = new URL(url);
+
+    // 1. Google Search Redirect: google.com/url?q=... or google.com/url?url=...
+    if (parsed.hostname.includes('google.') && parsed.pathname === '/url') {
+      const target = parsed.searchParams.get('q') || parsed.searchParams.get('url');
+      if (target && target.startsWith('http')) {
+        return target;
+      }
+    }
+
+    // 2. Google Docs: convert /edit or /view to export?format=txt for clean text extraction
+    const gDocMatch = url.match(/https?:\/\/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/i);
+    if (gDocMatch) {
+      const docId = gDocMatch[1];
+      return `https://docs.google.com/document/d/${docId}/export?format=txt`;
+    }
+
+    // 3. Google Sheets: convert /edit to export?format=csv
+    const gSheetMatch = url.match(/https?:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/i);
+    if (gSheetMatch) {
+      const sheetId = gSheetMatch[1];
+      return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+    }
+
+    // 4. Google Slides: convert /edit or /view to export/txt
+    const gSlideMatch = url.match(/https?:\/\/docs\.google\.com\/presentation\/d\/([a-zA-Z0-9_-]+)/i);
+    if (gSlideMatch) {
+      const slideId = gSlideMatch[1];
+      return `https://docs.google.com/presentation/d/${slideId}/export/txt`;
+    }
+
+    // 5. DuckDuckGo Redirect: duckduckgo.com/l/?uddg=...
+    if (parsed.hostname.includes('duckduckgo.com') && parsed.pathname.startsWith('/l/')) {
+      const target = parsed.searchParams.get('uddg');
+      if (target) {
+        return decodeURIComponent(target);
+      }
+    }
+
+    // 5. Yandex Redirect: yandex.ru/clck/...
+    if (parsed.hostname.includes('yandex.') && parsed.pathname.startsWith('/clck/')) {
+      const target = parsed.searchParams.get('url') || parsed.searchParams.get('target');
+      if (target && target.startsWith('http')) {
+        return target;
+      }
+    }
+  } catch {}
+
+  return url;
+}
+
+/**
  * Clean URL from DuckDuckGo redirect format (uddg=...)
  */
 export function cleanDuckDuckGoUrl(rawUrl: string): string {
-  try {
-    const uddgMatch = /[?&]uddg=([^&]+)/.exec(rawUrl);
-    if (uddgMatch) {
-      return decodeURIComponent(uddgMatch[1]);
-    }
-    // Relative protocol // -> https://
-    if (rawUrl.startsWith('//')) {
-      return `https:${rawUrl}`;
-    }
-  } catch {}
-  return rawUrl;
+  return normalizeWebUrl(rawUrl);
 }
 
 /**
@@ -453,13 +505,10 @@ export function extractReadableTextFromHtml(html: string): { title: string; meta
  */
 export async function fetchWebPageContent(
   url: string,
-  timeoutMs: number = 5500
+  timeoutMs: number = 7000
 ): Promise<{ title: string; snippet: string; content: string; url: string; source: string } | null> {
   try {
-    let targetUrl = url.trim();
-    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-      targetUrl = `https://${targetUrl}`;
-    }
+    const targetUrl = normalizeWebUrl(url);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -469,27 +518,82 @@ export async function fetchWebPageContent(
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        Accept: 'text/html,text/plain,text/csv,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'ru,en;q=0.9',
       },
       signal: controller.signal,
     });
     clearTimeout(timer);
 
-    if (!res.ok) return null;
-    const html = await res.text();
-    const parsed = extractReadableTextFromHtml(html);
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        if (targetUrl.includes('docs.google.com')) {
+          return {
+            title: 'Google Документ (Требуется доступ)',
+            snippet: 'Документ закрыт настройками приватности.',
+            content:
+              'Этот Google Документ или Таблица закрыты для публичного доступа. Откройте доступ в Google Docs: "Поделиться" -> "Все, у кого есть ссылка" (Читатель), чтобы ИИ мог прочитать его.',
+            url: targetUrl,
+            source: 'docs.google.com',
+          };
+        }
+      }
+      return null;
+    }
+
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    const rawText = await res.text();
+
+    if (!rawText || rawText.trim().length === 0) return null;
+
+    // Check if Google redirected to a login page
+    if (
+      targetUrl.includes('docs.google.com') &&
+      (rawText.includes('ServiceLogin') || rawText.includes('accounts.google.com') || rawText.includes('identifierId'))
+    ) {
+      return {
+        title: 'Google Документ (Требуется доступ)',
+        snippet: 'Документ закрыт настройками приватности.',
+        content:
+          'Этот Google Документ или Таблица закрыты для публичного чтения. Пожалуйста, откройте доступ в Google Docs ("Поделиться" -> "Все, у кого есть ссылка"), чтобы ИИ мог проанализировать его.',
+        url: targetUrl,
+        source: 'docs.google.com',
+      };
+    }
 
     const source = getHostnameFromUrl(targetUrl);
-    const title = parsed.title || source;
-    const snippet = parsed.metaDesc || parsed.content.substring(0, 220).trim();
+    let title = source;
+    let snippet = '';
+    let content = '';
 
-    if (!parsed.content && !snippet) return null;
+    // Plain text / CSV / JSON or raw text response (e.g. Google Docs / Sheets exports)
+    if (
+      contentType.includes('text/plain') ||
+      contentType.includes('text/csv') ||
+      contentType.includes('application/json') ||
+      (!rawText.includes('<html') && !rawText.includes('<!DOCTYPE') && !rawText.includes('<body'))
+    ) {
+      content = rawText.trim();
+      title = targetUrl.includes('docs.google.com') ? 'Документ Google' : source;
+      snippet = content.substring(0, 240).trim();
+    } else {
+      const parsed = extractReadableTextFromHtml(rawText);
+      title = parsed.title || source;
+      snippet = parsed.metaDesc || parsed.content.substring(0, 220).trim();
+      content = parsed.content || snippet;
+    }
+
+    if (!content && !snippet) return null;
+
+    // Limit single page content to prevent blowing up model context (max 12,000 chars)
+    if (content.length > 12000) {
+      content = `${content.substring(0, 12000)}\n... [текст сокращен для размера контекста]`;
+    }
 
     return {
       title,
       snippet,
-      content: parsed.content || snippet,
+      content,
       url: targetUrl,
       source,
     };
@@ -845,9 +949,9 @@ export async function searchWeb(
   // 1. Direct URL check: if the user included a link or website domain, directly read it
   const directUrls = extractUrlsFromText(query);
   if (directUrls.length > 0) {
-    for (const url of directUrls.slice(0, 2)) {
+    for (const url of directUrls.slice(0, 3)) {
       onStatus?.(`Читаем сайт: ${getHostnameFromUrl(url)}`);
-      const page = await fetchWebPageContent(url, 5000);
+      const page = await fetchWebPageContent(url, 7000);
       if (page) {
         addResults([
           {
@@ -860,12 +964,9 @@ export async function searchWeb(
         ]);
       }
     }
-    // If the prompt was only a URL or request to read it, return the page directly
-    const remainingText = query
-      .replace(URL_WITH_PROTO_REGEX, '')
-      .replace(BARE_DOMAIN_REGEX, '')
-      .trim();
-    if (results.length > 0 && remainingText.length < 25) {
+    // If the user provided direct links and we successfully retrieved their content,
+    // return them directly to avoid polluting context with general web search
+    if (results.length > 0) {
       return results;
     }
   }
@@ -962,6 +1063,9 @@ export function buildWebSearchPromptContext(query: string, results: WebSearchRes
   ];
   const dateStr = `${now.getDate()} ${monthNames[now.getMonth()]} ${year} года (${dayNames[now.getDay()]})`;
 
+  const directUrls = extractUrlsFromText(query);
+  const isDirectLinkAnalysis = directUrls.length > 0;
+
   const formattedSources = results
     .map((r, i) => {
       let block = `[Источник ${i + 1}]: "${r.title}" (${r.source})\nСсылка: ${r.url}\nКратко: ${r.snippet}`;
@@ -971,6 +1075,24 @@ export function buildWebSearchPromptContext(query: string, results: WebSearchRes
       return block;
     })
     .join('\n\n');
+
+  if (isDirectLinkAnalysis) {
+    return `
+[СОДЕРЖИМОЕ СТРАНИЦ ПО ССЫЛКЕ ПОЛЬЗОВАТЕЛЯ]:
+Пользователь предоставил ссылку и просит проанализировать, прочитать или ответить на вопросы по её содержимому.
+Исходный запрос пользователя: "${query}"
+Текущая дата: ${dateStr}.
+
+Прочитанные материалы по предоставленной ссылке:
+${formattedSources}
+
+Инструкция для модели:
+1. Внимательно изучи прочитанный текст выше. Ответь строго, полно и детально на вопрос пользователя относительно этого материала.
+2. Если пользователь попросил краткий пересказ, выдели главные тезисы, ключевые мысли и выводы.
+3. Если пользователь задал конкретный вопрос по документу/странице, найди точный ответ в тексте выше и ответь.
+4. Отвечай прямо, точно и структурированно на русском языке. При необходимости ссылайся на источник в формате [Название](URL).
+`;
+  }
 
   return `
 [АКТУАЛЬНЫЕ ДАННЫЕ ИЗ ВЕБ-ПОИСКА В СЕТИ И ИНТЕРНЕТ-СТРАНИЦ]:
@@ -990,7 +1112,8 @@ ${formattedSources}
 }
 
 // Pronouns and reference particles indicating follow-up questions
-const PRONOUN_AND_ELLIPSIS_REGEX = /\b(он|она|оно|они|его|ее|их|ему|ей|им|нем|ней|них|это|этого|этому|этом|этот|эта|эти|эту|этих|туда|там|it|he|she|they|its|his|her|their|this|that)\b/i;
+const PRONOUN_AND_ELLIPSIS_REGEX =
+  /\b(он|она|оно|они|его|ее|их|ему|ей|им|нем|ней|них|это|этого|этому|этом|этот|эта|эти|эту|этих|туда|там|ссылк[а-я]*|документ[а-я]*|страниц[а-я]*|сайт[а-я]*|стать[а-я]*|it|he|she|they|its|his|her|their|this|that|link|document|page|site)\b/i;
 
 /**
  * Extracts the primary entity, product, or subject from the immediate prior conversation turns
@@ -1003,6 +1126,12 @@ export function extractTopicFromHistory(history?: Array<{ role: string; content:
     if (!msg || !msg.content || typeof msg.content !== 'string') continue;
     const text = msg.content.trim();
     if (text.length < 3) continue;
+
+    // 0. Look for explicit URLs in history (prior user message with link or assistant response referencing link)
+    const urlsInHistory = extractUrlsFromText(text);
+    if (urlsInHistory.length > 0) {
+      return urlsInHistory[0];
+    }
 
     // 1. Look for English capitalized entity names (e.g. OpenAI Sora, Playdate, React 19)
     const properNounMatches = text.match(/\b[A-Z][a-zA-Z0-9]*(?:\s+[A-Z0-9][a-zA-Z0-9]*)*\b/g);
