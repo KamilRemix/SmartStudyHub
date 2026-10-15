@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   Pressable,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
@@ -41,15 +43,50 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
     getCachedProviderHealth()
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const translateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!visible) return;
+    translateY.setValue(0);
     const unsubscribe = subscribeToHealthUpdates((updated) => {
       setHealthMap(updated);
     });
     pingAllProviders(false).catch(() => {});
     return () => unsubscribe();
   }, [visible]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        return gesture.dy > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx);
+      },
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dy > 0) {
+          translateY.setValue(gesture.dy);
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > 90 || gesture.vy > 0.4) {
+          Animated.timing(translateY, {
+            toValue: 500,
+            duration: 180,
+            useNativeDriver: true,
+          }).start(() => {
+            translateY.setValue(0);
+            onClose();
+          });
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            friction: 8,
+            tension: 90,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -209,14 +246,22 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
           accessibilityLabel="Закрыть выбор модели"
         />
 
-        <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+        <Animated.View
+          style={[
+            styles.modalCard,
+            { backgroundColor: colors.surface, transform: [{ translateY }] },
+          ]}
+        >
           {/* Top handle bar */}
-          <View style={styles.handleWrap}>
+          <View {...panResponder.panHandlers} style={styles.handleWrap}>
             <View style={[styles.handleBar, { backgroundColor: colors.borderColor }]} />
           </View>
 
           {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
+          <View
+            {...panResponder.panHandlers}
+            style={[styles.header, { borderBottomColor: colors.borderColor }]}
+          >
             <View style={styles.headerLeft}>
               <View style={[styles.iconBox, { backgroundColor: colors.componentBackground }]}>
                 <Feather name="cpu" size={18} color={colors.primaryAccent} />
@@ -385,7 +430,7 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
               </Text>
             </View>
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

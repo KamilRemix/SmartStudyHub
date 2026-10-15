@@ -83,13 +83,84 @@ export async function setActiveSessionId(id: string): Promise<void> {
   }
 }
 
+/**
+ * Generates an intelligent, clean, and concise title for a chat session from the first prompt.
+ * Strips conversational fluff ("Привет", "Помоги решить", etc.) and extracts the subject/topic.
+ */
+export function generateSmartChatTitle(rawPrompt: string): string {
+  if (!rawPrompt || typeof rawPrompt !== 'string') return 'Новый диалог';
+  let clean = rawPrompt.trim();
+
+  // 1. Photo / camera prompt
+  if (
+    clean.includes('[Изображение прикреплено]') ||
+    clean.toLowerCase().includes('задание с фото') ||
+    clean.toLowerCase().includes('задачу с фото') ||
+    clean.toLowerCase().includes('уравнение на фото')
+  ) {
+    const stripped = clean.replace(/\[Изображение прикреплено\]/gi, '').trim();
+    if (stripped.length > 3) {
+      const topic = stripped.replace(/^[,\s:!.-]+/, '');
+      return `Анализ фото: ${topic.slice(0, 24)}`.trim();
+    }
+    return 'Решение по фото';
+  }
+
+  // 2. Direct Web URLs or domain references
+  const urlMatch = clean.match(/(?:https?:\/\/)?([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\/[^\s]*)?/i);
+  if (urlMatch && clean.length < 140) {
+    const domain = urlMatch[1].replace(/^www\./i, '').toLowerCase();
+    if (domain.includes('docs.google.com')) return 'Документ Google';
+    if (domain.includes('wikipedia.org')) return 'Статья Wikipedia';
+    if (domain.includes('habr.com')) return 'Статья Habr';
+    if (domain.includes('github.com')) return 'Проект GitHub';
+    return `Анализ ${domain}`;
+  }
+
+  // 3. Strip conversational greetings & intent prefixes
+  const greetingPrefixes = [
+    /^(?:привет|здравствуй(?:те)?|добрый (?:день|вечер|утро)|хай|салют|hello|hi|hey)[,!.\s]+/i,
+    /^(?:подскажи(?: пожалуйста)?|пожалуйста|помоги(?: мне)?(?: решить)?|можешь помочь)[,!.\s]+/i,
+    /^(?:объясни(?: мне| пожалуйста)?|расскажи(?: мне| пожалуйста)?|как решить|реши(?:ть)?(?: мне)?)[,!.\s]+/i,
+    /^(?:что такое|кто такой|в чем разница|как работает|почему|зачем)[,\s]+/i,
+    /^(?:напиши|составь|придумай|найди|дай)[,\s]+/i,
+  ];
+
+  for (const prefix of greetingPrefixes) {
+    clean = clean.replace(prefix, '').trim();
+  }
+
+  // Strip trailing "пожалуйста" and punctuation
+  clean = clean.replace(/[,.\s]*пожалуйста[!.]*$/i, '').trim();
+  clean = clean.replace(/[?!:;.]+$/g, '').trim();
+
+  // If after stripping it became too short, restore cleaned original
+  if (clean.length < 3) {
+    clean = rawPrompt.trim().replace(/\n/g, ' ').replace(/[?!:;.]+$/g, '');
+  }
+
+  // Capitalize first letter
+  if (clean.length > 0) {
+    clean = clean.charAt(0).toUpperCase() + clean.slice(1);
+  }
+
+  // Truncate cleanly at word boundary (max ~34 chars)
+  if (clean.length > 34) {
+    const words = clean.split(/\s+/);
+    let truncated = '';
+    for (const w of words) {
+      if ((truncated + ' ' + w).trim().length > 30) break;
+      truncated = (truncated + ' ' + w).trim();
+    }
+    clean = (truncated || clean.slice(0, 30)).trim() + '...';
+  }
+
+  return clean || 'Новый диалог';
+}
+
 export async function createNewChatSession(firstPrompt?: string): Promise<ChatSession> {
   const sessions = await loadAllChatSessions();
-  let title = 'Новый диалог';
-  if (firstPrompt && firstPrompt.trim()) {
-    const clean = firstPrompt.trim().replace(/\n/g, ' ');
-    title = clean.length > 32 ? `${clean.slice(0, 32)}...` : clean;
-  }
+  const title = firstPrompt ? generateSmartChatTitle(firstPrompt) : 'Новый диалог';
 
   const newSession: ChatSession = {
     id: `chat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -105,6 +176,24 @@ export async function createNewChatSession(firstPrompt?: string): Promise<ChatSe
   return newSession;
 }
 
+export async function renameChatSession(
+  sessionId: string,
+  newTitle: string
+): Promise<ChatSession[]> {
+  const sessions = await loadAllChatSessions();
+  const index = sessions.findIndex((s) => s.id === sessionId);
+  if (index !== -1) {
+    const cleanTitle = newTitle.trim() || 'Новый диалог';
+    sessions[index] = {
+      ...sessions[index],
+      title: cleanTitle,
+      updatedAt: Date.now(),
+    };
+    await saveAllChatSessions(sessions);
+  }
+  return sessions;
+}
+
 export async function updateSessionMessages(
   sessionId: string,
   messages: ChatMessage[]
@@ -115,11 +204,7 @@ export async function updateSessionMessages(
   if (index === -1) {
     // If not found, create new session with these messages
     const firstUserMsg = messages.find((m) => m.role === 'user');
-    let title = 'Новый диалог';
-    if (firstUserMsg?.content) {
-      const clean = firstUserMsg.content.trim().replace(/\n/g, ' ');
-      title = clean.length > 32 ? `${clean.slice(0, 32)}...` : clean;
-    }
+    const title = firstUserMsg?.content ? generateSmartChatTitle(firstUserMsg.content) : 'Новый диалог';
 
     const newSession: ChatSession = {
       id: sessionId,
@@ -133,13 +218,12 @@ export async function updateSessionMessages(
     return updated;
   }
 
-  // Update existing session
+  // Update existing session title if default
   let title = sessions[index].title;
-  if (title === 'Новый диалог') {
+  if (!title || title === 'Новый диалог' || title === 'New Chat') {
     const firstUserMsg = messages.find((m) => m.role === 'user');
     if (firstUserMsg?.content) {
-      const clean = firstUserMsg.content.trim().replace(/\n/g, ' ');
-      title = clean.length > 32 ? `${clean.slice(0, 32)}...` : clean;
+      title = generateSmartChatTitle(firstUserMsg.content);
     }
   }
 

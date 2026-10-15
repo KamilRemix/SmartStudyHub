@@ -48,6 +48,7 @@ import {
   createNewChatSession,
   updateSessionMessages,
   deleteChatSession,
+  renameChatSession,
   getActiveSessionId,
   setActiveSessionId,
 } from '../../../services/aiChatStorageService';
@@ -117,6 +118,14 @@ export const AIAssistantScreen: React.FC = () => {
   const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
+  // Rename session state
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [showRenameModal, setShowRenameModal] = useState(false);
+
+  // Attach sheet swipe-to-dismiss
+  const attachTranslateY = useRef(new Animated.Value(0)).current;
+
   const flatListRef = useRef<FlatList>(null);
 
   // ─── Init ────────────────────────────────────────────────────────────────
@@ -177,40 +186,133 @@ export const AIAssistantScreen: React.FC = () => {
   }, [drawerAnim, backdropAnim]);
 
   // ─── Swipe Gestures (PanResponder) ───────────────────────────────────────
-  // Swipe right on main screen to open drawer
+  // Swipe right on main screen from left edge to open drawer with 1:1 tracking
   const mainPanResponder = useRef(
     PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gesture) => {
         return (
           !drawerOpen &&
-          gesture.dx > 25 &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.8
+          gesture.x0 < 70 &&
+          gesture.dx > 15 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5
         );
       },
+      onPanResponderMove: (_, gesture) => {
+        const offset = Math.min(0, -DRAWER_WIDTH + gesture.dx);
+        drawerAnim.setValue(offset);
+        const progress = Math.min(1, Math.max(0, (DRAWER_WIDTH + offset) / DRAWER_WIDTH));
+        backdropAnim.setValue(progress);
+      },
       onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx > 45 || gesture.vx > 0.3) {
+        if (gesture.dx > 60 || gesture.vx > 0.3) {
           openDrawer();
+        } else {
+          Animated.parallel([
+            Animated.timing(drawerAnim, {
+              toValue: -DRAWER_WIDTH,
+              duration: 180,
+              useNativeDriver: true,
+            }),
+            Animated.timing(backdropAnim, {
+              toValue: 0,
+              duration: 150,
+              useNativeDriver: true,
+            }),
+          ]).start();
         }
       },
     })
   ).current;
 
-  // Swipe left anywhere on open drawer panel to close
+  // Swipe left anywhere on open drawer panel to close with 1:1 tracking
   const drawerPanResponder = useRef(
     PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gesture) => {
         return (
-          gesture.dx < -15 &&
+          gesture.dx < -10 &&
           Math.abs(gesture.dx) > Math.abs(gesture.dy)
         );
       },
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dx < 0) {
+          drawerAnim.setValue(gesture.dx);
+          const progress = Math.max(0, 1 + gesture.dx / DRAWER_WIDTH);
+          backdropAnim.setValue(progress);
+        }
+      },
       onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx < -35 || gesture.vx < -0.3) {
+        if (gesture.dx < -50 || gesture.vx < -0.3) {
           closeDrawer();
+        } else {
+          Animated.parallel([
+            Animated.spring(drawerAnim, {
+              toValue: 0,
+              friction: 8,
+              tension: 90,
+              useNativeDriver: true,
+            }),
+            Animated.timing(backdropAnim, {
+              toValue: 1,
+              duration: 150,
+              useNativeDriver: true,
+            }),
+          ]).start();
         }
       },
     })
   ).current;
+
+  // Attach modal swipe-down-to-dismiss gesture
+  const attachPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        return gesture.dy > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx);
+      },
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dy > 0) {
+          attachTranslateY.setValue(gesture.dy);
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > 80 || gesture.vy > 0.4) {
+          Animated.timing(attachTranslateY, {
+            toValue: 400,
+            duration: 180,
+            useNativeDriver: true,
+          }).start(() => {
+            attachTranslateY.setValue(0);
+            setShowAttachModal(false);
+          });
+        } else {
+          Animated.spring(attachTranslateY, {
+            toValue: 0,
+            friction: 8,
+            tension: 90,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  // ─── Rename Handlers ─────────────────────────────────────────────────────
+  const handleOpenRename = (session: ChatSession) => {
+    setEditingSessionId(session.id);
+    setEditingTitle(session.title || 'Новый диалог');
+    setShowRenameModal(true);
+  };
+
+  const handleSaveRename = async () => {
+    if (!editingSessionId) return;
+    const clean = editingTitle.trim() || 'Новый диалог';
+    const updated = await renameChatSession(editingSessionId, clean);
+    setSessions(updated);
+    setShowRenameModal(false);
+    setEditingSessionId(null);
+  };
 
   // ─── Handlers ────────────────────────────────────────────────────────────
   const handleSelectProvider = async (providerId: AIProviderId) => {
@@ -577,6 +679,7 @@ export const AIAssistantScreen: React.FC = () => {
         <PressableScale
           style={styles.drawerSessionMain}
           onPress={() => handleSelectSession(session)}
+          onLongPress={() => handleOpenRename(session)}
         >
           <View
             style={[
@@ -618,14 +721,24 @@ export const AIAssistantScreen: React.FC = () => {
             </Text>
           </View>
         </PressableScale>
-        <PressableScale
-          style={styles.drawerDeleteBtn}
-          onPress={() => handleDeleteSession(session.id)}
-          accessibilityLabel="Удалить чат"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Feather name="trash-2" size={14} color={colors.textColorSecondary} />
-        </PressableScale>
+        <View style={styles.drawerItemActionsRow}>
+          <PressableScale
+            style={styles.drawerItemActionBtn}
+            onPress={() => handleOpenRename(session)}
+            accessibilityLabel="Переименовать чат"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="edit-2" size={13} color={colors.textColorSecondary} />
+          </PressableScale>
+          <PressableScale
+            style={styles.drawerItemActionBtn}
+            onPress={() => handleDeleteSession(session.id)}
+            accessibilityLabel="Удалить чат"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="trash-2" size={13} color={colors.textColorSecondary} />
+          </PressableScale>
+        </View>
       </View>
     );
   };
@@ -1078,14 +1191,20 @@ export const AIAssistantScreen: React.FC = () => {
             activeOpacity={1}
             onPress={() => setShowAttachModal(false)}
           />
-          <View
+          <Animated.View
             style={[
               styles.attachSheet,
-              { backgroundColor: colors.surface, borderColor: colors.borderColor },
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.borderColor,
+                transform: [{ translateY: attachTranslateY }],
+              },
             ]}
           >
-            <View style={[styles.sheetHandle, { backgroundColor: colors.borderColor }]} />
-            <Text style={[styles.sheetTitle, { color: colors.textColor }]}>
+            <View {...attachPanResponder.panHandlers} style={styles.sheetHandleWrap}>
+              <View style={[styles.sheetHandle, { backgroundColor: colors.borderColor }]} />
+            </View>
+            <Text {...attachPanResponder.panHandlers} style={[styles.sheetTitle, { color: colors.textColor }]}>
               Прикрепить изображение
             </Text>
             <Text style={[styles.sheetSub, { color: colors.textColorSecondary }]}>
@@ -1159,8 +1278,79 @@ export const AIAssistantScreen: React.FC = () => {
                 Отмена
               </Text>
             </PressableScale>
-          </View>
+          </Animated.View>
         </View>
+      </Modal>
+
+      {/* ═══ Rename Modal ═══ */}
+      <Modal
+        visible={showRenameModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRenameModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.renameBackdrop}
+        >
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowRenameModal(false)}
+          />
+          <View
+            style={[
+              styles.renameCard,
+              { backgroundColor: colors.componentBackground, borderColor: colors.borderColor },
+            ]}
+          >
+            <View style={styles.renameHeader}>
+              <View style={[styles.renameIconWrap, { backgroundColor: colors.primaryAccent + '18' }]}>
+                <Feather name="edit-3" size={16} color={colors.primaryAccent} />
+              </View>
+              <Text style={[styles.renameTitle, { color: colors.textColor }]}>
+                Название диалога
+              </Text>
+            </View>
+
+            <TextInput
+              style={[
+                styles.renameInput,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderColor,
+                  color: colors.textColor,
+                },
+              ]}
+              value={editingTitle}
+              onChangeText={setEditingTitle}
+              placeholder="Введите название..."
+              placeholderTextColor={colors.textColorSecondary}
+              maxLength={40}
+              autoFocus
+              selectTextOnFocus
+            />
+
+            <View style={styles.renameActionsRow}>
+              <PressableScale
+                style={[styles.renameBtn, { backgroundColor: colors.surface, borderColor: colors.borderColor, borderWidth: 1 }]}
+                onPress={() => setShowRenameModal(false)}
+              >
+                <Text style={[styles.renameBtnText, { color: colors.textColor }]}>
+                  Отмена
+                </Text>
+              </PressableScale>
+              <PressableScale
+                style={[styles.renameBtn, { backgroundColor: colors.primaryAccent }]}
+                onPress={handleSaveRename}
+              >
+                <Text style={[styles.renameBtnText, { color: '#ffffff' }]}>
+                  Сохранить
+                </Text>
+              </PressableScale>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Personalization Modal */}
@@ -1653,6 +1843,10 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 36 : 24,
     gap: 12,
   },
+  sheetHandleWrap: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
   sheetHandle: {
     width: 38,
     height: 4,
@@ -1692,4 +1886,83 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sheetCancelText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
+
+  // ── Drawer item actions ──
+  drawerItemActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginLeft: 6,
+  },
+  drawerItemActionBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Rename Modal ──
+  renameBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  renameCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 18,
+    gap: 14,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+  },
+  renameHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  renameIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  renameTitle: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 15,
+  },
+  renameInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+  },
+  renameActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 4,
+  },
+  renameBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  renameBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+  },
 });

@@ -5,6 +5,8 @@ import {
   createNewChatSession,
   updateSessionMessages,
   deleteChatSession,
+  renameChatSession,
+  generateSmartChatTitle,
   AI_CHATS_STORAGE_KEY,
 } from '../../src/services/aiChatStorageService';
 import {
@@ -67,7 +69,7 @@ describe('AI Assistant Markdown Formatting & Chat History Sessions', () => {
     test('creates new session and updates title from first user message', async () => {
       const initial = await loadAllChatSessions();
       const newSession = await createNewChatSession('Как решить квадратное уравнение?');
-      expect(newSession.title).toContain('Как решить квадратное');
+      expect(newSession.title).toBe('Квадратное уравнение');
 
       const all = await loadAllChatSessions();
       expect(all.length).toBe(initial.length + 1);
@@ -105,5 +107,41 @@ describe('AI Assistant Markdown Formatting & Chat History Sessions', () => {
       all = await loadAllChatSessions();
       expect(all.some((s) => s.id === s1.id)).toBe(false);
     });
+
+    test('renames an existing session', async () => {
+      const session = await createNewChatSession('Исходное название');
+      const updatedList = await renameChatSession(session.id, 'Квантовая физика: лекция 3');
+      const renamed = updatedList.find((s) => s.id === session.id);
+      expect(renamed?.title).toBe('Квантовая физика: лекция 3');
+
+      const reloaded = await loadAllChatSessions();
+      const reloadedTarget = reloaded.find((s) => s.id === session.id);
+      expect(reloadedTarget?.title).toBe('Квантовая физика: лекция 3');
+    });
+
+    test('generateSmartChatTitle cleans conversational fluff and handles special inputs', () => {
+      // Strips greeting prefixes
+      expect(generateSmartChatTitle('Привет, помоги решить дифференциальные уравнения'))
+        .toBe('Дифференциальные уравнения');
+      expect(generateSmartChatTitle('Здравствуйте! Объясни закон Ома пожалуйста'))
+        .toBe('Закон Ома');
+
+      // Handles photo prompts
+      expect(generateSmartChatTitle('[Изображение прикреплено] Реши уравнение на фото'))
+        .toBe('Анализ фото: Реши уравнение на фото');
+
+      // Handles URL prompts
+      expect(generateSmartChatTitle('Посмотри https://docs.google.com/document/d/123/edit'))
+        .toBe('Документ Google');
+      expect(generateSmartChatTitle('https://ru.wikipedia.org/wiki/Теорема_Пифагора'))
+        .toBe('Статья Wikipedia');
+
+      // Caps length cleanly
+      const longPrompt = 'Как устроен квантовый компьютер и в чем его главное отличие от традиционных полупроводниковых транзисторов и суперкомпьютеров';
+      const truncated = generateSmartChatTitle(longPrompt);
+      expect(truncated.length).toBeLessThanOrEqual(35);
+      expect(truncated.endsWith('...')).toBe(true);
+    });
   });
 });
+
