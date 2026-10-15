@@ -137,4 +137,44 @@ describe('Tier 1 - R1: Safe Expo Go Authentication Flow', () => {
     expect(fallbackTriggered).toBe(true);
     expect(activeUser).toBeNull();
   });
+
+  test('R1-7: AI Assistant access is strictly gated for registered users (Google/Email) and blocked for guests', () => {
+    const checkIsRegisteredUser = (user: any): boolean => {
+      return Boolean(user && !user.isAnonymous && !user.isOfflineDemo);
+    };
+
+    // Unauthenticated (null)
+    expect(checkIsRegisteredUser(null)).toBe(false);
+
+    // Guest / Offline demo
+    const guestUser = {
+      uid: 'offline_guest_user',
+      displayName: 'Гость (Офлайн)',
+      email: 'guest@smartstudyhub.local',
+      isAnonymous: true,
+      isOfflineDemo: true,
+    };
+    expect(checkIsRegisteredUser(guestUser)).toBe(false);
+
+    // Online anonymous guest
+    const anonymousUser = {
+      uid: 'anon_12345',
+      displayName: '',
+      email: '',
+      isAnonymous: true,
+      isOfflineDemo: false,
+    };
+    expect(checkIsRegisteredUser(anonymousUser)).toBe(false);
+
+    // Registered user via Google or Email
+    const emailUser = {
+      uid: 'firebase_user_abc',
+      displayName: 'Иван Иванов',
+      email: 'student@gmail.com',
+      isAnonymous: false,
+      isOfflineDemo: false,
+    };
+    expect(checkIsRegisteredUser(emailUser)).toBe(true);
+  });
 });
+

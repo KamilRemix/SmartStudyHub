@@ -56,6 +56,10 @@ import { ChatMessageRenderer } from '../components/ChatMessageRenderer';
 import { PersonalizationModal } from '../components/PersonalizationModal';
 import { ModelSelectorModal } from '../components/ModelSelectorModal';
 import { AISettingsModal } from '../components/AISettingsModal';
+import { AIAuthGate } from '../components/AIAuthGate';
+import { AuthNavigator } from '../../auth/AuthNavigator';
+import { performGoogleSignIn } from '../../../services/googleAuth';
+import { cloudSyncService } from '../../../services/cloudSync';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 340);
@@ -90,6 +94,25 @@ export const AIAssistantScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
   const { t } = useI18n();
   const { user } = useAuth();
+  const isRegisteredUser = Boolean(user && !user.isAnonymous && !user.isOfflineDemo);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authInitialScreen, setAuthInitialScreen] = useState<'login' | 'register'>('login');
+  const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
+
+  const handleGoogleSignInFromGate = async () => {
+    setIsGoogleSigningIn(true);
+    try {
+      const res = await performGoogleSignIn();
+      if (res?.success && res.user?.uid) {
+        await cloudSyncService.syncAll(res.user.uid);
+        setShowAuthModal(false);
+      }
+    } catch (e) {
+      console.warn('[AIAssistant] Google sign-in gate error:', e);
+    } finally {
+      setIsGoogleSigningIn(false);
+    }
+  };
 
   // Dynamic greeting
   const firstName = user?.displayName?.split(' ')[0] ?? null;
@@ -360,6 +383,11 @@ export const AIAssistantScreen: React.FC = () => {
   };
 
   const handleNewChat = async () => {
+    if (!isRegisteredUser) {
+      setAuthInitialScreen('login');
+      setShowAuthModal(true);
+      return;
+    }
     const newSession = await createNewChatSession();
     const updated = await loadAllChatSessions();
     setSessions(updated);
@@ -385,6 +413,11 @@ export const AIAssistantScreen: React.FC = () => {
   };
 
   const handleQuickPrompt = (action: string) => {
+    if (!isRegisteredUser) {
+      setAuthInitialScreen('login');
+      setShowAuthModal(true);
+      return;
+    }
     if (action === 'camera') {
       setShowAttachModal(true);
     } else if (action === 'explain') {
@@ -397,6 +430,11 @@ export const AIAssistantScreen: React.FC = () => {
   };
 
   const handleSend = async (textToSend?: string) => {
+    if (!isRegisteredUser) {
+      setAuthInitialScreen('login');
+      setShowAuthModal(true);
+      return;
+    }
     const text = (textToSend || inputText).trim();
     if ((!text && !attachedImage) || isLoading) return;
 
@@ -812,42 +850,53 @@ export const AIAssistantScreen: React.FC = () => {
           </PressableScale>
         </View>
 
-        {/* ── Messages ── */}
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessage}
-          contentContainerStyle={[
-            styles.chatList,
-            isConversationEmpty && styles.chatListEmpty,
-          ]}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          ListHeaderComponent={isConversationEmpty ? renderWelcomeHero : null}
-          ListFooterComponent={
-            isLoading ? (
-              <View style={styles.loadingContainer}>
-                <View
-                  style={[
-                    styles.loadingBubble,
-                    {
-                      backgroundColor: colors.componentBackground,
-                      borderColor: colors.borderColor,
-                    },
-                  ]}
-                >
-                  <ActivityIndicator size="small" color={colors.primaryAccent} />
-                  <Text style={[styles.loadingText, { color: colors.textColorSecondary }]}>
-                    {t('aiTyping')}
-                  </Text>
+        {/* ── Messages or Auth Gate ── */}
+        {!isRegisteredUser ? (
+          <AIAuthGate
+            onOpenAuth={(mode) => {
+              setAuthInitialScreen(mode || 'login');
+              setShowAuthModal(true);
+            }}
+            onGoogleSignIn={handleGoogleSignInFromGate}
+            isGoogleLoading={isGoogleSigningIn}
+          />
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={renderMessage}
+            contentContainerStyle={[
+              styles.chatList,
+              isConversationEmpty && styles.chatListEmpty,
+            ]}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            ListHeaderComponent={isConversationEmpty ? renderWelcomeHero : null}
+            ListFooterComponent={
+              isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <View
+                    style={[
+                      styles.loadingBubble,
+                      {
+                        backgroundColor: colors.componentBackground,
+                        borderColor: colors.borderColor,
+                      },
+                    ]}
+                  >
+                    <ActivityIndicator size="small" color={colors.primaryAccent} />
+                    <Text style={[styles.loadingText, { color: colors.textColorSecondary }]}>
+                      {t('aiTyping')}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ) : null
-          }
-        />
+              ) : null
+            }
+          />
+        )}
 
         {/* ── Web search status strip ── */}
-        {searchQueryStatus && (
+        {searchQueryStatus && isRegisteredUser && (
           <View
             style={[
               styles.searchStatusStrip,
@@ -868,12 +917,54 @@ export const AIAssistantScreen: React.FC = () => {
 
         {/* ── Input bar ── */}
         <View style={styles.inputWrapper}>
-          <View
-            style={[
-              styles.inputCapsule,
-              { backgroundColor: colors.componentBackground, borderColor: colors.borderColor },
-            ]}
-          >
+          {!isRegisteredUser ? (
+            <TouchableOpacity
+              style={[
+                styles.authLockedInputCapsule,
+                {
+                  backgroundColor: colors.componentBackground,
+                  borderColor: colors.borderColor,
+                },
+              ]}
+              onPress={() => {
+                setAuthInitialScreen('login');
+                setShowAuthModal(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <View
+                style={[
+                  styles.authLockedIconWrap,
+                  { backgroundColor: colors.primaryAccent + '18' },
+                ]}
+              >
+                <Feather name="lock" size={15} color={colors.primaryAccent} />
+              </View>
+              <Text
+                style={[
+                  styles.authLockedText,
+                  { color: colors.textColorSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                Войдите в аккаунт для общения с ИИ
+              </Text>
+              <View
+                style={[
+                  styles.authLockedPill,
+                  { backgroundColor: colors.primaryAccent },
+                ]}
+              >
+                <Text style={styles.authLockedPillText}>Войти</Text>
+              </View>
+            </TouchableOpacity>
+          ) : (
+            <View
+              style={[
+                styles.inputCapsule,
+                { backgroundColor: colors.componentBackground, borderColor: colors.borderColor },
+              ]}
+            >
             {/* Attached image preview */}
             {attachedImage && (
               <View
@@ -994,6 +1085,7 @@ export const AIAssistantScreen: React.FC = () => {
               </PressableScale>
             </View>
           </View>
+          )}
         </View>
       </KeyboardAvoidingView>
 
@@ -1381,6 +1473,30 @@ export const AIAssistantScreen: React.FC = () => {
         onClearAllSessions={handleClearAllSessions}
         totalSessionsCount={sessions.length}
       />
+
+      {/* ═══ Auth Modal (Login / Register) ═══ */}
+      <Modal
+        visible={showAuthModal && !isRegisteredUser}
+        animationType="slide"
+        onRequestClose={() => setShowAuthModal(false)}
+      >
+        <SafeAreaView style={[styles.authModalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.authModalHeader, { borderBottomColor: colors.borderColor }]}>
+            <PressableScale
+              style={[styles.authModalCloseBtn, { backgroundColor: colors.componentBackground }]}
+              onPress={() => setShowAuthModal(false)}
+              accessibilityLabel="Закрыть"
+            >
+              <Feather name="x" size={20} color={colors.textColor} />
+            </PressableScale>
+            <Text style={[styles.authModalTitle, { color: colors.textColor }]}>
+              {authInitialScreen === 'register' ? 'Регистрация' : 'Вход в аккаунт'}
+            </Text>
+            <View style={{ width: 36 }} />
+          </View>
+          <AuthNavigator initialScreen={authInitialScreen} />
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1964,5 +2080,60 @@ const styles = StyleSheet.create({
   renameBtnText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
+  },
+
+  // ── Auth Locked State & Modal ──
+  authLockedInputCapsule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 10,
+  },
+  authLockedIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  authLockedText: {
+    flex: 1,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+  },
+  authLockedPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  authLockedPillText: {
+    color: '#ffffff',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+  },
+  authModalContainer: {
+    flex: 1,
+  },
+  authModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  authModalCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  authModalTitle: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 16,
   },
 });
