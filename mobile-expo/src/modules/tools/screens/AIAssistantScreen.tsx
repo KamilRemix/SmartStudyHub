@@ -57,6 +57,8 @@ import { PersonalizationModal } from '../components/PersonalizationModal';
 import { ModelSelectorModal } from '../components/ModelSelectorModal';
 import { AISettingsModal } from '../components/AISettingsModal';
 import { AIAuthGate } from '../components/AIAuthGate';
+import { CreateQuizModal, CreateQuizModalParams } from '../components/CreateQuizModal';
+import { generateQuizFromAI } from '../../../services/quizService';
 import { AuthNavigator } from '../../auth/AuthNavigator';
 import { performGoogleSignIn } from '../../../services/googleAuth';
 import { cloudSyncService } from '../../../services/cloudSync';
@@ -129,6 +131,8 @@ export const AIAssistantScreen: React.FC = () => {
   const [showModelModal, setShowModelModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAttachModal, setShowAttachModal] = useState(false);
+  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [selectedProvider, setSelectedProviderState] = useState<AIProviderId>('auto');
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [searchQueryStatus, setSearchQueryStatus] = useState<string | null>(null);
@@ -412,6 +416,59 @@ export const AIAssistantScreen: React.FC = () => {
     }
   };
 
+  const handleGenerateQuizFromModal = async (params: CreateQuizModalParams) => {
+    if (!isRegisteredUser) {
+      setAuthInitialScreen('login');
+      setShowAuthModal(true);
+      return;
+    }
+    setIsGeneratingQuiz(true);
+    try {
+      const generated = await generateQuizFromAI({
+        topic: params.topic,
+        questionCount: params.questionCount,
+        type: params.type,
+        difficulty: params.difficulty,
+      });
+
+      const quizJson = JSON.stringify(generated, null, 2);
+      const content = `Вот интерактивный тест по теме «${generated.title}» (${generated.questions.length} вопросов):\n\n\`\`\`quiz\n${quizJson}\n\`\`\`\n\nВы можете отвечать прямо в интерактивной карточке теста выше, и ИИ проверит ваши ответы!`;
+
+      const modelMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'model',
+        content,
+        timestamp: Date.now(),
+        modelUsed: selectedProviderInfo.name,
+      };
+
+      const nextMessages = [...messages, modelMessage];
+      setMessages(nextMessages);
+
+      let sid = activeSessionId;
+      if (!sid) {
+        const created = await createNewChatSession(
+          `Тест: ${generated.title.substring(0, 24)}`,
+          nextMessages
+        );
+        sid = created.id;
+        setActiveSessionIdState(sid);
+        await setActiveSessionId(sid);
+        setSessions((prev) => [created, ...prev]);
+      } else {
+        await updateSessionMessages(sid, nextMessages);
+        setSessions((prev) =>
+          prev.map((s) => (s.id === sid ? { ...s, messages: nextMessages, updatedAt: Date.now() } : s))
+        );
+      }
+    } catch (err: any) {
+      console.warn('[AIAssistant] Error generating quiz in chat:', err);
+      throw err;
+    } finally {
+      setIsGeneratingQuiz(false);
+    }
+  };
+
   const handleQuickPrompt = (action: string) => {
     if (!isRegisteredUser) {
       setAuthInitialScreen('login');
@@ -425,7 +482,7 @@ export const AIAssistantScreen: React.FC = () => {
     } else if (action === 'test') {
       handleSend('Помоги подготовиться к контрольной работе: составь план и ключевые вопросы');
     } else if (action === 'quiz') {
-      handleSend('Создай интерактивный тест по любому предмету');
+      setShowQuizModal(true);
     }
   };
 
@@ -1062,6 +1119,42 @@ export const AIAssistantScreen: React.FC = () => {
                     Поиск в сети
                   </Text>
                 </PressableScale>
+
+                {/* Quiz pill */}
+                <PressableScale
+                  style={[
+                    styles.quizPill,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.borderColor,
+                    },
+                  ]}
+                  onPress={() => {
+                    if (!isRegisteredUser) {
+                      setAuthInitialScreen('login');
+                      setShowAuthModal(true);
+                      return;
+                    }
+                    setShowQuizModal(true);
+                  }}
+                  accessibilityLabel="Создать тест"
+                >
+                  <Feather
+                    name="check-circle"
+                    size={13}
+                    color={colors.primaryAccent}
+                  />
+                  <Text
+                    style={[
+                      styles.quizPillText,
+                      {
+                        color: colors.textColor,
+                      },
+                    ]}
+                  >
+                    Тест
+                  </Text>
+                </PressableScale>
               </View>
 
               {/* Send button */}
@@ -1474,6 +1567,14 @@ export const AIAssistantScreen: React.FC = () => {
         totalSessionsCount={sessions.length}
       />
 
+      {/* Create Quiz Modal */}
+      <CreateQuizModal
+        visible={showQuizModal}
+        onClose={() => setShowQuizModal(false)}
+        onGenerate={handleGenerateQuizFromModal}
+        isLoading={isGeneratingQuiz}
+      />
+
       {/* ═══ Auth Modal (Login / Register) ═══ */}
       <Modal
         visible={showAuthModal && !isRegisteredUser}
@@ -1737,6 +1838,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   webSearchText: { fontSize: 12 },
+  quizPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+  },
+  quizPillText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+  },
   sendBtn: {
     width: 34,
     height: 34,

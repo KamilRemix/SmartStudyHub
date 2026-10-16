@@ -252,6 +252,41 @@ jest.mock('@expo/vector-icons', () => ({
   MaterialIcons: 'MaterialIcon',
 }));
 
+// Expo Print, Sharing, and FileSystem Mocks
+jest.mock(
+  'expo-print',
+  () => ({
+    printToFileAsync: jest.fn(async ({ html }) => ({ uri: 'file:///mock/print/quiz.pdf' })),
+    printAsync: jest.fn(async () => {}),
+  }),
+  { virtual: true }
+);
+
+jest.mock(
+  'expo-sharing',
+  () => ({
+    isAvailableAsync: jest.fn(async () => true),
+    shareAsync: jest.fn(async (uri) => {}),
+  }),
+  { virtual: true }
+);
+
+jest.mock(
+  'expo-file-system',
+  () => ({
+    cacheDirectory: 'file:///mock/cache/',
+    documentDirectory: 'file:///mock/documents/',
+    writeAsStringAsync: jest.fn(async () => {}),
+    readAsStringAsync: jest.fn(async () => ''),
+    deleteAsync: jest.fn(async () => {}),
+    EncodingType: {
+      UTF8: 'utf8',
+      Base64: 'base64',
+    },
+  }),
+  { virtual: true }
+);
+
 // Reset state before each test
 beforeEach(() => {
   jest.clearAllMocks();

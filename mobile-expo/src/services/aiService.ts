@@ -168,7 +168,8 @@ export async function callGeminiAdvanced(
   systemInstruction: string,
   modelName: string,
   explicitKey?: string,
-  enableGoogleSearch: boolean = false
+  enableGoogleSearch: boolean = false,
+  responseMimeType?: string
 ): Promise<GeminiAdvancedResult> {
   const pool = explicitKey ? [explicitKey] : await getGeminiKeyPool();
   const now = Date.now();
@@ -193,15 +194,20 @@ export async function callGeminiAdvanced(
 
     for (const activeModel of candidateModels) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${encodeURIComponent(key)}`;
+      const generationConfig: any = {
+        temperature: 0.7,
+        maxOutputTokens: 2800,
+      };
+      if (responseMimeType) {
+        generationConfig.responseMimeType = responseMimeType;
+      }
+
       const body: any = {
         contents,
         systemInstruction: {
           parts: [{ text: systemInstruction }],
         },
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2800,
-        },
+        generationConfig,
       };
 
       if (enableGoogleSearch) {
@@ -300,9 +306,10 @@ export async function callGemini(
   contents: any[],
   systemInstruction: string,
   modelName: string,
-  explicitKey?: string
+  explicitKey?: string,
+  responseMimeType?: string
 ): Promise<string> {
-  const result = await callGeminiAdvanced(contents, systemInstruction, modelName, explicitKey, false);
+  const result = await callGeminiAdvanced(contents, systemInstruction, modelName, explicitKey, false, responseMimeType);
   return result.text;
 }
 

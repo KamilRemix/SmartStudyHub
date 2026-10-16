@@ -237,5 +237,108 @@ describe('AI Quiz Generation Enhancements & Web Search Service', () => {
       expect(text).toContain('-> Ключ:');
       expect(text).toContain('СВОДКА ДЛЯ ПРЕПОДАВАТЕЛЯ');
     });
+
+    test('generates Word-compatible .doc XML document with formatting and tables', () => {
+      const { formatQuizToWordDoc } = require('../../src/services/quizService');
+      const docHtml = formatQuizToWordDoc(mockQuiz, 'teacher');
+      expect(docHtml).toContain('schemas-microsoft-com:office:word');
+      expect(docHtml).toContain('Квантовая механика и основы физики');
+      expect(docHtml).toContain('Правильный ответ:');
+      expect(docHtml).toContain('Пояснение:');
+    });
+
+    test('exports quiz to PDF and triggers native sharing', async () => {
+      const { exportQuizToPdfAsync } = require('../../src/services/quizService');
+      const res = await exportQuizToPdfAsync(mockQuiz, 'student');
+      expect(res.uri).toContain('.pdf');
+    });
+
+    test('exports quiz to Word (.doc) and triggers native sharing', async () => {
+      const { exportQuizToDocxAsync } = require('../../src/services/quizService');
+      const res = await exportQuizToDocxAsync(mockQuiz, 'teacher');
+      expect(res.uri).toContain('.doc');
+    });
+  });
+
+  describe('Semantic AI & Heuristic Grading for Open-Ended Questions', () => {
+    const {
+      evaluateOpenEndedHeuristic,
+      evaluateQuizAsync,
+    } = require('../../src/services/quizService');
+
+    const openQuestion = {
+      id: 'q_open',
+      question: 'Что такое фотосинтез?',
+      type: 'open_ended',
+      correctAnswer: 'Процесс образования органических веществ из углекислого газа и воды на свету',
+      explanation: 'Происходит в хлоропластах растений под действием хлорофилла.',
+      topic: 'Биология растений',
+    };
+
+    test('evaluates open-ended answer by conceptual stems even if phrasing differs', () => {
+      // User wrote in their own words
+      const studentAnswer = 'образование органических веществ из углекислого газа на свету растениями';
+      const isCorrect = evaluateOpenEndedHeuristic(studentAnswer, openQuestion.correctAnswer);
+      expect(isCorrect).toBe(true);
+    });
+
+    test('rejects completely irrelevant or incorrect open answers', () => {
+      const studentAnswer = 'деление клеток митозом и мейозом в ядре';
+      const isCorrect = evaluateOpenEndedHeuristic(studentAnswer, openQuestion.correctAnswer);
+      expect(isCorrect).toBe(false);
+    });
+
+    test('evaluates numerical answers with precision tolerance', () => {
+      const numQuestion = {
+        id: 'q_num',
+        question: 'Сколько грамм в одном килограмме?',
+        type: 'open_ended',
+        correctAnswer: '1000',
+        explanation: '1 кг = 1000 г',
+        topic: 'Меры массы',
+      };
+
+      const isCorrect = evaluateOpenEndedHeuristic('1000 грамм', numQuestion.correctAnswer);
+      expect(isCorrect).toBe(true);
+    });
+
+    test('evaluateQuizAsync accurately scores mixed quiz with semantic evaluation', async () => {
+      const quizToGrade: Quiz = {
+        id: 'test_grade',
+        title: 'Тест по биологии',
+        description: 'Проверка знаний',
+        difficulty: 'medium',
+        questions: [
+          {
+            id: 'q1',
+            question: 'Основной пигмент фотосинтеза',
+            type: 'multiple_choice',
+            options: ['Хлорофилл', 'Гемоглобин', 'Каротин', 'Меланин'],
+            correctAnswer: 'Хлорофилл',
+            explanation: 'Хлорофилл поглощает кванты света.',
+            topic: 'Ботаника',
+          },
+          {
+            id: 'q2',
+            question: 'Что образуется при фотосинтезе?',
+            type: 'open_ended',
+            correctAnswer: 'Органические вещества и кислород',
+            explanation: 'В световую фазу выделяется O2, в темновую синтезируется глюкоза.',
+            topic: 'Ботаника',
+          },
+        ],
+      };
+
+      const userAnswers = {
+        q1: 'Хлорофилл',
+        q2: 'образуются органические вещества и выделяется кислород',
+      };
+
+      const evalResult = await evaluateQuizAsync(quizToGrade, userAnswers);
+      expect(evalResult.score).toBe(2);
+      expect(evalResult.total).toBe(2);
+      expect(evalResult.percentage).toBe(100);
+      expect(evalResult.detailedResults[1].isCorrect).toBe(true);
+    });
   });
 });

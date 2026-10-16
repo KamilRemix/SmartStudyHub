@@ -17,7 +17,7 @@ interface ChatMessageRendererProps {
 type BlockType =
   | { type: 'code'; code: string; language: string }
   | { type: 'display_math'; latex: string }
-  | { type: 'quiz'; title?: string; questionCount?: number; difficulty?: string }
+  | { type: 'quiz'; title?: string; questionCount?: number; difficulty?: string; quiz?: any }
   | { type: 'text'; text: string };
 
 export function parseMessageBlocks(content: string): BlockType[] {
@@ -51,6 +51,7 @@ export function parseMessageBlocks(content: string): BlockType[] {
               title: parsed.title,
               questionCount: parsed.questions.length,
               difficulty: parsed.difficulty,
+              quiz: parsed,
             });
             lastIndex = match.index + fullMatch.length;
             continue;
@@ -72,6 +73,27 @@ export function parseMessageBlocks(content: string): BlockType[] {
     const trailingText = content.substring(lastIndex);
     if (trailingText.trim()) {
       blocks.push({ type: 'text', text: trailingText });
+    }
+  }
+
+  // Check if text is a raw JSON quiz object without code fences
+  if (blocks.length === 1 && blocks[0].type === 'text') {
+    const rawTrimmed = blocks[0].text.trim();
+    if (rawTrimmed.startsWith('{') && rawTrimmed.endsWith('}') && rawTrimmed.includes('"questions"')) {
+      try {
+        const parsed = JSON.parse(rawTrimmed);
+        if (Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+          return [
+            {
+              type: 'quiz',
+              title: parsed.title,
+              questionCount: parsed.questions.length,
+              difficulty: parsed.difficulty,
+              quiz: parsed,
+            },
+          ];
+        }
+      } catch {}
     }
   }
 
@@ -476,6 +498,7 @@ export const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({
               title={block.title}
               questionCount={block.questionCount}
               difficulty={block.difficulty}
+              quiz={block.quiz}
             />
           );
         }

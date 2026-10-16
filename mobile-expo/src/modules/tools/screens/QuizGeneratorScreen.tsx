@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Share,
   Image,
+  Modal,
+  SafeAreaView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,15 +18,24 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../../theme';
+import { useAuth } from '../../../context/AuthContext';
 import { AppHeader } from '../../../components/common/AppHeader';
+import { PressableScale } from '../../../components/common/PressableScale';
+import { AIAuthGate } from '../components/AIAuthGate';
+import { AuthNavigator } from '../../auth/AuthNavigator';
+import { performGoogleSignIn } from '../../../services/googleAuth';
 import { ToolsStackParamList } from '../../../navigation/types';
 import {
   Quiz,
   QuizEvaluation,
   generateQuizFromAI,
   evaluateQuiz,
+  evaluateQuizAsync,
+  evaluateOpenEndedAnswerWithAI,
   formatQuizForExport,
   formatQuizToHtmlPrintable,
+  exportQuizToPdfAsync,
+  exportQuizToDocxAsync,
 } from '../../../services/quizService';
 import { formatLatexToReadable } from '../utils/latexFormatter';
 
@@ -33,6 +44,13 @@ type NavProp = NativeStackNavigationProp<ToolsStackParamList>;
 export const QuizGeneratorScreen: React.FC = () => {
   const { colors } = useTheme();
   const navigation = useNavigation<NavProp>();
+  const { user } = useAuth();
+  const isRegisteredUser = Boolean(user && !user.isAnonymous && !user.isOfflineDemo);
+
+  // Auth gate modal state
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authInitialScreen, setAuthInitialScreen] = useState<'login' | 'register'>('login');
+  const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
 
   // Phases: 'setup' | 'playing' | 'results'
   const [phase, setPhase] = useState<'setup' | 'playing' | 'results'>('setup');
@@ -44,7 +62,7 @@ export const QuizGeneratorScreen: React.FC = () => {
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [attachedImage, setAttachedImage] = useState<{ uri: string; base64: string } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [genStep, setGenStep] = useState(0);
+  const [genStatusText, setGenStatusText] = useState('Подготовка параметров теста...');
   const [genError, setGenError] = useState<string | null>(null);
 
   // Playing state
@@ -54,11 +72,16 @@ export const QuizGeneratorScreen: React.FC = () => {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [openInputText, setOpenInputText] = useState('');
   const [showExplanation, setShowExplanation] = useState(false);
+  const [isEvaluatingOpen, setIsEvaluatingOpen] = useState(false);
+  const [openAnswerEvaluation, setOpenAnswerEvaluation] = useState<{ isCorrect: boolean; feedback: string } | null>(null);
+  const [isEvaluatingQuiz, setIsEvaluatingQuiz] = useState(false);
 
   // Results state
   const [evaluation, setEvaluation] = useState<QuizEvaluation | null>(null);
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [copiedExport, setCopiedExport] = useState(false);
+  const [exportLoading, setExportLoading] = useState<string | null>(null);
+  const [exportBanner, setExportBanner] = useState<string | null>(null);
 
   // Handlers for image attachment in quiz
   const handlePickImage = async () => {
@@ -102,8 +125,28 @@ export const QuizGeneratorScreen: React.FC = () => {
     }
   };
 
+  const handleGoogleSignInFromGate = async () => {
+    setIsGoogleSigningIn(true);
+    try {
+      const res = await performGoogleSignIn();
+      if (res?.success && res.user?.uid) {
+        setShowAuthModal(false);
+      }
+    } catch (e) {
+      console.warn('[QuizGenerator] Google sign-in gate error:', e);
+    } finally {
+      setIsGoogleSigningIn(false);
+    }
+  };
+
   // Generate Quiz
   const handleGenerate = async () => {
+    if (!isRegisteredUser) {
+      setAuthInitialScreen('login');
+      setShowAuthModal(true);
+      return;
+    }
+
     if (!topic.trim() && !attachedImage) {
       setGenError('Пожалуйста, укажите тему или прикрепите фото билета/задач.');
       return;
@@ -111,11 +154,15 @@ export const QuizGeneratorScreen: React.FC = () => {
 
     setGenError(null);
     setIsGenerating(true);
-    setGenStep(0);
+    setGenStatusText('Анализ параметров темы и подготовка промпта...');
 
-    const stepTimer = setInterval(() => {
-      setGenStep((prev) => (prev < 3 ? prev + 1 : prev));
-    }, 1800);
+    const timer1 = setTimeout(() => {
+      setGenStatusText('Генерация вопросов, вариантов и формул с ИИ...');
+    }, 1200);
+
+    const timer2 = setTimeout(() => {
+      setGenStatusText('Верификация ключей и составление пояснений...');
+    }, 3800);
 
     try {
       const generated = await generateQuizFromAI({
@@ -126,17 +173,20 @@ export const QuizGeneratorScreen: React.FC = () => {
         imageBase64: attachedImage?.base64,
       });
 
-      clearInterval(stepTimer);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       setQuiz(generated);
       setCurrentIndex(0);
       setUserAnswers({});
       setSelectedOption(null);
       setOpenInputText('');
       setShowExplanation(false);
+      setOpenAnswerEvaluation(null);
       setPhase('playing');
     } catch (err: any) {
-      clearInterval(stepTimer);
-      setGenError(err?.message || 'Ошибка генерации теста. Попробуйте еще раз.');
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      setGenError(err?.message || 'Ошибка генерации теста. Пожалуйста, проверьте тему и повторите попытку.');
     } finally {
       setIsGenerating(false);
     }
@@ -154,18 +204,28 @@ export const QuizGeneratorScreen: React.FC = () => {
     }
   };
 
-  const handleSubmitOpenEnded = () => {
-    if (!openInputText.trim() || showExplanation) return;
-    setShowExplanation(true);
-
+  const handleSubmitOpenEnded = async () => {
+    if (!openInputText.trim() || showExplanation || isEvaluatingOpen) return;
     const q = quiz?.questions[currentIndex];
-    if (q) {
-      setUserAnswers((prev) => ({ ...prev, [q.id]: openInputText.trim() }));
+    if (!q) return;
+
+    setIsEvaluatingOpen(true);
+    const answer = openInputText.trim();
+    setUserAnswers((prev) => ({ ...prev, [q.id]: answer }));
+
+    try {
+      const aiEval = await evaluateOpenEndedAnswerWithAI(q, answer);
+      setOpenAnswerEvaluation(aiEval);
+    } catch (e) {
+      setOpenAnswerEvaluation(null);
+    } finally {
+      setIsEvaluatingOpen(false);
+      setShowExplanation(true);
     }
   };
 
   // Navigation between questions
-  const handleNextQuestion = () => {
+  const handleNextQuestion = async () => {
     if (!quiz) return;
 
     if (currentIndex + 1 < quiz.questions.length) {
@@ -173,15 +233,52 @@ export const QuizGeneratorScreen: React.FC = () => {
       setSelectedOption(null);
       setOpenInputText('');
       setShowExplanation(false);
+      setOpenAnswerEvaluation(null);
     } else {
-      // Finished Quiz -> Evaluate
-      const evalResult = evaluateQuiz(quiz, userAnswers);
-      setEvaluation(evalResult);
-      setPhase('results');
+      // Finished Quiz -> Evaluate with AI grading for open-ended questions
+      setIsEvaluatingQuiz(true);
+      try {
+        const evalResult = await evaluateQuizAsync(quiz, userAnswers);
+        setEvaluation(evalResult);
+      } catch (e) {
+        const fallbackEval = evaluateQuiz(quiz, userAnswers);
+        setEvaluation(fallbackEval);
+      } finally {
+        setIsEvaluatingQuiz(false);
+        setPhase('results');
+      }
     }
   };
 
   // Export Quiz
+  const handleExportPdf = async (mode: 'teacher' | 'student') => {
+    if (!quiz) return;
+    setExportLoading(`pdf_${mode}`);
+    try {
+      await exportQuizToPdfAsync(quiz, mode);
+      setExportBanner('PDF бланк успешно сформирован!');
+      setTimeout(() => setExportBanner(null), 3000);
+    } catch (err: any) {
+      console.warn('Export PDF error:', err);
+    } finally {
+      setExportLoading(null);
+    }
+  };
+
+  const handleExportDocx = async (mode: 'teacher' | 'student') => {
+    if (!quiz) return;
+    setExportLoading(`docx_${mode}`);
+    try {
+      await exportQuizToDocxAsync(quiz, mode);
+      setExportBanner('Word (.doc) документ успешно сохранен!');
+      setTimeout(() => setExportBanner(null), 3000);
+    } catch (err: any) {
+      console.warn('Export DOCX error:', err);
+    } finally {
+      setExportLoading(null);
+    }
+  };
+
   const handleShareExport = async (mode: 'teacher' | 'student') => {
     if (!quiz) return;
     const text = formatQuizForExport(quiz, mode);
@@ -210,7 +307,6 @@ export const QuizGeneratorScreen: React.FC = () => {
       });
     } catch (err) {
       console.warn('Share HTML error:', err);
-    }
   };
 
   // Navigate to AI Assistant to discuss missed questions
@@ -264,333 +360,306 @@ export const QuizGeneratorScreen: React.FC = () => {
 
       {/* PHASE 1: SETUP */}
       {phase === 'setup' && (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: colors.componentBackground,
-                borderColor: colors.borderColor,
-              },
-            ]}
-          >
-            <Text style={[styles.cardTitle, { color: colors.textColor }]}>
-              Тема или учебный материал
-            </Text>
-            <TextInput
-              style={[
-                styles.topicInput,
-                {
-                  backgroundColor: colors.background,
-                  borderColor: colors.borderColor,
-                  color: colors.textColor,
-                },
-              ]}
-              placeholder="Например: Законы Ньютона, Квадратные уравнения, Python структуры данных..."
-              placeholderTextColor={colors.textColorSecondary}
-              value={topic}
-              onChangeText={setTopic}
-              multiline
-              numberOfLines={3}
-            />
-
-            {/* Photo Attachment */}
-            <View style={styles.attachRow}>
-              <TouchableOpacity
-                style={[
-                  styles.attachBtn,
-                  {
-                    backgroundColor: colors.background,
-                    borderColor: colors.borderColor,
-                  },
-                ]}
-                onPress={handleLaunchCamera}
-                activeOpacity={0.7}
-              >
-                <Feather name="camera" size={16} color={colors.primaryAccent} />
-                <Text style={[styles.attachText, { color: colors.textColor }]}>Снять фото</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.attachBtn,
-                  {
-                    backgroundColor: colors.background,
-                    borderColor: colors.borderColor,
-                  },
-                ]}
-                onPress={handlePickImage}
-                activeOpacity={0.7}
-              >
-                <Feather name="image" size={16} color={colors.primaryAccent} />
-                <Text style={[styles.attachText, { color: colors.textColor }]}>Из галереи</Text>
-              </TouchableOpacity>
-            </View>
-
-            {attachedImage && (
-              <View style={[styles.imagePreviewWrap, { borderColor: colors.borderColor }]}>
-                <Image source={{ uri: attachedImage.uri }} style={styles.attachedThumbnail} />
-                <View style={styles.attachedInfo}>
-                  <Text style={[styles.attachedName, { color: colors.textColor }]}>
-                    Фото материала прикреплено
-                  </Text>
-                  <Text style={[styles.attachedDesc, { color: colors.textColorSecondary }]}>
-                    ИИ распознает формулы и задания с фото
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setAttachedImage(null)}
-                  style={styles.removeImageBtn}
-                >
-                  <Feather name="x" size={16} color={colors.textColorSecondary} />
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-
-          {/* Question Count */}
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: colors.componentBackground,
-                borderColor: colors.borderColor,
-              },
-            ]}
-          >
-            <Text style={[styles.cardTitle, { color: colors.textColor }]}>
-              Количество вопросов
-            </Text>
-            <View style={styles.chipsRow}>
-              {[3, 5, 10, 15].map((cnt) => (
-                <TouchableOpacity
-                  key={cnt}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor:
-                        questionCount === cnt ? colors.primaryAccent : colors.background,
-                      borderColor:
-                        questionCount === cnt ? colors.primaryAccent : colors.borderColor,
-                    },
-                  ]}
-                  onPress={() => setQuestionCount(cnt)}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: questionCount === cnt ? '#ffffff' : colors.textColor },
-                    ]}
-                  >
-                    {cnt} вопросов
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Question Type */}
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: colors.componentBackground,
-                borderColor: colors.borderColor,
-              },
-            ]}
-          >
-            <Text style={[styles.cardTitle, { color: colors.textColor }]}>Формат ответов</Text>
-            <View style={styles.chipsRow}>
-              {[
-                { id: 'multiple_choice', label: 'Тест (4 варианта)' },
-                { id: 'open_ended', label: 'Свой ввод (открытый)' },
-                { id: 'mixed', label: 'Смешанный' },
-              ].map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor:
-                        quizType === item.id ? colors.primaryAccent : colors.background,
-                      borderColor:
-                        quizType === item.id ? colors.primaryAccent : colors.borderColor,
-                    },
-                  ]}
-                  onPress={() => setQuizType(item.id as any)}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: quizType === item.id ? '#ffffff' : colors.textColor },
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Difficulty */}
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: colors.componentBackground,
-                borderColor: colors.borderColor,
-              },
-            ]}
-          >
-            <Text style={[styles.cardTitle, { color: colors.textColor }]}>Сложность</Text>
-            <View style={styles.chipsRow}>
-              {[
-                { id: 'easy', label: 'Базовый' },
-                { id: 'medium', label: 'Средний' },
-                { id: 'hard', label: 'Олимпиадный / Экзамен' },
-              ].map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor:
-                        difficulty === item.id ? colors.primaryAccent : colors.background,
-                      borderColor:
-                        difficulty === item.id ? colors.primaryAccent : colors.borderColor,
-                    },
-                  ]}
-                  onPress={() => setDifficulty(item.id as any)}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: difficulty === item.id ? '#ffffff' : colors.textColor },
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {genError && (
-            <View style={styles.errorBox}>
-              <Feather name="alert-triangle" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{genError}</Text>
-            </View>
-          )}
-
-          {/* Generate Button or Active Generation Progress Card */}
-          {isGenerating ? (
+        !isRegisteredUser ? (
+          <AIAuthGate
+            onOpenAuth={(mode) => {
+              setAuthInitialScreen(mode || 'login');
+              setShowAuthModal(true);
+            }}
+            onGoogleSignIn={handleGoogleSignInFromGate}
+            isGoogleLoading={isGoogleSigningIn}
+          />
+        ) : (
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View
               style={[
-                styles.generatingCard,
+                styles.card,
                 {
                   backgroundColor: colors.componentBackground,
                   borderColor: colors.borderColor,
                 },
               ]}
             >
-              <View
-                style={[
-                  styles.generatingIconCircle,
-                  { backgroundColor: colors.primaryAccent + '18' },
-                ]}
-              >
-                <ActivityIndicator size="large" color={colors.primaryAccent} />
-              </View>
-
-              <Text style={[styles.generatingTitle, { color: colors.textColor }]}>
-                ИИ составляет тест...
+              <Text style={[styles.cardTitle, { color: colors.textColor }]}>
+                Тема или учебный материал
               </Text>
-              <Text style={[styles.generatingSubtitle, { color: colors.textColorSecondary }]}>
-                Тема: «{topic.trim() || 'По материалам фото'}»
-              </Text>
-
-              {/* Step by step checklist */}
-              <View style={styles.stepsList}>
-                {[
-                  'Анализ темы и академических параметров',
-                  'Генерация уникальных вопросов и вариантов ответов',
-                  'Проверка ключей и составление пояснений',
-                  'Финализация интерактивного теста',
-                ].map((stepText, idx) => {
-                  const isDone = genStep > idx;
-                  const isCurrent = genStep === idx;
-                  return (
-                    <View key={idx} style={styles.stepItem}>
-                      <View
-                        style={[
-                          styles.stepDot,
-                          {
-                            backgroundColor: isDone
-                              ? '#22c55e'
-                              : isCurrent
-                              ? colors.primaryAccent
-                              : colors.borderColor,
-                          },
-                        ]}
-                      >
-                        {isDone ? (
-                          <Feather name="check" size={10} color="#ffffff" />
-                        ) : isCurrent ? (
-                          <ActivityIndicator
-                            size="small"
-                            color="#ffffff"
-                            style={{ transform: [{ scale: 0.6 }] }}
-                          />
-                        ) : (
-                          <Text style={styles.stepNum}>{idx + 1}</Text>
-                        )}
-                      </View>
-                      <Text
-                        style={[
-                          styles.stepText,
-                          {
-                            color: isDone
-                              ? colors.textColor
-                              : isCurrent
-                              ? colors.primaryAccent
-                              : colors.textColorSecondary,
-                            fontWeight: isCurrent ? '600' : '400',
-                          },
-                        ]}
-                      >
-                        {stepText}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-
-              <View
+              <TextInput
                 style={[
-                  styles.generatingNote,
+                  styles.topicInput,
                   {
-                    backgroundColor: colors.surface,
+                    backgroundColor: colors.background,
+                    borderColor: colors.borderColor,
+                    color: colors.textColor,
+                  },
+                ]}
+                placeholder="Например: Законы Ньютона, Квадратные уравнения, Python структуры данных..."
+                placeholderTextColor={colors.textColorSecondary}
+                value={topic}
+                onChangeText={setTopic}
+                multiline
+                numberOfLines={3}
+              />
+
+              {/* Photo Attachment */}
+              <View style={styles.attachRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.attachBtn,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.borderColor,
+                    },
+                  ]}
+                  onPress={handleLaunchCamera}
+                  activeOpacity={0.7}
+                >
+                  <Feather name="camera" size={16} color={colors.primaryAccent} />
+                  <Text style={[styles.attachText, { color: colors.textColor }]}>Снять фото</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.attachBtn,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.borderColor,
+                    },
+                  ]}
+                  onPress={handlePickImage}
+                  activeOpacity={0.7}
+                >
+                  <Feather name="image" size={16} color={colors.primaryAccent} />
+                  <Text style={[styles.attachText, { color: colors.textColor }]}>Из галереи</Text>
+                </TouchableOpacity>
+              </View>
+
+              {attachedImage && (
+                <View style={[styles.imagePreviewWrap, { borderColor: colors.borderColor }]}>
+                  <Image source={{ uri: attachedImage.uri }} style={styles.attachedThumbnail} />
+                  <View style={styles.attachedInfo}>
+                    <Text style={[styles.attachedName, { color: colors.textColor }]}>
+                      Фото материала прикреплено
+                    </Text>
+                    <Text style={[styles.attachedDesc, { color: colors.textColorSecondary }]}>
+                      ИИ распознает формулы и задания с фото
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setAttachedImage(null)}
+                    style={styles.removeImageBtn}
+                  >
+                    <Feather name="x" size={16} color={colors.textColorSecondary} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* Question Count */}
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.componentBackground,
+                  borderColor: colors.borderColor,
+                },
+              ]}
+            >
+              <Text style={[styles.cardTitle, { color: colors.textColor }]}>
+                Количество вопросов
+              </Text>
+              <View style={styles.chipsRow}>
+                {[3, 5, 10, 15].map((cnt) => (
+                  <TouchableOpacity
+                    key={cnt}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor:
+                          questionCount === cnt ? colors.primaryAccent : colors.background,
+                        borderColor:
+                          questionCount === cnt ? colors.primaryAccent : colors.borderColor,
+                      },
+                    ]}
+                    onPress={() => setQuestionCount(cnt)}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        { color: questionCount === cnt ? '#ffffff' : colors.textColor },
+                      ]}
+                    >
+                      {cnt} вопросов
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Question Type */}
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.componentBackground,
+                  borderColor: colors.borderColor,
+                },
+              ]}
+            >
+              <Text style={[styles.cardTitle, { color: colors.textColor }]}>Формат ответов</Text>
+              <View style={styles.chipsRow}>
+                {[
+                  { id: 'multiple_choice', label: 'Тест (4 варианта)' },
+                  { id: 'open_ended', label: 'Свой ввод (открытый)' },
+                  { id: 'mixed', label: 'Смешанный' },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor:
+                          quizType === item.id ? colors.primaryAccent : colors.background,
+                        borderColor:
+                          quizType === item.id ? colors.primaryAccent : colors.borderColor,
+                      },
+                    ]}
+                    onPress={() => setQuizType(item.id as any)}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        { color: quizType === item.id ? '#ffffff' : colors.textColor },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Difficulty */}
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.componentBackground,
+                  borderColor: colors.borderColor,
+                },
+              ]}
+            >
+              <Text style={[styles.cardTitle, { color: colors.textColor }]}>Сложность</Text>
+              <View style={styles.chipsRow}>
+                {[
+                  { id: 'easy', label: 'Базовый' },
+                  { id: 'medium', label: 'Средний' },
+                  { id: 'hard', label: 'Олимпиадный / Экзамен' },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor:
+                          difficulty === item.id ? colors.primaryAccent : colors.background,
+                        borderColor:
+                          difficulty === item.id ? colors.primaryAccent : colors.borderColor,
+                      },
+                    ]}
+                    onPress={() => setDifficulty(item.id as any)}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        { color: difficulty === item.id ? '#ffffff' : colors.textColor },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {genError && (
+              <View style={styles.errorBox}>
+                <Feather name="alert-triangle" size={16} color="#ef4444" />
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={styles.errorText}>{genError}</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Generate Button or Active Generation Progress Card */}
+            {isGenerating ? (
+              <View
+                style={[
+                  styles.generatingCard,
+                  {
+                    backgroundColor: colors.componentBackground,
                     borderColor: colors.borderColor,
                   },
                 ]}
               >
-                <Feather name="info" size={13} color={colors.primaryAccent} />
-                <Text style={[styles.generatingNoteText, { color: colors.textColorSecondary }]}>
-                  ИИ создаёт тест с нуля с поддержкой формул. Это обычно занимает от 3 до 8 секунд.
+                <View
+                  style={[
+                    styles.generatingIconCircle,
+                    { backgroundColor: colors.primaryAccent + '18' },
+                  ]}
+                >
+                  <ActivityIndicator size="large" color={colors.primaryAccent} />
+                </View>
+
+                <Text style={[styles.generatingTitle, { color: colors.textColor }]}>
+                  ИИ составляет тест...
                 </Text>
+                <Text style={[styles.generatingSubtitle, { color: colors.textColorSecondary }]}>
+                  Тема: «{topic.trim() || 'По материалам фото'}»
+                </Text>
+
+                {/* Real-time Stage Status */}
+                <View
+                  style={[
+                    styles.activeStatusBox,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.borderColor,
+                    },
+                  ]}
+                >
+                  <ActivityIndicator size="small" color={colors.primaryAccent} />
+                  <Text style={[styles.activeStatusText, { color: colors.textColor }]}>
+                    {genStatusText}
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.generatingNote,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.borderColor,
+                    },
+                  ]}
+                >
+                  <Feather name="info" size={13} color={colors.primaryAccent} />
+                  <Text style={[styles.generatingNoteText, { color: colors.textColorSecondary }]}>
+                    Нейросеть генерирует уникальные вопросы, ключи и формулы LaTeX. В случае высокой нагрузки автоматически подключается резервная модель.
+                  </Text>
+                </View>
               </View>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: colors.primaryAccent }]}
-              onPress={handleGenerate}
-              activeOpacity={0.8}
-            >
-              <Feather name="zap" size={18} color="#ffffff" />
-              <Text style={styles.primaryBtnText}>Сгенерировать тест с ИИ</Text>
-            </TouchableOpacity>
-          )}
-        </ScrollView>
+            ) : (
+              <TouchableOpacity
+                style={[styles.primaryBtn, { backgroundColor: colors.primaryAccent }]}
+                onPress={handleGenerate}
+                activeOpacity={0.8}
+              >
+                <Feather name="zap" size={18} color="#ffffff" />
+                <Text style={styles.primaryBtnText}>Сгенерировать тест с ИИ</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+        )
       )}
 
       {/* PHASE 2: PLAYING */}
@@ -724,13 +793,23 @@ export const QuizGeneratorScreen: React.FC = () => {
                           color: colors.textColor,
                         },
                       ]}
-                      placeholder="Введите ваш ответ (число, формулу или термин)..."
+                      placeholder="Введите ваш ответ своими словами..."
                       placeholderTextColor={colors.textColorSecondary}
                       value={openInputText}
                       onChangeText={setOpenInputText}
-                      editable={!showExplanation}
+                      editable={!showExplanation && !isEvaluatingOpen}
                     />
-                    {!showExplanation && (
+
+                    {isEvaluatingOpen && (
+                      <View style={styles.evaluatingOpenRow}>
+                        <ActivityIndicator size="small" color={colors.primaryAccent} />
+                        <Text style={[styles.evaluatingOpenText, { color: colors.textColorSecondary }]}>
+                          ИИ проверяет смысл ответа...
+                        </Text>
+                      </View>
+                    )}
+
+                    {!showExplanation && !isEvaluatingOpen && (
                       <TouchableOpacity
                         style={[
                           styles.openSubmitBtn,
@@ -743,7 +822,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                         onPress={handleSubmitOpenEnded}
                         disabled={!openInputText.trim()}
                       >
-                        <Text style={styles.openSubmitText}>Проверить ответ</Text>
+                        <Text style={styles.openSubmitText}>Проверить ответ с ИИ</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -760,12 +839,48 @@ export const QuizGeneratorScreen: React.FC = () => {
                       },
                     ]}
                   >
+                    {/* Semantic grading verdict for open-ended questions */}
+                    {openAnswerEvaluation && (
+                      <View
+                        style={[
+                          styles.aiVerdictCard,
+                          {
+                            backgroundColor: openAnswerEvaluation.isCorrect
+                              ? 'rgba(34, 197, 94, 0.12)'
+                              : 'rgba(239, 68, 68, 0.12)',
+                            borderColor: openAnswerEvaluation.isCorrect ? '#22c55e' : '#ef4444',
+                          },
+                        ]}
+                      >
+                        <View style={styles.aiVerdictHeader}>
+                          <Feather
+                            name={openAnswerEvaluation.isCorrect ? 'check-circle' : 'alert-circle'}
+                            size={14}
+                            color={openAnswerEvaluation.isCorrect ? '#22c55e' : '#ef4444'}
+                          />
+                          <Text
+                            style={[
+                              styles.aiVerdictTitle,
+                              { color: openAnswerEvaluation.isCorrect ? '#22c55e' : '#ef4444' },
+                            ]}
+                          >
+                            {openAnswerEvaluation.isCorrect
+                              ? 'Смысл ответа верный (зачтено)'
+                              : 'Ответ не совсем точен'}
+                          </Text>
+                        </View>
+                        <Text style={[styles.aiVerdictBody, { color: colors.textColor }]}>
+                          {openAnswerEvaluation.feedback}
+                        </Text>
+                      </View>
+                    )}
+
                     <View style={styles.explanationHeader}>
                       <Feather name="info" size={15} color={colors.primaryAccent} />
                       <Text
                         style={[styles.explanationTitle, { color: colors.textColor }]}
                       >
-                        Правильный ответ:{' '}
+                        Эталонный ответ:{' '}
                         <Text style={{ color: '#22c55e' }}>{currentQ.correctAnswer}</Text>
                       </Text>
                     </View>
@@ -781,14 +896,21 @@ export const QuizGeneratorScreen: React.FC = () => {
                     <TouchableOpacity
                       style={[styles.nextBtn, { backgroundColor: colors.primaryAccent }]}
                       onPress={handleNextQuestion}
+                      disabled={isEvaluatingQuiz}
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.nextBtnText}>
-                        {currentIndex + 1 < quiz.questions.length
-                          ? 'Следующий вопрос'
-                          : 'Посмотреть результаты'}
-                      </Text>
-                      <Feather name="arrow-right" size={16} color="#ffffff" />
+                      {isEvaluatingQuiz ? (
+                        <ActivityIndicator size="small" color="#ffffff" />
+                      ) : (
+                        <>
+                          <Text style={styles.nextBtnText}>
+                            {currentIndex + 1 < quiz.questions.length
+                              ? 'Следующий вопрос'
+                              : 'Посмотреть результаты'}
+                          </Text>
+                          <Feather name="arrow-right" size={16} color="#ffffff" />
+                        </>
+                      )}
                     </TouchableOpacity>
                   </View>
                 )}
@@ -854,6 +976,75 @@ export const QuizGeneratorScreen: React.FC = () => {
             <Text style={[styles.resultsSub, { color: colors.textColorSecondary }]}>
               Тест: {quiz.title}
             </Text>
+          </View>
+
+          {/* Quick PDF & Word Export Bar */}
+          <View
+            style={[
+              styles.quickExportCard,
+              {
+                backgroundColor: colors.componentBackground,
+                borderColor: colors.borderColor,
+              },
+            ]}
+          >
+            <Text style={[styles.quickExportTitle, { color: colors.textColor }]}>
+              Скачать тест
+            </Text>
+            <View style={styles.quickExportRow}>
+              <TouchableOpacity
+                style={[
+                  styles.quickExportBtn,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.borderColor,
+                  },
+                ]}
+                onPress={() => handleExportPdf('teacher')}
+                activeOpacity={0.7}
+              >
+                {exportLoading === 'pdf_teacher' ? (
+                  <ActivityIndicator size="small" color={colors.primaryAccent} />
+                ) : (
+                  <>
+                    <Feather name="file-text" size={15} color={colors.primaryAccent} />
+                    <Text style={[styles.quickExportBtnText, { color: colors.textColor }]}>
+                      Скачать в PDF
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.quickExportBtn,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.borderColor,
+                  },
+                ]}
+                onPress={() => handleExportDocx('teacher')}
+                activeOpacity={0.7}
+              >
+                {exportLoading === 'docx_teacher' ? (
+                  <ActivityIndicator size="small" color="#2563eb" />
+                ) : (
+                  <>
+                    <Feather name="file" size={15} color="#2563eb" />
+                    <Text style={[styles.quickExportBtnText, { color: colors.textColor }]}>
+                      В Word (.doc)
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {exportBanner && (
+              <View style={styles.exportSuccessPill}>
+                <Feather name="check" size={12} color="#22c55e" />
+                <Text style={styles.exportSuccessPillText}>{exportBanner}</Text>
+              </View>
+            )}
           </View>
 
           {/* AI Knowledge Diagnostic: Strong & Weak Areas */}
@@ -947,7 +1138,7 @@ export const QuizGeneratorScreen: React.FC = () => {
             >
               <Feather name="share-2" size={16} color={colors.textColor} />
               <Text style={[styles.secondaryBtnText, { color: colors.textColor }]}>
-                Экспорт теста (для учителя / печати)
+                Все форматы экспорта (PDF, Word, печать)
               </Text>
             </TouchableOpacity>
 
@@ -993,14 +1184,14 @@ export const QuizGeneratorScreen: React.FC = () => {
             </View>
 
             <Text style={[styles.exportModalDesc, { color: colors.textColorSecondary }]}>
-              Выберите формат бланка для распечатки или отправки ученикам:
+              Скачайте файл в формате PDF, Word (.doc) или скопируйте бланк:
             </Text>
 
             {/* Teacher Mode */}
             <View style={[styles.exportOption, { borderColor: colors.borderColor }]}>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, marginBottom: 8 }}>
                 <Text style={[styles.exportOptionName, { color: colors.textColor }]}>
-                  Вариант для учителя
+                  Вариант для преподавателя
                 </Text>
                 <Text style={[styles.exportOptionSub, { color: colors.textColorSecondary }]}>
                   Вопросы + ключи ответов, темы и подробные пояснения
@@ -1008,23 +1199,55 @@ export const QuizGeneratorScreen: React.FC = () => {
               </View>
               <View style={styles.exportBtnGroup}>
                 <TouchableOpacity
+                  style={[styles.actionExportBtn, { backgroundColor: colors.background, borderColor: colors.borderColor }]}
+                  onPress={() => handleExportPdf('teacher')}
+                  accessibilityLabel="Скачать в PDF"
+                >
+                  {exportLoading === 'pdf_teacher' ? (
+                    <ActivityIndicator size="small" color={colors.primaryAccent} />
+                  ) : (
+                    <>
+                      <Feather name="file-text" size={13} color={colors.primaryAccent} />
+                      <Text style={[styles.actionExportText, { color: colors.textColor }]}>PDF</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionExportBtn, { backgroundColor: colors.background, borderColor: colors.borderColor }]}
+                  onPress={() => handleExportDocx('teacher')}
+                  accessibilityLabel="Скачать в Word"
+                >
+                  {exportLoading === 'docx_teacher' ? (
+                    <ActivityIndicator size="small" color="#2563eb" />
+                  ) : (
+                    <>
+                      <Feather name="file" size={13} color="#2563eb" />
+                      <Text style={[styles.actionExportText, { color: colors.textColor }]}>Word</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   style={[styles.smallBtn, { backgroundColor: colors.background }]}
                   onPress={() => handleCopyExport('teacher')}
-                  accessibilityLabel="Скопировать для Word / Docs"
+                  accessibilityLabel="Скопировать"
                 >
                   <Feather name="copy" size={13} color={colors.textColor} />
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   style={[styles.smallBtn, { backgroundColor: colors.background }]}
                   onPress={() => handleShareHtmlExport('teacher')}
-                  accessibilityLabel="Печать / Сохранить в PDF"
+                  accessibilityLabel="Печать"
                 >
                   <Feather name="printer" size={13} color={colors.primaryAccent} />
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   style={[styles.smallBtn, { backgroundColor: colors.primaryAccent }]}
                   onPress={() => handleShareExport('teacher')}
-                  accessibilityLabel="Поделиться в файл"
+                  accessibilityLabel="Поделиться"
                 >
                   <Feather name="share-2" size={13} color="#ffffff" />
                 </TouchableOpacity>
@@ -1033,7 +1256,7 @@ export const QuizGeneratorScreen: React.FC = () => {
 
             {/* Student Mode */}
             <View style={[styles.exportOption, { borderColor: colors.borderColor }]}>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, marginBottom: 8 }}>
                 <Text style={[styles.exportOptionName, { color: colors.textColor }]}>
                   Бланк для учеников
                 </Text>
@@ -1043,23 +1266,55 @@ export const QuizGeneratorScreen: React.FC = () => {
               </View>
               <View style={styles.exportBtnGroup}>
                 <TouchableOpacity
+                  style={[styles.actionExportBtn, { backgroundColor: colors.background, borderColor: colors.borderColor }]}
+                  onPress={() => handleExportPdf('student')}
+                  accessibilityLabel="Скачать в PDF"
+                >
+                  {exportLoading === 'pdf_student' ? (
+                    <ActivityIndicator size="small" color={colors.primaryAccent} />
+                  ) : (
+                    <>
+                      <Feather name="file-text" size={13} color={colors.primaryAccent} />
+                      <Text style={[styles.actionExportText, { color: colors.textColor }]}>PDF</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionExportBtn, { backgroundColor: colors.background, borderColor: colors.borderColor }]}
+                  onPress={() => handleExportDocx('student')}
+                  accessibilityLabel="Скачать в Word"
+                >
+                  {exportLoading === 'docx_student' ? (
+                    <ActivityIndicator size="small" color="#2563eb" />
+                  ) : (
+                    <>
+                      <Feather name="file" size={13} color="#2563eb" />
+                      <Text style={[styles.actionExportText, { color: colors.textColor }]}>Word</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   style={[styles.smallBtn, { backgroundColor: colors.background }]}
                   onPress={() => handleCopyExport('student')}
-                  accessibilityLabel="Скопировать для Word / Docs"
+                  accessibilityLabel="Скопировать"
                 >
                   <Feather name="copy" size={13} color={colors.textColor} />
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   style={[styles.smallBtn, { backgroundColor: colors.background }]}
                   onPress={() => handleShareHtmlExport('student')}
-                  accessibilityLabel="Печать / Сохранить в PDF"
+                  accessibilityLabel="Печать"
                 >
                   <Feather name="printer" size={13} color={colors.primaryAccent} />
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   style={[styles.smallBtn, { backgroundColor: colors.primaryAccent }]}
                   onPress={() => handleShareExport('student')}
-                  accessibilityLabel="Поделиться в файл"
+                  accessibilityLabel="Поделиться"
                 >
                   <Feather name="share-2" size={13} color="#ffffff" />
                 </TouchableOpacity>
@@ -1070,16 +1325,45 @@ export const QuizGeneratorScreen: React.FC = () => {
             <View style={[styles.exportHintBox, { backgroundColor: colors.background }]}>
               <Feather name="info" size={12} color={colors.primaryAccent} />
               <Text style={[styles.exportHintText, { color: colors.textColorSecondary }]}>
-                Иконка принтера формирует HTML/PDF бланк для распечатки. Иконка «Поделиться» отправляет файл в Google Docs, Word или Telegram.
+                PDF и Word (.doc) скачиваются на устройство и поддерживают открытие в Word, Google Docs и печать.
               </Text>
             </View>
 
             {copiedExport && (
-              <Text style={styles.copiedBanner}>Тест успешно скопирован в буфер обмена для Word / Docs!</Text>
+              <Text style={styles.copiedBanner}>Тест успешно скопирован в буфер обмена!</Text>
+            )}
+            {exportBanner && (
+              <Text style={[styles.copiedBanner, { backgroundColor: '#22c55e22', color: '#22c55e' }]}>
+                {exportBanner}
+              </Text>
             )}
           </View>
         </View>
       )}
+
+      {/* Auth Modal (Login / Register) */}
+      <Modal
+        visible={showAuthModal && !isRegisteredUser}
+        animationType="slide"
+        onRequestClose={() => setShowAuthModal(false)}
+      >
+        <SafeAreaView style={[styles.authModalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.authModalHeader, { borderBottomColor: colors.borderColor }]}>
+            <PressableScale
+              style={[styles.authModalCloseBtn, { backgroundColor: colors.componentBackground }]}
+              onPress={() => setShowAuthModal(false)}
+              accessibilityLabel="Закрыть"
+            >
+              <Feather name="x" size={20} color={colors.textColor} />
+            </PressableScale>
+            <Text style={[styles.authModalTitle, { color: colors.textColor }]}>
+              {authInitialScreen === 'register' ? 'Регистрация' : 'Вход в аккаунт'}
+            </Text>
+            <View style={{ width: 36 }} />
+          </View>
+          <AuthNavigator initialScreen={authInitialScreen} />
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 };
@@ -1558,5 +1842,129 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 15,
     flex: 1,
+  },
+  evaluatingOpenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+  },
+  evaluatingOpenText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+  },
+  aiVerdictCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  aiVerdictHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  aiVerdictTitle: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 13,
+  },
+  aiVerdictBody: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  quickExportCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+  },
+  quickExportTitle: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 14,
+  },
+  quickExportRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  quickExportBtn: {
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  quickExportBtnText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+  },
+  exportSuccessPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#22c55e15',
+    alignSelf: 'flex-start',
+  },
+  exportSuccessPillText: {
+    color: '#22c55e',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+  },
+  actionExportBtn: {
+    height: 34,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  actionExportText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+  },
+  activeStatusBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    width: '100%',
+  },
+  activeStatusText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    flex: 1,
+  },
+  authModalContainer: {
+    flex: 1,
+  },
+  authModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  authModalCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  authModalTitle: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 16,
   },
 });

@@ -67,6 +67,7 @@ export function buildPersonalizedSystemInstruction(
     "Help with university and school subjects, problem-solving, mathematics, physics, computer science, and writing. " +
     "Always format code blocks with triple backticks specifying the programming language (e.g. ```python, ```bash). " +
     "Always format mathematical equations, scientific variables, and calculations using clean LaTeX notation: use $$...$$ for display formulas and $...$ for inline formulas (e.g. $E = mc^2$, $$\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$). " +
+    "When asked to create a quiz, test, or check knowledge (e.g. 'составь тест', 'сделай тест', 'проверь знания', 'квиз'), always output a brief encouraging intro followed by the structured quiz embedded inside a ```quiz code block containing a valid JSON object matching: {\"title\": \"Название\", \"description\": \"Описание\", \"difficulty\": \"medium\", \"questions\": [{\"id\": \"q1\", \"question\": \"Текст\", \"type\": \"multiple_choice\" or \"open_ended\", \"options\": [\"A\", \"B\", \"C\", \"D\"], \"correctAnswer\": \"A\", \"explanation\": \"Пояснение\", \"topic\": \"Тема\"}]}. This will automatically render an interactive test runner right inside the chat. " +
     "Reply in the same language as the user's message.";
 
   const withTemporal = `${baseInstruction}${buildTemporalSystemContext()}`;
