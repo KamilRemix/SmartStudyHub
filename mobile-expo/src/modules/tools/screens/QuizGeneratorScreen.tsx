@@ -307,6 +307,7 @@ export const QuizGeneratorScreen: React.FC = () => {
       });
     } catch (err) {
       console.warn('Share HTML error:', err);
+    }
   };
 
   // Navigate to AI Assistant to discuss missed questions
@@ -316,11 +317,11 @@ export const QuizGeneratorScreen: React.FC = () => {
       .filter((r) => !r.isCorrect)
       .map(
         (r, i) =>
-          `${i + 1}. Вопрос: "${r.question.question}". Мой ответ: "${r.userAnswer || 'нет ответа'}". Правильный: "${r.question.correctAnswer}". Пояснение: "${r.question.explanation}"`
+          `${i + 1}. Вопрос: "${r.question.question}". Мой ответ: "${r.userAnswer || 'нет ответа'}". Правильный: "${r.question.correctAnswer}". Пояснение[...]
       )
       .join('\n\n');
 
-    const prompt = `Привет! Я прошел тест "${quiz.title}" и набрал ${evaluation.score} из ${evaluation.total}. Помоги разобрать мои ошибки и объясни детально, почему мои ответы неверны:\n\n${wrongQuestions}`;
+    const prompt = `Привет! Я прошел тест "${quiz.title}" и набрал ${evaluation.score} из ${evaluation.total}. Помоги разобрать мои ошибки и о�[...]`;
 
     navigation.navigate('AIAssistant');
   };
@@ -644,7 +645,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                 >
                   <Feather name="info" size={13} color={colors.primaryAccent} />
                   <Text style={[styles.generatingNoteText, { color: colors.textColorSecondary }]}>
-                    Нейросеть генерирует уникальные вопросы, ключи и формулы LaTeX. В случае высокой нагрузки автоматически подключается резервная модель.
+                    Нейросеть генерирует уникальные вопросы, ключи и формулы LaTeX. В случае высокой нагрузки автомат[...]
                   </Text>
                 </View>
               </View>
