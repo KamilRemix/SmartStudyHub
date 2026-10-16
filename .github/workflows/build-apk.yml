@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-expo-apk:
@@ -81,3 +81,9 @@ jobs:
           name: SmartStudyHub
           path: SmartStudyHub.apk
           retention-days: 14
+
+      - name: Publish SmartStudyHub.apk to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload v1.4.0 SmartStudyHub.apk --clobber
