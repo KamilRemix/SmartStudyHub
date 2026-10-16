@@ -42,8 +42,32 @@ export const AI_PROVIDERS: AIProviderInfo[] = [
     id: 'auto',
     name: 'Авто (Умный каскад)',
     badge: 'Рекомендуется',
-    description: 'Автоматический выбор наилучшей модели и мгновенный откат при сбоях',
+    description: 'Google Поиск в реальном времени, автоматический выбор лучшей модели и защита от сбоев',
     icon: 'zap',
+    supportsVision: true,
+  },
+  {
+    id: 'gemini',
+    name: 'Google Gemini',
+    badge: 'Google Search',
+    description: 'Нативный Google Поиск 2026, распознавание рукописей, задач с фото и высокая эрудиция',
+    icon: 'cpu',
+    supportsVision: true,
+  },
+  {
+    id: 'groq',
+    name: 'Groq Cloud',
+    badge: 'GPT-OSS / Ультрабыстрый',
+    description: 'Мгновенная генерация ответов (~500 токенов/сек) на базе OpenAI GPT-OSS и Qwen 3.8',
+    icon: 'activity',
+    supportsVision: false,
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter Free Pool',
+    badge: 'Gemma 4 / Nemotron',
+    description: 'Пул открытых моделей Google Gemma 4 и NVIDIA Nemotron с автоматическим фолбэком',
+    icon: 'share-2',
     supportsVision: true,
   },
   {
@@ -55,36 +79,12 @@ export const AI_PROVIDERS: AIProviderInfo[] = [
     supportsVision: false,
   },
   {
-    id: 'gemini',
-    name: 'Google Gemini',
-    badge: 'Мультимодальный',
-    description: 'Распознавание фото и рукописного текста задач, высокая эрудиция',
-    icon: 'cpu',
-    supportsVision: true,
-  },
-  {
-    id: 'groq',
-    name: 'Groq Cloud',
-    badge: 'Ультра-быстрый',
-    description: 'Мгновенная генерация ответов на базе Llama 3.3 70B (~500 токенов/сек)',
-    icon: 'activity',
-    supportsVision: false,
-  },
-  {
     id: 'sambanova',
     name: 'SambaNova Cloud',
-    badge: 'Llama 3.3 70B',
+    badge: 'Llama 3.3',
     description: 'Глубокий пошаговый анализ и академическая точность решений',
     icon: 'layers',
     supportsVision: false,
-  },
-  {
-    id: 'openrouter',
-    name: 'OpenRouter Free Pool',
-    badge: 'Открытые модели',
-    description: 'Пул бесплатных нейросетей DeepSeek R1, Llama 3.3 и Gemini Flash',
-    icon: 'share-2',
-    supportsVision: true,
   },
   {
     id: 'huggingface',
@@ -214,14 +214,25 @@ export async function callGigaChat(
   return reply.trim();
 }
 
+export const GROQ_CANDIDATE_MODELS = [
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'qwen/qwen3.8-27b',
+];
+
 /**
- * 2. Call Groq (Ultra-fast Llama 3.3 70B)
+ * 2. Call Groq (Ultra-fast OpenAI GPT-OSS / Qwen)
  */
 export async function callGroq(
   messages: Array<{ role: string; content: string }>,
   systemInstruction: string,
-  modelName: string = 'llama-3.3-70b-versatile'
+  modelName: string = 'openai/gpt-oss-120b'
 ): Promise<string> {
+  const modelsToTry = [
+    modelName,
+    ...GROQ_CANDIDATE_MODELS.filter((m) => m !== modelName),
+  ];
+
   const fullMessages = [
     { role: 'system', content: systemInstruction },
     ...messages.map((m) => ({
@@ -230,35 +241,45 @@ export async function callGroq(
     })),
   ];
 
-  const res = await fetchWithTimeout(
-    'https://api.groq.com/openai/v1/chat/completions',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${BUILTIN_GROQ_KEY}`,
-      },
-      body: JSON.stringify({
-        model: modelName,
-        messages: fullMessages,
-        temperature: 0.7,
-        max_tokens: 2048,
-      }),
-    },
-    14000
-  );
+  let lastError: Error | null = null;
+  for (const model of modelsToTry) {
+    try {
+      const res = await fetchWithTimeout(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${BUILTIN_GROQ_KEY}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: fullMessages,
+            temperature: 0.7,
+            max_tokens: 2048,
+          }),
+        },
+        14000
+      );
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Groq ${modelName} HTTP ${res.status}: ${errText}`);
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Groq ${model} HTTP ${res.status}: ${errText}`);
+      }
+
+      const data = await res.json();
+      const reply = data?.choices?.[0]?.message?.content;
+      if (!reply) {
+        throw new Error(`Groq ${model} returned empty text`);
+      }
+      return reply.trim();
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[Groq] Model ${model} failed, trying next candidate:`, err?.message);
+    }
   }
 
-  const data = await res.json();
-  const reply = data?.choices?.[0]?.message?.content;
-  if (!reply) {
-    throw new Error(`Groq ${modelName} returned empty text`);
-  }
-  return reply.trim();
+  throw lastError || new Error('Groq unavailable');
 }
 
 /**
@@ -485,7 +506,8 @@ export async function executeMultiProviderCascade(params: {
   systemInstruction: string;
   imageAttachment?: ChatImageAttachment;
   preferredProvider?: AIProviderId;
-  callGeminiFn: (model: string) => Promise<string>;
+  webSearchEnabled?: boolean;
+  callGeminiFn: (model: string, useGoogleSearch?: boolean) => Promise<string | { text: string; webSources?: any[] }>;
 }): Promise<ChatResponse> {
   const {
     history,
@@ -493,6 +515,7 @@ export async function executeMultiProviderCascade(params: {
     systemInstruction,
     imageAttachment,
     preferredProvider = 'auto',
+    webSearchEnabled = false,
     callGeminiFn,
   } = params;
 
@@ -532,19 +555,20 @@ export async function executeMultiProviderCascade(params: {
 
   // MULTIMODAL ROUTE (Images attached): only Gemini & OpenRouter Multimodal
   if (imageAttachment?.base64) {
-    // 1. Gemini Flash
-    try {
-      const text = await callGeminiFn('gemini-2.5-flash');
-      return { text, modelUsed: 'Gemini (gemini-2.5-flash)' };
-    } catch (e: any) {
-      console.warn('[AI Cascade] Gemini 2.5 Flash image failed:', e?.message);
-    }
-
-    try {
-      const text = await callGeminiFn('gemini-2.0-flash');
-      return { text, modelUsed: 'Gemini (gemini-2.0-flash)' };
-    } catch (e: any) {
-      console.warn('[AI Cascade] Gemini 2.0 Flash image failed:', e?.message);
+    const visionModels = [
+      'gemini-2.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.5-flash',
+      'gemini-3.8-flash',
+    ];
+    for (const m of visionModels) {
+      try {
+        const res = await callGeminiFn(m);
+        const text = typeof res === 'string' ? res : res.text;
+        return { text, modelUsed: `Gemini (${m})` };
+      } catch (e: any) {
+        console.warn(`[AI Cascade] Gemini ${m} image failed:`, e?.message);
+      }
     }
 
     // 2. OpenRouter Multimodal
@@ -552,9 +576,9 @@ export async function executeMultiProviderCascade(params: {
       const text = await callOpenRouterInternal(
         openRouterMessages,
         systemInstruction,
-        'google/gemini-2.0-flash-exp:free'
+        'nvidia/nemotron-3.5-super-vl:free'
       );
-      return { text, modelUsed: 'OpenRouter (gemini-flash-vision)' };
+      return { text, modelUsed: 'OpenRouter (nemotron-vision)' };
     } catch (e: any) {
       console.warn('[AI Cascade] OpenRouter vision failed:', e?.message);
     }
@@ -595,52 +619,36 @@ export async function executeMultiProviderCascade(params: {
     try {
       switch (provider) {
         case 'gemini': {
-          try {
-            const text = await callGeminiFn('gemini-2.5-flash');
-            return { text, modelUsed: 'Gemini (gemini-2.5-flash)' };
-          } catch (e) {
-            const text = await callGeminiFn('gemini-2.0-flash');
-            return { text, modelUsed: 'Gemini (gemini-2.0-flash)' };
+          const geminiModels = [
+            'gemini-2.5-flash',
+            'gemini-3.5-flash-lite',
+            'gemini-3.5-flash',
+            'gemini-3.8-flash',
+          ];
+          for (const m of geminiModels) {
+            try {
+              const res = await callGeminiFn(m, webSearchEnabled);
+              const text = typeof res === 'string' ? res : res.text;
+              const webSources = typeof res === 'object' ? res.webSources : undefined;
+              return { text, modelUsed: `Gemini (${m})`, webSources };
+            } catch (gemErr: any) {
+              console.warn(`[AI Cascade] Gemini ${m} failed:`, gemErr?.message);
+            }
           }
-        }
-
-        case 'gigachat': {
-          const text = await callGigaChat(standardMessages, systemInstruction);
-          return { text, modelUsed: 'GigaChat (Сбербанк)' };
+          throw new Error('Все модели Gemini временно недоступны');
         }
 
         case 'groq': {
-          try {
-            const text = await callGroq(
-              standardMessages,
-              systemInstruction,
-              'llama-3.3-70b-versatile'
-            );
-            return { text, modelUsed: 'Groq (Llama-3.3-70B)' };
-          } catch (e) {
-            const text = await callGroq(
-              standardMessages,
-              systemInstruction,
-              'llama-3.1-8b-instant'
-            );
-            return { text, modelUsed: 'Groq (Llama-3.1-8B)' };
-          }
-        }
-
-        case 'sambanova': {
-          const text = await callSambaNova(
-            standardMessages,
-            systemInstruction,
-            'Meta-Llama-3.3-70B-Instruct'
-          );
-          return { text, modelUsed: 'SambaNova (Llama-3.3-70B)' };
+          const text = await callGroq(standardMessages, systemInstruction);
+          return { text, modelUsed: 'Groq (GPT-OSS 120B)' };
         }
 
         case 'openrouter': {
           const openRouterModels = [
-            'google/gemini-2.0-flash-exp:free',
-            'deepseek/deepseek-r1:free',
-            'meta-llama/llama-3.3-70b-instruct:free',
+            'google/gemma-4-31b-it:free',
+            'google/gemma-4-26b-a4b-it:free',
+            'nvidia/nemotron-3.5-super-vl:free',
+            'liquid/lfm-2.5-2.6b:free',
           ];
           for (const m of openRouterModels) {
             try {
@@ -661,6 +669,20 @@ export async function executeMultiProviderCascade(params: {
           } catch (polErr: any) {
             throw new Error('Все модели OpenRouter Free пула заняты');
           }
+        }
+
+        case 'gigachat': {
+          const text = await callGigaChat(standardMessages, systemInstruction);
+          return { text, modelUsed: 'GigaChat (Сбербанк)' };
+        }
+
+        case 'sambanova': {
+          const text = await callSambaNova(
+            standardMessages,
+            systemInstruction,
+            'Meta-Llama-3.3-70B-Instruct'
+          );
+          return { text, modelUsed: 'SambaNova (Llama-3.3-70B)' };
         }
 
         case 'huggingface': {

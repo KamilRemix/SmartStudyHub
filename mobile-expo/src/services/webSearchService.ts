@@ -150,6 +150,29 @@ const PURE_CLOCK_PATTERNS = [
   /^what (year|day|time) is it\??$/i,
 ];
 
+// Patterns for non-search meta-questions and conversational chit-chat
+const NON_SEARCH_META_PATTERNS = [
+  /^(это\s+)?вопрос(\s+ли\s+это)?\??$/i,
+  /^это\s+(был\s+)?вопрос\??$/i,
+  /^ты\s+(тут|здесь|живой|работаешь|бот|ии|человек)\??$/i,
+  /^как\s+(у\s+тебя\s+)?дела\??$/i,
+  /^кто\s+ты(\s+такой)?\??$/i,
+  /^что\s+ты\s+(умеешь|можешь)(\s+делать)?\??$/i,
+  /^привет(ствую)?\??$/i,
+  /^здравствуй(те)?\??$/i,
+  /^спасибо(чки)?\??$/i,
+  /^пока|до\s+свидания\??$/i,
+  /^проверка(\s+связи)?\??$/i,
+  /^test|ping|hello|hi\??$/i,
+];
+
+export function isNonSearchMetaQuery(text: string): boolean {
+  if (!text || typeof text !== 'string') return true;
+  const trimmed = text.trim();
+  if (trimmed.length < 2) return true;
+  return NON_SEARCH_META_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
 // Matches full URLs with protocol
 const URL_WITH_PROTO_REGEX = /https?:\/\/[^\s<>"'{}|\\^`]+/gi;
 
@@ -240,17 +263,17 @@ export function extractSearchKeywords(rawQuery: string): string {
   // Remove trailing question marks, dots, exclamation
   q = q.replace(/[?!:;.]+$/g, '').trim();
 
-  // If query is long (conversational question), filter out low-signal stopwords
+  // Filter out low-signal stopwords
   const tokens = q.split(/\s+/).filter(Boolean);
-  if (tokens.length > 3) {
-    const filteredTokens = tokens.filter((t) => {
-      const clean = t.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '');
-      return clean.length > 0 && !CONVERSATIONAL_STOPWORDS.has(clean);
-    });
-    // Keep filtered terms if we have enough informative keywords left
-    if (filteredTokens.length >= 2) {
-      q = filteredTokens.join(' ');
-    }
+  const filteredTokens = tokens.filter((t) => {
+    const clean = t.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '');
+    return clean.length > 0 && !CONVERSATIONAL_STOPWORDS.has(clean);
+  });
+
+  if (filteredTokens.length > 0) {
+    q = filteredTokens.join(' ');
+  } else if (isNonSearchMetaQuery(rawQuery)) {
+    return '';
   }
 
   // If query is about current/latest status and doesn't contain a year, append current year for freshness
@@ -293,10 +316,14 @@ export function isTimeSensitiveQuery(query: string): boolean {
  * Triggers if manual toggle is on, if URLs or domain names are present, or if real-world intent is detected.
  */
 export function shouldPerformWebSearch(prompt: string, manualToggle: boolean): boolean {
-  if (manualToggle) return true;
   if (!prompt || typeof prompt !== 'string') return false;
 
   const trimmed = prompt.trim();
+  // If the query is just asking for conversational meta-chatter, never trigger web search
+  if (isNonSearchMetaQuery(trimmed)) {
+    return false;
+  }
+
   // If the query is just asking for the clock/calendar, system prompt already knows this with 100% precision
   if (PURE_CLOCK_PATTERNS.some((p) => p.test(trimmed))) {
     return false;
@@ -306,6 +333,8 @@ export function shouldPerformWebSearch(prompt: string, manualToggle: boolean): b
   if (extractUrlsFromText(trimmed).length > 0) {
     return true;
   }
+
+  if (manualToggle) return true;
 
   return isTimeSensitiveQuery(trimmed);
 }
@@ -352,7 +381,15 @@ export function normalizeWebUrl(rawUrl: string): string {
       return `https://docs.google.com/presentation/d/${slideId}/export/txt`;
     }
 
-    // 5. DuckDuckGo Redirect: duckduckgo.com/l/?uddg=...
+    // 5. Bing News Redirect: bing.com/news/apiclick.aspx?ref=...&url=...
+    if (parsed.hostname.includes('bing.com') && (parsed.pathname.includes('apiclick.aspx') || parsed.pathname.startsWith('/news/'))) {
+      const target = parsed.searchParams.get('url');
+      if (target && target.startsWith('http')) {
+        return target;
+      }
+    }
+
+    // 6. DuckDuckGo Redirect: duckduckgo.com/l/?uddg=...
     if (parsed.hostname.includes('duckduckgo.com') && parsed.pathname.startsWith('/l/')) {
       const target = parsed.searchParams.get('uddg');
       if (target) {
@@ -360,7 +397,7 @@ export function normalizeWebUrl(rawUrl: string): string {
       }
     }
 
-    // 5. Yandex Redirect: yandex.ru/clck/...
+    // 7. Yandex Redirect: yandex.ru/clck/...
     if (parsed.hostname.includes('yandex.') && parsed.pathname.startsWith('/clck/')) {
       const target = parsed.searchParams.get('url') || parsed.searchParams.get('target');
       if (target && target.startsWith('http')) {
@@ -828,7 +865,80 @@ async function fetchGoogleNews(query: string, maxResults: number = 4): Promise<W
 }
 
 /**
- * 5. Wikipedia API Fetcher with Rich Extract Support
+ * 5. Bing News RSS Fetcher
+ * Real-time news articles, events, and currency/finance updates.
+ */
+async function fetchBingNews(query: string, maxResults: number = 4): Promise<WebSearchResult[]> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4500);
+
+    const url = `https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=rss`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const items: WebSearchResult[] = [];
+    const chunks = xml.split('<item>');
+
+    for (let i = 1; i < chunks.length && items.length < maxResults; i++) {
+      const chunk = chunks[i];
+      const titleM = /<title>([\s\S]*?)<\/title>/.exec(chunk);
+      const linkM = /<link>([\s\S]*?)<\/link>/.exec(chunk);
+      const descM = /<description>([\s\S]*?)<\/description>/.exec(chunk);
+      const pubDateM = /<pubDate>([\s\S]*?)<\/pubDate>/.exec(chunk);
+
+      if (titleM) {
+        const rawTitle = decodeHtmlEntities(titleM[1].replace(/<[^>]+>/g, '').trim());
+        let link = linkM ? decodeHtmlEntities(linkM[1].trim()) : '';
+        link = normalizeWebUrl(link);
+
+        let formattedDate = '';
+        if (pubDateM) {
+          try {
+            const d = new Date(pubDateM[1]);
+            if (!isNaN(d.getTime())) {
+              formattedDate = d.toLocaleDateString('ru-RU', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              });
+            }
+          } catch {}
+        }
+
+        const rawDesc = descM ? decodeHtmlEntities(descM[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) : '';
+        const sourceName = getHostnameFromUrl(link);
+        const snippet = formattedDate
+          ? `[${formattedDate}] ${sourceName}: ${rawDesc || rawTitle}`
+          : `${sourceName}: ${rawDesc || rawTitle}`;
+
+        if (rawTitle && link) {
+          items.push({
+            title: rawTitle,
+            snippet,
+            url: link,
+            source: sourceName,
+          });
+        }
+      }
+    }
+    return items;
+  } catch (err: any) {
+    console.warn('[WebSearch] Bing News fetch error:', err?.message);
+    return [];
+  }
+}
+
+/**
+ * 6. Wikipedia API Fetcher with Rich Extract Support & Keyword Relevance Check
  * Used for encyclopedic, biographical, scientific, and definitional queries.
  */
 async function fetchWikipedia(query: string, maxResults: number = 2): Promise<WebSearchResult[]> {
@@ -868,6 +978,12 @@ async function fetchWikipedia(query: string, maxResults: number = 2): Promise<We
       } catch {}
     }
 
+    const queryTokens = query
+      .toLowerCase()
+      .split(/\s+/)
+      .map((t) => t.replace(/[^a-zа-яё0-9]/gi, ''))
+      .filter((t) => t.length >= 3 && !CONVERSATIONAL_STOPWORDS.has(t));
+
     const results: WebSearchResult[] = [];
 
     for (const item of searchItems) {
@@ -877,6 +993,19 @@ async function fetchWikipedia(query: string, maxResults: number = 2): Promise<We
         (item.title.includes('(значения)') || item.title.includes('(disambiguation)'))
       ) {
         continue;
+      }
+
+      // Relevance check: ensure Wikipedia article title or snippet actually matches at least one significant query term
+      const titleLower = (item.title || '').toLowerCase();
+      if (queryTokens.length > 0) {
+        const titleMatches = queryTokens.some((t) => titleLower.includes(t) || t.includes(titleLower));
+        if (!titleMatches) {
+          const snippetLower = (item.snippet || '').toLowerCase();
+          const snippetMatches = queryTokens.some((t) => snippetLower.includes(t));
+          if (!snippetMatches) {
+            continue; // Skip irrelevant page
+          }
+        }
       }
 
       const cleanSnippet = decodeHtmlEntities((item.snippet || '').replace(/<[^>]+>/g, '').trim());
@@ -924,7 +1053,7 @@ async function fetchWikipedia(query: string, maxResults: number = 2): Promise<We
  * Perform web search using multi-source cascade & live page reading:
  * 1. Extracts direct URLs / bare domains from query and fetches them directly.
  * 2. Cleans conversational fluff into laser-targeted search keywords.
- * 3. Queries DuckDuckGo Lite (with HTML & Instant Answers fallback), Google News RSS, and Wikipedia.
+ * 3. Queries Google News RSS, Bing News RSS, Wikipedia (with relevance checks), and DuckDuckGo Instant Answers.
  * 4. Automatically reads full readable content from top search results.
  */
 export async function searchWeb(
@@ -973,32 +1102,36 @@ export async function searchWeb(
 
   // 2. Clean conversational fluff into focused keywords
   const cleanKeywords = extractSearchKeywords(query);
-  if (!cleanKeywords) return results;
+  if (!cleanKeywords || isNonSearchMetaQuery(cleanKeywords)) return results;
 
   onStatus?.(`Ищем: ${cleanKeywords}`);
 
   const timeSensitive = isTimeSensitiveQuery(query) || isTimeSensitiveQuery(cleanKeywords);
 
   if (timeSensitive) {
-    // Current events / news cascade: DuckDuckGo Lite + Google News RSS
-    let ddgItems = await fetchDuckDuckGoLite(cleanKeywords, maxResults);
-    if (ddgItems.length === 0) {
-      ddgItems = await fetchDuckDuckGoHtml(cleanKeywords, maxResults);
+    // Current events / news cascade: Google News RSS + Bing News RSS + Instant Answers
+    const [googleNews, bingNews, instantAnswer] = await Promise.all([
+      fetchGoogleNews(cleanKeywords, maxResults),
+      fetchBingNews(cleanKeywords, maxResults),
+      fetchDuckDuckGoInstantAnswer(cleanKeywords),
+    ]);
+
+    if (instantAnswer) {
+      addResults([instantAnswer]);
     }
-    const newsItems = await fetchGoogleNews(cleanKeywords, 2);
+    addResults(googleNews);
+    addResults(bingNews);
 
-    addResults(ddgItems);
-    addResults(newsItems);
-
-    // If still empty, fallback to raw query or broader news search
-    if (results.length === 0 && cleanKeywords !== query.trim()) {
-      const fallbackNews = await fetchGoogleNews(query.trim(), maxResults);
-      addResults(fallbackNews);
+    // Fallback to DDG Lite if still needed
+    if (results.length < maxResults) {
+      const ddgItems = await fetchDuckDuckGoLite(cleanKeywords, 2);
+      addResults(ddgItems);
     }
   } else {
-    // General or academic cascade: DuckDuckGo Lite + Wikipedia + Instant Answers + Google News
-    const [ddgLiteItems, wikiItems, instantAnswer] = await Promise.all([
-      fetchDuckDuckGoLite(cleanKeywords, 3),
+    // General or academic cascade: Google News + Bing News + Wikipedia (with relevance filter) + Instant Answers
+    const [googleNews, bingNews, wikiItems, instantAnswer] = await Promise.all([
+      fetchGoogleNews(cleanKeywords, 2),
+      fetchBingNews(cleanKeywords, 2),
       fetchWikipedia(cleanKeywords, 2),
       fetchDuckDuckGoInstantAnswer(cleanKeywords),
     ]);
@@ -1006,18 +1139,13 @@ export async function searchWeb(
     if (instantAnswer) {
       addResults([instantAnswer]);
     }
-
-    let ddgItems = ddgLiteItems;
-    if (ddgItems.length === 0) {
-      ddgItems = await fetchDuckDuckGoHtml(cleanKeywords, 3);
-    }
-
-    addResults(ddgItems);
+    addResults(googleNews);
+    addResults(bingNews);
     addResults(wikiItems);
 
     if (results.length < 2) {
-      const newsItems = await fetchGoogleNews(cleanKeywords, 2);
-      addResults(newsItems);
+      const ddgItems = await fetchDuckDuckGoLite(cleanKeywords, 2);
+      addResults(ddgItems);
     }
   }
 

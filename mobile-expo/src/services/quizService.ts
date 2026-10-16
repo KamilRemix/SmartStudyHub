@@ -130,12 +130,12 @@ Ensure all questions are high quality, factual, educational, and unambiguous.`;
       console.warn('[Quiz] GigaChat failed:', err?.message);
     }
 
-    // 3. Cascade: Groq (Ultra-fast Llama 3.3)
+    // 3. Cascade: Groq (Ultra-fast OpenAI GPT-OSS / Qwen)
     try {
       const rawJson = await callGroq(
         [{ role: 'user', content: userPrompt }],
         systemPrompt,
-        'llama-3.3-70b-versatile'
+        'openai/gpt-oss-120b'
       );
       const parsed = parseQuizJson(rawJson);
       if (parsed) return parsed;

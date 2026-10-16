@@ -150,8 +150,13 @@ export async function pingAllProviders(force: boolean = false): Promise<Record<A
 
   // 7. Ping Gemini Flash
   const pingGemini = async () => {
-    return await pingEndpoint(
+    const res = await pingEndpoint(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash?key=${encodeURIComponent(BUILTIN_GEMINI_KEY)}`,
+      { method: 'GET' }
+    );
+    if (res.success) return res;
+    return await pingEndpoint(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite?key=${encodeURIComponent(BUILTIN_GEMINI_KEY)}`,
       { method: 'GET' }
     );
   };

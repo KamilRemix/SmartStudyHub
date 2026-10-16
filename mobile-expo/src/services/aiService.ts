@@ -35,21 +35,19 @@ export const DEFAULT_OPENROUTER_KEY =
 
 // 100% Free models on OpenRouter (cost: $0 / 0 RUB)
 export const OPENROUTER_FREE_MODELS = [
-  'google/gemini-2.0-flash-exp:free',
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'deepseek/deepseek-r1:free',
-  'qwen/qwen-2.5-72b-instruct:free',
-  'mistralai/mistral-small-24b-instruct-2501:free',
+  'google/gemma-4-31b-it:free',
+  'google/gemma-4-26b-a4b-it:free',
+  'nvidia/nemotron-3.5-super-vl:free',
+  'liquid/lfm-2.5-2.6b:free',
+  'nvidia/nemotron-3.5-lightning:free',
 ];
 
 // Priority Gemini candidate models
 export const GEMINI_CANDIDATE_MODELS = [
   'gemini-2.5-flash',
-  'gemini-flash-lite-latest',
-  'gemini-3.8-flash',
+  'gemini-3.5-flash-lite',
   'gemini-3.5-flash',
-  'gemini-flash-latest',
-  'gemini-2.5-pro',
+  'gemini-3.8-flash',
 ];
 
 import {
@@ -156,15 +154,22 @@ async function callWithTimeout(
   }
 }
 
+export interface GeminiAdvancedResult {
+  text: string;
+  webSources?: WebSearchResult[];
+  webSearchQueries?: string[];
+}
+
 /**
- * Calls Gemini with automatic key pool rotation and failover on 429 rate limits
+ * Calls Gemini with automatic key pool rotation, multi-model failover, and Google Search Grounding support
  */
-export async function callGemini(
+export async function callGeminiAdvanced(
   contents: any[],
   systemInstruction: string,
   modelName: string,
-  explicitKey?: string
-): Promise<string> {
+  explicitKey?: string,
+  enableGoogleSearch: boolean = false
+): Promise<GeminiAdvancedResult> {
   const pool = explicitKey ? [explicitKey] : await getGeminiKeyPool();
   const now = Date.now();
 
@@ -177,69 +182,128 @@ export async function callGemini(
   const keysToTry = availableKeys.length > 0 ? availableKeys : pool;
   const errors: string[] = [];
 
+  // Models to try in priority order: first requested model, then remaining stable candidates
+  const candidateModels = [
+    modelName,
+    ...GEMINI_CANDIDATE_MODELS.filter((m) => m !== modelName),
+  ];
+
   for (let i = 0; i < keysToTry.length; i++) {
     const key = keysToTry[(geminiKeyIndex + i) % keysToTry.length];
 
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(key)}`;
-    const body = {
-      contents,
-      systemInstruction: {
-        parts: [{ text: systemInstruction }],
-      },
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 2800,
-      },
-    };
-
-    try {
-      const response = await callWithTimeout(
-        url,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
+    for (const activeModel of candidateModels) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${encodeURIComponent(key)}`;
+      const body: any = {
+        contents,
+        systemInstruction: {
+          parts: [{ text: systemInstruction }],
         },
-        12000
-      );
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2800,
+        },
+      };
 
-      if (!response.ok) {
-        const errText = await response.text();
-        let msg = errText;
-        try {
-          const parsed = JSON.parse(errText);
-          msg = parsed?.error?.message || errText;
-        } catch {}
+      if (enableGoogleSearch) {
+        body.tools = [{ googleSearch: {} }];
+      }
 
-        if (response.status === 429) {
-          // Rate limit: cooldown this key for 60 seconds
-          keyCooldowns.set(key, Date.now() + 60000);
-          console.warn(`[Gemini Pool] Key ${key.substring(0, 8)}... rate-limited (429). Rotating to next key...`);
-        } else if (response.status === 401 || response.status === 403) {
-          keyCooldowns.set(key, Date.now() + 300000);
-          console.warn(`[Gemini Pool] Key ${key.substring(0, 8)}... auth error (${response.status}): ${msg}`);
+      try {
+        const response = await callWithTimeout(
+          url,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          },
+          14000
+        );
+
+        if (!response.ok) {
+          const errText = await response.text();
+          let msg = errText;
+          try {
+            const parsed = JSON.parse(errText);
+            msg = parsed?.error?.message || errText;
+          } catch {}
+
+          if (response.status === 429) {
+            console.warn(`[Gemini Pool] Model ${activeModel} with key ${key.substring(0, 8)}... rate-limited (429). Trying next model...`);
+            errors.push(`${activeModel} 429: ${msg}`);
+            continue;
+          } else if (response.status === 503) {
+            console.warn(`[Gemini Pool] Model ${activeModel} high demand spike (503). Trying next candidate model...`);
+            errors.push(`${activeModel} 503: ${msg}`);
+            continue;
+          } else if (response.status === 404) {
+            console.warn(`[Gemini Pool] Model ${activeModel} not found (404). Trying next model...`);
+            errors.push(`${activeModel} 404: ${msg}`);
+            continue;
+          } else if (response.status === 401 || response.status === 403) {
+            keyCooldowns.set(key, Date.now() + 300000);
+            console.warn(`[Gemini Pool] Key ${key.substring(0, 8)}... auth error (${response.status}): ${msg}`);
+            errors.push(`Key auth ${response.status}: ${msg}`);
+            break; // Skip to next key
+          }
+
+          errors.push(`${activeModel} (${response.status}): ${msg}`);
+          continue;
         }
 
-        errors.push(`Key ${key.substring(0, 8)}... (${response.status}): ${msg}`);
-        continue;
-      }
+        const data = await response.json();
+        const cand = data?.candidates?.[0];
+        const text = cand?.content?.parts?.[0]?.text;
+        if (!text) {
+          throw new Error(`Gemini ${activeModel} returned empty text`);
+        }
 
-      const data = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) {
-        throw new Error(`Gemini ${modelName} returned empty text`);
-      }
+        // Parse Google Search Grounding metadata
+        const webSources: WebSearchResult[] = [];
+        const groundingChunks = cand?.groundingMetadata?.groundingChunks;
+        if (Array.isArray(groundingChunks)) {
+          for (const chunk of groundingChunks) {
+            const uri = chunk?.web?.uri;
+            if (uri && !webSources.some((s) => s.url === uri)) {
+              const title = chunk?.web?.title || getHostnameFromUrl(uri);
+              webSources.push({
+                title,
+                snippet: 'Информация проверена в реальном времени поисковой системой Google.',
+                url: uri,
+                source: getHostnameFromUrl(uri) || 'Google Search',
+              });
+            }
+          }
+        }
 
-      // Successful request: rotate index for next request to balance load
-      geminiKeyIndex = (geminiKeyIndex + 1) % keysToTry.length;
-      return text;
-    } catch (err: any) {
-      errors.push(`Key ${key.substring(0, 8)}... error: ${err?.message || 'timeout'}`);
+        const webSearchQueries: string[] = cand?.groundingMetadata?.webSearchQueries || [];
+
+        // Successful request: rotate index for next request to balance load
+        geminiKeyIndex = (geminiKeyIndex + 1) % keysToTry.length;
+        return {
+          text,
+          webSources: webSources.length > 0 ? webSources : undefined,
+          webSearchQueries,
+        };
+      } catch (err: any) {
+        errors.push(`${activeModel} error: ${err?.message || 'timeout'}`);
+      }
     }
   }
 
-  throw new Error(`Gemini pool exhausted (${errors.slice(-2).join('; ')})`);
+  throw new Error(`Все модели Gemini временно недоступны (${errors.slice(-2).join('; ')})`);
+}
+
+/**
+ * Calls Gemini with automatic key pool rotation and failover on 429 rate limits
+ */
+export async function callGemini(
+  contents: any[],
+  systemInstruction: string,
+  modelName: string,
+  explicitKey?: string
+): Promise<string> {
+  const result = await callGeminiAdvanced(contents, systemInstruction, modelName, explicitKey, false);
+  return result.text;
 }
 
 export async function callOpenRouter(
@@ -391,12 +455,26 @@ export async function sendChatMessage(
     parts: userParts,
   });
 
-  const callGeminiFn = async (model: string): Promise<string> => {
+  const callGeminiFn = async (
+    model: string,
+    enableSearch?: boolean
+  ): Promise<{ text: string; webSources?: WebSearchResult[] }> => {
     const geminiKey = await getGeminiApiKey();
     if (!geminiKey) {
       throw new Error('Gemini API key is not configured');
     }
-    return callGemini(geminiContents, systemInstruction, model, geminiKey);
+    const searchToUse = typeof enableSearch === 'boolean' ? enableSearch : (doSearch || !!webSearchEnabled);
+    const result = await callGeminiAdvanced(
+      geminiContents,
+      systemInstruction,
+      model,
+      geminiKey,
+      searchToUse
+    );
+    return {
+      text: result.text,
+      webSources: result.webSources,
+    };
   };
 
   const selectedProvider = preferredProvider || (await getSelectedProvider());
@@ -407,11 +485,25 @@ export async function sendChatMessage(
     systemInstruction,
     imageAttachment,
     preferredProvider: selectedProvider,
+    webSearchEnabled: doSearch || !!webSearchEnabled,
     callGeminiFn,
   });
 
+  const combinedSources = [
+    ...foundSources,
+    ...(response.webSources || []),
+  ];
+  const uniqueSources: WebSearchResult[] = [];
+  const seenUrls = new Set<string>();
+  for (const s of combinedSources) {
+    if (s && s.url && !seenUrls.has(s.url.toLowerCase())) {
+      seenUrls.add(s.url.toLowerCase());
+      uniqueSources.push(s);
+    }
+  }
+
   return {
     ...response,
-    webSources: foundSources.length > 0 ? foundSources : undefined,
+    webSources: uniqueSources.length > 0 ? uniqueSources : undefined,
   };
 }

@@ -317,7 +317,7 @@
             if (name === 'search_google') {
                 const query = args.query;
                 try {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
                     const requestBody = {
                         contents: [{ role: 'user', parts: [{ text: `Find detailed information about: ${query}` }] }],
                         tools: [{ googleSearch: {} }]
@@ -728,8 +728,8 @@
     }
 
     async function callPersonalAiApi(message, apiKey) {
-        // Models list: gemini-2.0-flash is extremely fast and supported in this project environment
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+        // Models list: gemini-2.5-flash is extremely fast and supported in this project environment
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
         
         // Build contents history
         const contents = [];
