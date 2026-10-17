@@ -51,10 +51,10 @@ export const MathFormulaBlock: React.FC<MathFormulaBlockProps> = ({ latex }) => 
             style={styles.modeToggle}
             onPress={() => setShowRaw((prev) => !prev)}
             activeOpacity={0.7}
-            accessibilityLabel="Toggle raw LaTeX"
+            accessibilityLabel="Переключить вид формулы"
           >
             <Text style={styles.modeToggleText}>
-              {showRaw ? 'Вид' : 'LaTeX'}
+              {showRaw ? 'Вид' : 'Код'}
             </Text>
           </TouchableOpacity>
 
@@ -62,7 +62,7 @@ export const MathFormulaBlock: React.FC<MathFormulaBlockProps> = ({ latex }) => 
             style={[styles.copyBtn, copied && styles.copyBtnActive]}
             onPress={handleCopy}
             activeOpacity={0.7}
-            accessibilityLabel="Copy formula LaTeX"
+            accessibilityLabel="Копировать формулу"
           >
             <Feather
               name={copied ? 'check' : 'copy'}

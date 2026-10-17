@@ -78,7 +78,7 @@ interface FormatOption {
 const FORMAT_OPTIONS: FormatOption[] = [
   {
     id: 'latex',
-    label: 'Формулы LaTeX',
+    label: 'Математические формулы',
     icon: 'code',
     instruction: 'Всегда оформляй математические формулы через LaTeX ($...$ и $$...$$).',
   },
@@ -166,9 +166,9 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gesture) => {
-        return gesture.dy > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx);
+        return gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.5;
       },
       onPanResponderMove: (_, gesture) => {
         if (gesture.dy > 0) {
@@ -178,11 +178,10 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
       onPanResponderRelease: (_, gesture) => {
         if (gesture.dy > 90 || gesture.vy > 0.4) {
           Animated.timing(translateY, {
-            toValue: 500,
+            toValue: 600,
             duration: 180,
             useNativeDriver: true,
           }).start(() => {
-            translateY.setValue(0);
             onClose();
           });
         } else {
@@ -336,7 +335,7 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
                   Стиль общения
                 </Text>
               </View>
-              <View style={styles.chipsGrid}>
+              <View style={styles.toneListWrap}>
                 {TONE_OPTIONS.map((tone) => {
                   const active = isSnippetActive(tone.instruction);
                   return (
@@ -351,41 +350,42 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
                       ]}
                       onPress={() => togglePresetInstruction(tone.instruction)}
                     >
-                      <View style={styles.toneCardTop}>
-                        <View
-                          style={[
-                            styles.toneIconWrap,
-                            {
-                              backgroundColor: active
-                                ? colors.primaryAccent + '25'
-                                : colors.componentBackground,
-                            },
-                          ]}
-                        >
-                          <Feather
-                            name={tone.icon}
-                            size={14}
-                            color={active ? colors.primaryAccent : colors.textColorSecondary}
-                          />
-                        </View>
-                        {active && (
-                          <Feather name="check" size={13} color={colors.primaryAccent} />
-                        )}
-                      </View>
-                      <Text
+                      <View
                         style={[
-                          styles.toneCardTitle,
-                          { color: active ? colors.primaryAccent : colors.textColor },
+                          styles.toneIconWrap,
+                          {
+                            backgroundColor: active
+                              ? colors.primaryAccent + '25'
+                              : colors.componentBackground,
+                          },
                         ]}
                       >
-                        {tone.label}
-                      </Text>
-                      <Text
-                        style={[styles.toneCardDesc, { color: colors.textColorSecondary }]}
-                        numberOfLines={2}
-                      >
-                        {tone.desc}
-                      </Text>
+                        <Feather
+                          name={tone.icon}
+                          size={16}
+                          color={active ? colors.primaryAccent : colors.textColorSecondary}
+                        />
+                      </View>
+                      <View style={styles.toneContent}>
+                        <Text
+                          style={[
+                            styles.toneCardTitle,
+                            { color: active ? colors.primaryAccent : colors.textColor },
+                          ]}
+                        >
+                          {tone.label}
+                        </Text>
+                        <Text
+                          style={[styles.toneCardDesc, { color: colors.textColorSecondary }]}
+                        >
+                          {tone.desc}
+                        </Text>
+                      </View>
+                      <View style={styles.toneCheckWrap}>
+                        {active && (
+                          <Feather name="check-circle" size={18} color={colors.primaryAccent} />
+                        )}
+                      </View>
                     </PressableScale>
                   );
                 })}
@@ -664,39 +664,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.2,
   },
-  chipsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  toneListWrap: {
     gap: 8,
+    width: '100%',
   },
   toneCard: {
-    width: '48.5%',
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 14,
     borderWidth: 1,
     padding: 12,
-    gap: 4,
-  },
-  toneCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
+    gap: 12,
   },
   toneIconWrap: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+  },
+  toneContent: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
   },
   toneCardTitle: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
+    fontSize: 14,
   },
   toneCardDesc: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  toneCheckWrap: {
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   formatRow: {
     flexDirection: 'row',

@@ -645,7 +645,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                 >
                   <Feather name="info" size={13} color={colors.primaryAccent} />
                   <Text style={[styles.generatingNoteText, { color: colors.textColorSecondary }]}>
-                    Нейросеть генерирует уникальные вопросы, ключи и формулы LaTeX. В случае высокой нагрузки автоматически подключается резервная модель.
+                    Нейросеть генерирует уникальные вопросы, ключи и математические формулы. В случае высокой нагрузки автоматически подключается резервная модель.
                   </Text>
                 </View>
               </View>
