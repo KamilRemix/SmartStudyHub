@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
+import { formatLatexToReadable } from '../modules/tools/utils/latexFormatter';
 import {
   callGemini,
   callOpenRouter,
@@ -681,17 +682,17 @@ export function formatQuizToHtmlPrintable(quiz: Quiz, mode: 'teacher' | 'student
   </div>
   ${quiz.questions.map((q, idx) => `
     <div class="question">
-      <div class="q-title">${idx + 1}. ${q.question}</div>
+      <div class="q-title">${idx + 1}. ${formatLatexToReadable(q.question)}</div>
       ${q.type === 'multiple_choice' && q.options ? `
         <div class="options">
-          ${q.options.map((opt, oIdx) => `<div class="opt">&#9634; ${String.fromCharCode(65 + oIdx)}) ${opt}</div>`).join('')}
+          ${q.options.map((opt, oIdx) => `<div class="opt">&#9634; ${String.fromCharCode(65 + oIdx)}) ${formatLatexToReadable(opt)}</div>`).join('')}
         </div>
       ` : `
         <div class="answer-line"></div>
       `}
       ${isTeacher ? `
-        <div><span class="teacher-badge">Правильный ответ: ${q.correctAnswer}</span></div>
-        <div class="teacher-exp">Пояснение: ${q.explanation} (Тема: ${q.topic})</div>
+        <div><span class="teacher-badge">Правильный ответ: ${formatLatexToReadable(q.correctAnswer)}</span></div>
+        <div class="teacher-exp">Пояснение: ${formatLatexToReadable(q.explanation)} (Тема: ${q.topic})</div>
       ` : ''}
     </div>
   `).join('')}
@@ -820,18 +821,18 @@ export function formatQuizToWordDoc(quiz: Quiz, mode: 'teacher' | 'student'): st
 
   ${quiz.questions.map((q, idx) => `
     <div class='question-block'>
-      <div class='q-text'><span class='q-number'>Вопрос ${idx + 1}.</span> ${q.question}</div>
+      <div class='q-text'><span class='q-number'>Вопрос ${idx + 1}.</span> ${formatLatexToReadable(q.question)}</div>
       ${q.type === 'multiple_choice' && q.options ? `
         <div class='opt-list'>
-          ${q.options.map((opt, oIdx) => `<div class='opt-item'>&#9634; ${String.fromCharCode(65 + oIdx)}) ${opt}</div>`).join('')}
+          ${q.options.map((opt, oIdx) => `<div class='opt-item'>&#9634; ${String.fromCharCode(65 + oIdx)}) ${formatLatexToReadable(opt)}</div>`).join('')}
         </div>
       ` : `
         <div class='open-answer-box'></div>
       `}
       ${isTeacher ? `
         <div class='teacher-box'>
-          <div class='teacher-key'>Правильный ответ: ${q.correctAnswer}</div>
-          <div class='teacher-exp'>Пояснение: ${q.explanation} (Раздел: ${q.topic})</div>
+          <div class='teacher-key'>Правильный ответ: ${formatLatexToReadable(q.correctAnswer)}</div>
+          <div class='teacher-exp'>Пояснение: ${formatLatexToReadable(q.explanation)} (Раздел: ${q.topic})</div>
         </div>
       ` : ''}
     </div>
@@ -862,28 +863,278 @@ export async function exportQuizToPdfAsync(
   return { uri };
 }
 
+function escapeXml(str: string): string {
+  return (str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function stringToUtf8(str: string): Uint8Array {
+  const codePoints: number[] = [];
+  for (let i = 0; i < str.length; i++) {
+    let c = str.charCodeAt(i);
+    if (c < 0x80) {
+      codePoints.push(c);
+    } else if (c < 0x800) {
+      codePoints.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+    } else if (c < 0xd800 || c >= 0xe000) {
+      codePoints.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+    } else {
+      i++;
+      c = 0x10000 + (((c & 0x3ff) << 10) | (str.charCodeAt(i) & 0x3ff));
+      codePoints.push(
+        0xf0 | (c >> 18),
+        0x80 | ((c >> 12) & 0x3f),
+        0x80 | ((c >> 6) & 0x3f),
+        0x80 | (c & 0x3f)
+      );
+    }
+  }
+  return new Uint8Array(codePoints);
+}
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let base64 = '';
+  const len = bytes.length;
+  for (let i = 0; i < len; i += 3) {
+    const b0 = bytes[i];
+    const b1 = i + 1 < len ? bytes[i + 1] : 0;
+    const b2 = i + 2 < len ? bytes[i + 2] : 0;
+    base64 += chars[b0 >> 2];
+    base64 += chars[((b0 & 3) << 4) | (b1 >> 4)];
+    base64 += i + 1 < len ? chars[((b1 & 15) << 2) | (b2 >> 6)] : '=';
+    base64 += i + 2 < len ? chars[b2 & 63] : '=';
+  }
+  return base64;
+}
+
+const CRC32_TABLE = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+  let c = i;
+  for (let j = 0; j < 8; j++) {
+    c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  }
+  CRC32_TABLE[i] = c;
+}
+
+function crc32(bytes: Uint8Array): number {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) {
+    c = CRC32_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+interface ZipEntry {
+  path: string;
+  data: Uint8Array;
+}
+
+function createZipArchive(entries: ZipEntry[]): Uint8Array {
+  let totalSize = 0;
+  for (const entry of entries) {
+    const pathBytes = stringToUtf8(entry.path);
+    totalSize += 30 + pathBytes.length + entry.data.length;
+    totalSize += 46 + pathBytes.length;
+  }
+  totalSize += 22;
+
+  const buffer = new Uint8Array(totalSize);
+  const view = new DataView(buffer.buffer);
+  let offset = 0;
+
+  const localOffsets: number[] = [];
+
+  for (const entry of entries) {
+    localOffsets.push(offset);
+    const pathBytes = stringToUtf8(entry.path);
+    const crc = crc32(entry.data);
+    const size = entry.data.length;
+
+    view.setUint32(offset, 0x04034b50, true);
+    view.setUint16(offset + 4, 20, true);
+    view.setUint16(offset + 6, 0, true);
+    view.setUint16(offset + 8, 0, true);
+    view.setUint16(offset + 10, 0, true);
+    view.setUint16(offset + 12, 0x5241, true);
+    view.setUint32(offset + 14, crc, true);
+    view.setUint32(offset + 18, size, true);
+    view.setUint32(offset + 22, size, true);
+    view.setUint16(offset + 26, pathBytes.length, true);
+    view.setUint16(offset + 28, 0, true);
+    offset += 30;
+
+    buffer.set(pathBytes, offset);
+    offset += pathBytes.length;
+
+    buffer.set(entry.data, offset);
+    offset += size;
+  }
+
+  const centralDirStart = offset;
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const pathBytes = stringToUtf8(entry.path);
+    const crc = crc32(entry.data);
+    const size = entry.data.length;
+    const localOffset = localOffsets[i];
+
+    view.setUint32(offset, 0x02014b50, true);
+    view.setUint16(offset + 4, 20, true);
+    view.setUint16(offset + 6, 20, true);
+    view.setUint16(offset + 8, 0, true);
+    view.setUint16(offset + 10, 0, true);
+    view.setUint16(offset + 12, 0x5241, true);
+    view.setUint32(offset + 14, crc, true);
+    view.setUint32(offset + 18, size, true);
+    view.setUint32(offset + 22, size, true);
+    view.setUint16(offset + 26, pathBytes.length, true);
+    view.setUint16(offset + 28, 0, true);
+    view.setUint16(offset + 30, 0, true);
+    view.setUint16(offset + 32, 0, true);
+    view.setUint16(offset + 34, 0, true);
+    view.setUint32(offset + 36, 0, true);
+    view.setUint32(offset + 42, localOffset, true);
+    offset += 46;
+
+    buffer.set(pathBytes, offset);
+    offset += pathBytes.length;
+  }
+
+  const centralDirEnd = offset;
+  const centralDirSize = centralDirEnd - centralDirStart;
+
+  view.setUint32(offset, 0x06054b50, true);
+  view.setUint16(offset + 4, 0, true);
+  view.setUint16(offset + 6, 0, true);
+  view.setUint16(offset + 8, entries.length, true);
+  view.setUint16(offset + 10, entries.length, true);
+  view.setUint32(offset + 12, centralDirSize, true);
+  view.setUint32(offset + 16, centralDirStart, true);
+  view.setUint16(offset + 20, 0, true);
+
+  return buffer;
+}
+
+export function generateDocxZipBase64(quiz: Quiz, mode: 'teacher' | 'student'): string {
+  const isTeacher = mode === 'teacher';
+  const diffLabel =
+    quiz.difficulty === 'easy'
+      ? 'Базовый'
+      : quiz.difficulty === 'hard'
+      ? 'Олимпиадный / Экзамен'
+      : 'Средний';
+
+  const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+
+  const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+  let docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:jc w:val="center"/><w:spacing w:after="140"/></w:pPr>
+      <w:r><w:rPr><w:b/><w:sz w:val="36"/><w:color w:val="1E3A8A"/></w:rPr><w:t>${escapeXml(quiz.title)}</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="center"/><w:spacing w:after="280"/></w:pPr>
+      <w:r><w:rPr><w:i/><w:sz w:val="20"/><w:color w:val="64748B"/></w:rPr><w:t>Сложность: ${diffLabel} | Вопросов: ${quiz.questions.length} | ${isTeacher ? 'Версия для учителя (с ответами)' : 'Бланк заданий'}</w:t></w:r>
+    </w:p>`;
+
+  quiz.questions.forEach((q, idx) => {
+    const qText = escapeXml(formatLatexToReadable(q.question));
+    docXml += `
+    <w:p>
+      <w:pPr><w:spacing w:before="200" w:after="80"/></w:pPr>
+      <w:r><w:rPr><w:b/><w:color w:val="1E40AF"/><w:sz w:val="24"/></w:rPr><w:t>Вопрос ${idx + 1}. </w:t></w:r>
+      <w:r><w:rPr><w:sz w:val="24"/><w:color w:val="0F172A"/></w:rPr><w:t>${qText}</w:t></w:r>
+    </w:p>`;
+
+    if (q.type === 'multiple_choice' && q.options) {
+      q.options.forEach((opt, oIdx) => {
+        const letter = String.fromCharCode(65 + oIdx);
+        const optText = escapeXml(formatLatexToReadable(opt));
+        docXml += `
+    <w:p>
+      <w:pPr><w:ind w:left="360"/><w:spacing w:after="60"/></w:pPr>
+      <w:r><w:rPr><w:sz w:val="22"/><w:color w:val="334155"/></w:rPr><w:t>[  ] ${letter}) ${optText}</w:t></w:r>
+    </w:p>`;
+      });
+    } else {
+      docXml += `
+    <w:p>
+      <w:pPr><w:ind w:left="360"/><w:spacing w:after="120"/></w:pPr>
+      <w:r><w:rPr><w:sz w:val="22"/><w:color w:val="94A3B8"/></w:rPr><w:t>Ответ: __________________________________________________</w:t></w:r>
+    </w:p>`;
+    }
+
+    if (isTeacher) {
+      const correctText = escapeXml(formatLatexToReadable(q.correctAnswer));
+      const expText = escapeXml(formatLatexToReadable(q.explanation));
+      docXml += `
+    <w:p>
+      <w:pPr><w:ind w:left="360"/><w:spacing w:before="60" w:after="40"/></w:pPr>
+      <w:r><w:rPr><w:b/><w:sz w:val="22"/><w:color w:val="16A34A"/></w:rPr><w:t>Правильный ответ: ${correctText}</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:ind w:left="360"/><w:spacing w:after="160"/></w:pPr>
+      <w:r><w:rPr><w:i/><w:sz w:val="20"/><w:color w:val="475569"/></w:rPr><w:t>Пояснение: ${expText} (Тема: ${escapeXml(q.topic)})</w:t></w:r>
+    </w:p>`;
+    }
+  });
+
+  docXml += `
+    <w:p>
+      <w:pPr><w:jc w:val="center"/><w:spacing w:before="360"/></w:pPr>
+      <w:r><w:rPr><w:sz w:val="18"/><w:color w:val="94A3B8"/></w:rPr><w:t>Сгенерировано в SmartStudyHub AI • Учебная платформа</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>`;
+
+  const entries: ZipEntry[] = [
+    { path: '[Content_Types].xml', data: stringToUtf8(contentTypesXml) },
+    { path: '_rels/.rels', data: stringToUtf8(relsXml) },
+    { path: 'word/document.xml', data: stringToUtf8(docXml) },
+  ];
+
+  const zipBytes = createZipArchive(entries);
+  return uint8ArrayToBase64(zipBytes);
+}
+
 /**
- * Exports quiz to Microsoft Word DOCX / DOC document and opens native share dialog
+ * Exports quiz to genuine Microsoft Word DOCX document and opens native share dialog
  */
 export async function exportQuizToDocxAsync(
   quiz: Quiz,
   mode: 'teacher' | 'student'
 ): Promise<{ uri: string }> {
-  const docContent = formatQuizToWordDoc(quiz, mode);
-  const cleanTitle = quiz.title.replace(/[^a-zA-Zа-яА-Я0-9_-]/g, '_').substring(0, 30);
-  const suffix = mode === 'teacher' ? '_teacher' : '_student';
-  const fileName = `${cleanTitle}${suffix}.doc`;
-
+  const zipBase64 = generateDocxZipBase64(quiz, mode);
+  const safeId = 'SmartStudyHub_Quiz_' + Date.now() + (mode === 'teacher' ? '_teacher' : '_student');
+  const fileName = `${safeId}.docx`;
   const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
-  await FileSystem.writeAsStringAsync(fileUri, docContent, {
-    encoding: FileSystem.EncodingType.UTF8,
+
+  await FileSystem.writeAsStringAsync(fileUri, zipBase64, {
+    encoding: FileSystem.EncodingType.Base64,
   });
 
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(fileUri, {
-      mimeType: 'application/msword',
-      dialogTitle: `Сохранить тест в Word (.doc): ${quiz.title}`,
-      UTI: 'com.microsoft.word.doc',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      dialogTitle: `Сохранить тест в Word (.docx): ${quiz.title}`,
+      UTI: 'org.openxmlformats.wordprocessingml.document',
     });
   }
 

@@ -1185,7 +1185,7 @@ export const AIAssistantScreen: React.FC = () => {
       </KeyboardAvoidingView>
 
       {/* ═══ Side Drawer ═══ */}
-      <View pointerEvents={drawerOpen ? 'auto' : 'none'} style={StyleSheet.absoluteFillObject}>
+      <View pointerEvents={drawerOpen ? 'auto' : 'none'} style={StyleSheet.absoluteFill}>
         {/* Backdrop */}
           <TouchableWithoutFeedback onPress={closeDrawer} accessibilityLabel="Закрыть меню">
             <Animated.View

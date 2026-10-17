@@ -53,10 +53,13 @@ function toSubscript(str: string): string {
   return str.split('').map((ch) => SUBSCRIPTS[ch] || ch).join('');
 }
 
-export function formatLatexToReadable(rawFormula: string): string {
-  let s = rawFormula.trim();
+/**
+ * Formats a single isolated math expression or formula chunk into clean human-readable text
+ */
+export function formatSingleLatexExpression(rawFormula: string): string {
+  let s = (rawFormula || '').trim();
 
-  // Strip wrapping $$ or $ or \[ \]
+  // Strip wrapping $$ or $ or \[ \] \( \)
   if (s.startsWith('$$') && s.endsWith('$$')) {
     s = s.slice(2, -2).trim();
   } else if (s.startsWith('\\[') && s.endsWith('\\]')) {
@@ -72,7 +75,7 @@ export function formatLatexToReadable(rawFormula: string): string {
   // Handle \sqrt{x}
   s = s.replace(/\\sqrt\{([^{}]+)\}/g, '√($1)');
 
-  // Handle \frac{a}{b} -> (a) / (b) or a/b
+  // Handle nested or repeated \frac{a}{b} -> (a) / (b) or a/b
   s = s.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, (_, num, den) => {
     const cleanNum = num.trim();
     const cleanDen = den.trim();
@@ -118,6 +121,30 @@ export function formatLatexToReadable(rawFormula: string): string {
        .replace(/[{}]/g, '')
        .replace(/\s+/g, ' ')
        .trim();
+
+  return s;
+}
+
+/**
+ * Universal formatter that handles mixed text containing inline ($...$) and display ($$...$$) math,
+ * as well as raw standalone formulas.
+ */
+export function formatLatexToReadable(text: string): string {
+  if (!text) return '';
+  let s = text;
+
+  // 1. Replace display math $$...$$ and \[...\]
+  s = s.replace(/\$\$([\s\S]+?)\$\$/g, (_, inner) => formatSingleLatexExpression(inner));
+  s = s.replace(/\\\[([\s\S]+?)\\\]/g, (_, inner) => formatSingleLatexExpression(inner));
+
+  // 2. Replace inline math $...$ and \(...\)
+  s = s.replace(/(?<!\\)\$([^\$\n]+?)(?<!\\)\$/g, (_, inner) => formatSingleLatexExpression(inner));
+  s = s.replace(/\\\(([\s\S]+?)\\\)/g, (_, inner) => formatSingleLatexExpression(inner));
+
+  // 3. If there are still naked LaTeX commands like \frac, \sqrt, \pm, Greek letters without $ delimiters
+  if (s.includes('\\frac') || s.includes('\\sqrt') || s.includes('\\pm') || s.includes('\\cdot') || /\\([a-zA-Z]+)/.test(s)) {
+    s = formatSingleLatexExpression(s);
+  }
 
   return s;
 }
