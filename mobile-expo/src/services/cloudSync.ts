@@ -118,7 +118,7 @@ class CloudSyncService {
           gradingSystem: '5-point',
           periodMode: 'quarters',
           activePeriod: 'q1',
-          thresholds: { '5-point': { 5: 4.5, 4: 3.5, 3: 2.5 }, 'us-letter': { A: 90, B: 80, C: 70, D: 60, F: 0 } },
+          thresholds: { '5-point': { 5: 4.5, 4: 3.5, 3: 2.5 }, 'us-letter': { A: 3.5, B: 2.5, C: 1.5, D: 0.5, F: 0 } },
         },
         subjects: remoteGrades,
       };
@@ -147,7 +147,7 @@ class CloudSyncService {
           activePeriod: remoteGrades.settings?.activePeriod || 'q1',
           thresholds: remoteGrades.settings?.thresholds || {
             '5-point': { 5: 4.5, 4: 3.5, 3: 2.5 },
-            'us-letter': { A: 90, B: 80, C: 70, D: 60, F: 0 },
+            'us-letter': { A: 3.5, B: 2.5, C: 1.5, D: 0.5, F: 0 },
           },
         },
         subjects: subjectsArray,
@@ -296,7 +296,7 @@ class CloudSyncService {
             activePeriod: remoteGrades.settings?.activePeriod || (remoteGrades.settings?.periodMode === 'semesters' ? 's1' : 'q1'),
             thresholds: remoteGrades.settings?.thresholds || {
               '5-point': { 5: 4.5, 4: 3.5, 3: 2.5 },
-              'us-letter': { A: 90, B: 80, C: 70, D: 60, F: 0 },
+              'us-letter': { A: 3.5, B: 2.5, C: 1.5, D: 0.5, F: 0 },
             },
           },
           subjects: Array.isArray(remoteGrades.subjects) ? remoteGrades.subjects : [],
@@ -349,6 +349,11 @@ class CloudSyncService {
               ...(remoteGrades.settings || {}),
               ...(localData.settings || {}),
             };
+
+        // Sanitize legacy thresholds if us-letter was stored as percentage (>= 10)
+        if (mergedSettings.thresholds?.['us-letter']?.A >= 10) {
+          mergedSettings.thresholds['us-letter'] = { A: 3.5, B: 2.5, C: 1.5, D: 0.5, F: 0 };
+        }
 
         dataToSave = {
           settings: mergedSettings,

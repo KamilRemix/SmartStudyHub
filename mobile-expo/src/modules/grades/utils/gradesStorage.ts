@@ -10,7 +10,7 @@ export const INITIAL_GRADES_DATA: GradesStorageData = {
     activePeriod: 'q1',
     thresholds: {
       '5-point': { 5: 4.5, 4: 3.5, 3: 2.5 },
-      'us-letter': { A: 90, B: 80, C: 70, D: 60, F: 0 },
+      'us-letter': { A: 3.5, B: 2.5, C: 1.5, D: 0.5, F: 0 },
     },
   },
   subjects: [
@@ -57,6 +57,10 @@ export async function loadGradesData(): Promise<GradesStorageData> {
     }
     const parsed = JSON.parse(raw);
     if (parsed && Array.isArray(parsed.subjects)) {
+      // Sanitize legacy thresholds if us-letter was stored as percentage (>= 10)
+      if (parsed.settings?.thresholds?.['us-letter']?.A >= 10) {
+        parsed.settings.thresholds['us-letter'] = { A: 3.5, B: 2.5, C: 1.5, D: 0.5, F: 0 };
+      }
       return parsed;
     }
     return INITIAL_GRADES_DATA;

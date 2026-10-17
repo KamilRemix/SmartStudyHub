@@ -135,15 +135,24 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
 
   const handleResetDefaults = () => {
     if (system === '5-point') {
-      setT5Text('4.50');
-      setT4Text('3.50');
-      setT3Text('2.50');
+      apply5PointPreset('4.50', '3.50', '2.50');
     } else {
-      setTAText('3.50');
-      setTBText('2.50');
-      setTCText('1.50');
-      setTDText('0.50');
+      applyUSPreset('3.50', '2.50', '1.50', '0.50');
     }
+  };
+
+  const apply5PointPreset = (p5: string, p4: string, p3: string) => {
+    setT5Text(p5);
+    setT4Text(p4);
+    setT3Text(p3);
+    setValidationError('');
+  };
+
+  const applyUSPreset = (pA: string, pB: string, pC: string, pD: string) => {
+    setTAText(pA);
+    setTBText(pB);
+    setTCText(pC);
+    setTDText(pD);
     setValidationError('');
   };
 
@@ -293,6 +302,175 @@ export const ThresholdsModal: React.FC<ThresholdsModalProps> = ({
                 <Text style={[styles.infoTitle, { color: colors.textColor }]}>
                   {t('roundingThresholdsTitle')}
                 </Text>
+
+                {/* Quick Presets */}
+                <View style={styles.presetsRow}>
+                  {system === '5-point' ? (
+                    <>
+                      <TouchableOpacity
+                        style={[
+                          styles.presetPill,
+                          {
+                            backgroundColor:
+                              t5Text === '4.50' && t4Text === '3.50' && t3Text === '2.50'
+                                ? colors.primaryAccent + '20'
+                                : colors.componentBackground,
+                            borderColor:
+                              t5Text === '4.50' && t4Text === '3.50' && t3Text === '2.50'
+                                ? colors.primaryAccent
+                                : colors.borderColor,
+                          },
+                        ]}
+                        onPress={() => apply5PointPreset('4.50', '3.50', '2.50')}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.presetPillText,
+                            {
+                              color:
+                                t5Text === '4.50' && t4Text === '3.50' && t3Text === '2.50'
+                                  ? colors.primaryAccent
+                                  : colors.textColor,
+                            },
+                          ]}
+                        >
+                          С .50
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.presetPill,
+                          {
+                            backgroundColor:
+                              t5Text === '4.60' && t4Text === '3.60' && t3Text === '2.60'
+                                ? colors.primaryAccent + '20'
+                                : colors.componentBackground,
+                            borderColor:
+                              t5Text === '4.60' && t4Text === '3.60' && t3Text === '2.60'
+                                ? colors.primaryAccent
+                                : colors.borderColor,
+                          },
+                        ]}
+                        onPress={() => apply5PointPreset('4.60', '3.60', '2.60')}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.presetPillText,
+                            {
+                              color:
+                                t5Text === '4.60' && t4Text === '3.60' && t3Text === '2.60'
+                                  ? colors.primaryAccent
+                                  : colors.textColor,
+                            },
+                          ]}
+                        >
+                          С .60
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.presetPill,
+                          {
+                            backgroundColor:
+                              t5Text === '4.75' && t4Text === '3.75' && t3Text === '2.75'
+                                ? colors.primaryAccent + '20'
+                                : colors.componentBackground,
+                            borderColor:
+                              t5Text === '4.75' && t4Text === '3.75' && t3Text === '2.75'
+                                ? colors.primaryAccent
+                                : colors.borderColor,
+                          },
+                        ]}
+                        onPress={() => apply5PointPreset('4.75', '3.75', '2.75')}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.presetPillText,
+                            {
+                              color:
+                                t5Text === '4.75' && t4Text === '3.75' && t3Text === '2.75'
+                                  ? colors.primaryAccent
+                                  : colors.textColor,
+                            },
+                          ]}
+                        >
+                          С .75
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        style={[
+                          styles.presetPill,
+                          {
+                            backgroundColor:
+                              tAText === '3.50' && tBText === '2.50'
+                                ? colors.primaryAccent + '20'
+                                : colors.componentBackground,
+                            borderColor:
+                              tAText === '3.50' && tBText === '2.50'
+                                ? colors.primaryAccent
+                                : colors.borderColor,
+                          },
+                        ]}
+                        onPress={() => applyUSPreset('3.50', '2.50', '1.50', '0.50')}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.presetPillText,
+                            {
+                              color:
+                                tAText === '3.50' && tBText === '2.50'
+                                  ? colors.primaryAccent
+                                  : colors.textColor,
+                            },
+                          ]}
+                        >
+                          GPA (3.5+)
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.presetPill,
+                          {
+                            backgroundColor:
+                              tAText === '3.70' && tBText === '2.70'
+                                ? colors.primaryAccent + '20'
+                                : colors.componentBackground,
+                            borderColor:
+                              tAText === '3.70' && tBText === '2.70'
+                                ? colors.primaryAccent
+                                : colors.borderColor,
+                          },
+                        ]}
+                        onPress={() => applyUSPreset('3.70', '2.70', '1.70', '0.70')}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.presetPillText,
+                            {
+                              color:
+                                tAText === '3.70' && tBText === '2.70'
+                                  ? colors.primaryAccent
+                                  : colors.textColor,
+                            },
+                          ]}
+                        >
+                          Honors (3.7+)
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
 
                 {system === '5-point' ? (
                   <View style={styles.thresholdInputsContainer}>
@@ -651,5 +829,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 11,
     marginTop: 6,
+  },
+  presetsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginVertical: 10,
+  },
+  presetPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  presetPillText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
   },
 });
