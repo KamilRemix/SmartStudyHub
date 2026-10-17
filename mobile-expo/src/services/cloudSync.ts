@@ -442,13 +442,13 @@ class CloudSyncService {
       const map = new Map<string, any>();
       if (Array.isArray(remoteNotes)) {
         remoteNotes.forEach((n) => {
-          if (n?.id && !deletedIds.has(n.id)) {
+          if (n?.id && n.id !== 'note_seed_2' && !deletedIds.has(n.id)) {
             map.set(n.id, n);
           }
         });
       }
       localNotes.forEach((n) => {
-        if (!n?.id || deletedIds.has(n.id)) return;
+        if (!n?.id || n.id === 'note_seed_2' || deletedIds.has(n.id)) return;
         const existing = map.get(n.id);
         if (!existing || (n.updatedAt || 0) >= (existing.updatedAt || 0)) {
           map.set(n.id, n);

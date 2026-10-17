@@ -32,7 +32,7 @@ interface NotesScreenProps {
 export const NotesScreen: React.FC<NotesScreenProps> = ({ route }) => {
   const { colors } = useTheme();
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [viewMode, setViewMode] = useState<NoteViewMode>('grid');
@@ -56,7 +56,7 @@ export const NotesScreen: React.FC<NotesScreenProps> = ({ route }) => {
 
   useEffect(() => {
     const refreshNotes = () => {
-      loadNotes().then((loaded) => {
+      loadNotes(language).then((loaded) => {
         const sorted = [...loaded].sort(
           (a, b) =>
             (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0)
@@ -74,7 +74,7 @@ export const NotesScreen: React.FC<NotesScreenProps> = ({ route }) => {
     });
 
     return unsubscribe;
-  }, [user?.uid]);
+  }, [user?.uid, language]);
 
   const persistNotes = async (updated: NoteItem[], deletedNoteId?: string) => {
     const sorted = [...updated].sort(
