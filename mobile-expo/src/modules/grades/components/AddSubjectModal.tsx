@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   Modal,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
@@ -32,6 +34,52 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
   const [target, setTarget] = useState<number | string>(system === '5-point' ? 5 : 'A');
   const [error, setError] = useState('');
 
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      translateY.setValue(0);
+    }
+  }, [visible]);
+
+  const backdropOpacity = translateY.interpolate({
+    inputRange: [0, 300],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        return gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2;
+      },
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dy > 0) {
+          translateY.setValue(gesture.dy);
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > 90 || gesture.vy > 0.4) {
+          Animated.timing(translateY, {
+            toValue: 500,
+            duration: 180,
+            useNativeDriver: true,
+          }).start(() => {
+            onClose();
+          });
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            bounciness: 4,
+            speed: 14,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
   const targets = system === '5-point' ? [5, 4, 3] : ['A', 'B', 'C'];
 
   const handleSubmit = () => {
@@ -49,18 +97,24 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
+        <Animated.View style={[styles.overlay, { opacity: backdropOpacity }]}>
           <TouchableWithoutFeedback>
-            <View
+            <Animated.View
               style={[
                 styles.modalCard,
                 {
                   backgroundColor: colors.componentBackground,
                   borderColor: colors.borderColor,
+                  transform: [{ translateY }],
                 },
               ]}
             >
-              <View style={styles.header}>
+              {/* iOS Drag Handle */}
+              <View {...panResponder.panHandlers} style={styles.handleWrap}>
+                <View style={[styles.handleBar, { backgroundColor: colors.borderColor }]} />
+              </View>
+
+              <View {...panResponder.panHandlers} style={styles.header}>
                 <Text style={[styles.title, { color: colors.textColor }]}>
                   {t('addSubject')}
                 </Text>
@@ -156,9 +210,9 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </Animated.View>
           </TouchableWithoutFeedback>
-        </View>
+        </Animated.View>
       </TouchableWithoutFeedback>
     </Modal>
   );
@@ -177,7 +231,19 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     borderRadius: 20,
     borderWidth: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 8,
+  },
+  handleWrap: {
+    alignItems: 'center',
+    paddingVertical: 6,
+    marginBottom: 4,
+  },
+  handleBar: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
   header: {
     flexDirection: 'row',

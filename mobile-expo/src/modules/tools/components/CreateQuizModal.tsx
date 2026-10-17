@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
@@ -43,6 +45,52 @@ export const CreateQuizModal: React.FC<CreateQuizModalProps> = ({
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [error, setError] = useState<string | null>(null);
 
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      translateY.setValue(0);
+    }
+  }, [visible]);
+
+  const backdropOpacity = translateY.interpolate({
+    inputRange: [0, 350],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        return gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2;
+      },
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dy > 0) {
+          translateY.setValue(gesture.dy);
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > 90 || gesture.vy > 0.4) {
+          Animated.timing(translateY, {
+            toValue: 500,
+            duration: 180,
+            useNativeDriver: true,
+          }).start(() => {
+            onClose();
+          });
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            bounciness: 4,
+            speed: 14,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
   const handleSubmit = async () => {
     if (!topic.trim()) {
       setError('Пожалуйста, укажите тему для тестирования.');
@@ -67,45 +115,47 @@ export const CreateQuizModal: React.FC<CreateQuizModalProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.backdrop}
-      >
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          activeOpacity={1}
-          onPress={onClose}
-          accessibilityLabel="Закрыть"
-        />
-
-        <View
-          style={[
-            styles.sheetCard,
-            {
-              backgroundColor: colors.componentBackground,
-              borderColor: colors.borderColor,
-            },
-          ]}
+      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ width: '100%', justifyContent: 'flex-end' }}
         >
-          {/* Handle bar */}
-          <View style={styles.handleWrap}>
-            <View
-              style={[
-                styles.handle,
-                { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' },
-              ]}
-            />
-          </View>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={onClose}
+            accessibilityLabel="Закрыть"
+          />
 
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
+          <Animated.View
+            style={[
+              styles.sheetCard,
+              {
+                backgroundColor: colors.componentBackground,
+                borderColor: colors.borderColor,
+                transform: [{ translateY }],
+              },
+            ]}
+          >
+            {/* Handle bar with panHandlers */}
+            <View {...panResponder.panHandlers} style={styles.handleWrap}>
               <View
                 style={[
-                  styles.headerIconWrap,
+                  styles.handle,
+                  { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' },
+                ]}
+              />
+            </View>
+
+            {/* Header with panHandlers */}
+            <View {...panResponder.panHandlers} style={styles.header}>
+              <View style={styles.headerLeft}>
+                <View
+                  style={[
+                    styles.headerIconWrap,
                   { backgroundColor: colors.primaryAccent + '18' },
                 ]}
               >
@@ -291,8 +341,9 @@ export const CreateQuizModal: React.FC<CreateQuizModalProps> = ({
               )}
             </PressableScale>
           </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </Animated.View>
     </Modal>
   );
 };

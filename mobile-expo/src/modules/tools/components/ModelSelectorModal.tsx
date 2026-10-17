@@ -55,11 +55,17 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
     return () => unsubscribe();
   }, [visible]);
 
+  const backdropOpacity = translateY.interpolate({
+    inputRange: [0, 300],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gesture) => {
-        return gesture.dy > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx);
+        return gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2;
       },
       onPanResponderMove: (_, gesture) => {
         if (gesture.dy > 0) {
@@ -73,14 +79,13 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
             duration: 180,
             useNativeDriver: true,
           }).start(() => {
-            translateY.setValue(0);
             onClose();
           });
         } else {
           Animated.spring(translateY, {
             toValue: 0,
-            friction: 8,
-            tension: 90,
+            bounciness: 4,
+            speed: 14,
             useNativeDriver: true,
           }).start();
         }
@@ -238,7 +243,7 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <Animated.View style={[styles.overlay, { opacity: backdropOpacity }]}>
         {/* Backdrop tap to dismiss */}
         <Pressable
           style={StyleSheet.absoluteFill}
@@ -431,7 +436,7 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
             </View>
           </ScrollView>
         </Animated.View>
-      </View>
+      </Animated.View>
     </Modal>
   );
 };

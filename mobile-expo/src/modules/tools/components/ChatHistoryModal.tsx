@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   Modal,
   TouchableOpacity,
   FlatList,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
@@ -32,6 +34,52 @@ export const ChatHistoryModal: React.FC<ChatHistoryModalProps> = ({
   onClose,
 }) => {
   const { colors } = useTheme();
+
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      translateY.setValue(0);
+    }
+  }, [visible]);
+
+  const backdropOpacity = translateY.interpolate({
+    inputRange: [0, 350],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        return gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2;
+      },
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dy > 0) {
+          translateY.setValue(gesture.dy);
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > 90 || gesture.vy > 0.4) {
+          Animated.timing(translateY, {
+            toValue: 500,
+            duration: 180,
+            useNativeDriver: true,
+          }).start(() => {
+            onClose();
+          });
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            bounciness: 4,
+            speed: 14,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   const formatDate = (timestamp: number) => {
     if (!timestamp) return '';
@@ -115,22 +163,28 @@ export const ChatHistoryModal: React.FC<ChatHistoryModalProps> = ({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent
       onRequestClose={onClose}
     >
-      <View style={styles.backdrop}>
-        <View
+      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+        <Animated.View
           style={[
             styles.modalContent,
             {
               backgroundColor: colors.componentBackground,
               borderColor: colors.borderColor,
+              transform: [{ translateY }],
             },
           ]}
         >
-          {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
+          {/* iOS Drag Handle */}
+          <View {...panResponder.panHandlers} style={styles.handleWrap}>
+            <View style={[styles.handleBar, { backgroundColor: colors.borderColor }]} />
+          </View>
+
+          {/* Header with panHandlers */}
+          <View {...panResponder.panHandlers} style={[styles.header, { borderBottomColor: colors.borderColor }]}>
             <View style={styles.headerLeft}>
               <View style={[styles.headerIconWrap, { backgroundColor: colors.primaryAccent + '20' }]}>
                 <Feather name="clock" size={17} color={colors.primaryAccent} />
@@ -194,8 +248,8 @@ export const ChatHistoryModal: React.FC<ChatHistoryModalProps> = ({
               История синхронизируется с вашим аккаунтом
             </Text>
           </View>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 };
@@ -212,6 +266,15 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     borderTopWidth: 1,
     overflow: 'hidden',
+  },
+  handleWrap: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  handleBar: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
   header: {
     flexDirection: 'row',

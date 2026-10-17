@@ -52,11 +52,17 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
     }
   }, [visible]);
 
+  const backdropOpacity = translateY.interpolate({
+    inputRange: [0, 350],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gesture) => {
-        return gesture.dy > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx);
+        return gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2;
       },
       onPanResponderMove: (_, gesture) => {
         if (gesture.dy > 0) {
@@ -70,14 +76,13 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
             duration: 180,
             useNativeDriver: true,
           }).start(() => {
-            translateY.setValue(0);
             onClose();
           });
         } else {
           Animated.spring(translateY, {
             toValue: 0,
-            friction: 8,
-            tension: 90,
+            bounciness: 4,
+            speed: 14,
             useNativeDriver: true,
           }).start();
         }
@@ -96,11 +101,11 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent
       onRequestClose={onClose}
     >
-      <View style={styles.backdrop}>
+      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
         {/* Backdrop tap to dismiss */}
         <Pressable
           style={styles.backdropDismissArea}
@@ -418,7 +423,7 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
             </View>
           </ScrollView>
         </Animated.View>
-      </View>
+      </Animated.View>
     </Modal>
   );
 };

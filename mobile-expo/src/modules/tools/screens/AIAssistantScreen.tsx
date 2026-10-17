@@ -225,9 +225,6 @@ export const AIAssistantScreen: React.FC = () => {
           Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5
         );
       },
-      onPanResponderGrant: () => {
-        setDrawerOpen(true);
-      },
       onPanResponderMove: (_, gesture) => {
         const offset = Math.min(0, -DRAWER_WIDTH + gesture.dx);
         drawerAnim.setValue(offset);
@@ -279,8 +276,8 @@ export const AIAssistantScreen: React.FC = () => {
           Animated.parallel([
             Animated.spring(drawerAnim, {
               toValue: 0,
-              friction: 8,
-              tension: 90,
+              bounciness: 4,
+              speed: 14,
               useNativeDriver: true,
             }),
             Animated.timing(backdropAnim, {
@@ -313,14 +310,13 @@ export const AIAssistantScreen: React.FC = () => {
             duration: 180,
             useNativeDriver: true,
           }).start(() => {
-            attachTranslateY.setValue(0);
             setShowAttachModal(false);
           });
         } else {
           Animated.spring(attachTranslateY, {
             toValue: 0,
-            friction: 8,
-            tension: 90,
+            bounciness: 4,
+            speed: 14,
             useNativeDriver: true,
           }).start();
         }

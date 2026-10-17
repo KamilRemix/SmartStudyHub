@@ -164,11 +164,17 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
     onClose();
   };
 
+  const backdropOpacity = translateY.interpolate({
+    inputRange: [0, 350],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gesture) => {
-        return gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.5;
+        return gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.3;
       },
       onPanResponderMove: (_, gesture) => {
         if (gesture.dy > 0) {
@@ -187,8 +193,8 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
         } else {
           Animated.spring(translateY, {
             toValue: 0,
-            friction: 8,
-            tension: 90,
+            bounciness: 4,
+            speed: 14,
             useNativeDriver: true,
           }).start();
         }
@@ -220,31 +226,37 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.backdrop}
+      <Animated.View
+        style={[
+          styles.backdrop,
+          { opacity: backdropOpacity },
+        ]}
       >
-        {/* Backdrop tap to dismiss */}
-        <Pressable
-          style={styles.backdropDismissArea}
-          onPress={onClose}
-          accessibilityLabel="Закрыть персонализацию"
-        />
-
-        <Animated.View
-          style={[
-            styles.modalContent,
-            {
-              backgroundColor: colors.componentBackground,
-              borderColor: colors.borderColor,
-              transform: [{ translateY }],
-            },
-          ]}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ width: '100%', alignItems: 'center' }}
         >
+          {/* Backdrop tap to dismiss */}
+          <Pressable
+            style={styles.backdropDismissArea}
+            onPress={onClose}
+            accessibilityLabel="Закрыть персонализацию"
+          />
+
+          <Animated.View
+            style={[
+              styles.modalContent,
+              {
+                backgroundColor: colors.componentBackground,
+                borderColor: colors.borderColor,
+                transform: [{ translateY }],
+              },
+            ]}
+          >
           {/* Top handle bar with direct swipe-to-dismiss tracking */}
           <View {...panResponder.panHandlers} style={styles.handleWrap}>
             <View style={[styles.handleBar, { backgroundColor: colors.borderColor }]} />
@@ -536,7 +548,8 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
             </PressableScale>
           </View>
         </Animated.View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </Animated.View>
     </Modal>
   );
 };
