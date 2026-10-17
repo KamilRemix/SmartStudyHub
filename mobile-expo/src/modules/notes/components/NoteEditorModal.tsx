@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Animated,
+  PanResponder,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
@@ -63,6 +66,44 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
 }) => {
   const { colors } = useTheme();
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
+
+  const panY = useRef(new Animated.Value(0)).current;
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          return gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5;
+        },
+        onPanResponderMove: (_, gestureState) => {
+          if (gestureState.dy > 0) {
+            panY.setValue(gestureState.dy);
+          }
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dy > 120 || gestureState.vy > 0.6) {
+            Animated.timing(panY, {
+              toValue: 800,
+              duration: 200,
+              useNativeDriver: true,
+            }).start(() => {
+              onClose();
+              panY.setValue(0);
+            });
+          } else {
+            Animated.spring(panY, {
+              toValue: 0,
+              bounciness: 4,
+              speed: 14,
+              useNativeDriver: true,
+            }).start();
+          }
+        },
+      }),
+    [onClose, panY]
+  );
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -262,67 +303,82 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={[styles.container, { backgroundColor: colors.background }]}
       >
-        {/* Header */}
-        <View
+        <Animated.View
           style={[
-            styles.header,
-            {
-              backgroundColor: colors.componentBackground,
-              borderBottomColor: colors.borderColor,
-            },
+            styles.container,
+            { transform: [{ translateY: panY }] },
           ]}
         >
-          <TouchableOpacity
-            onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel={t('cancelEdit')}
-            style={styles.headerBtn}
+          {/* Header with safe area insets and iOS grabber handle */}
+          <View
+            {...panResponder.panHandlers}
+            style={[
+              styles.headerContainer,
+              {
+                backgroundColor: colors.componentBackground,
+                borderBottomColor: colors.borderColor,
+                paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 38 : 44) + 6,
+              },
+            ]}
           >
-            <Feather name="x" size={22} color={colors.textColor} />
-          </TouchableOpacity>
+            {/* iOS style drag handle */}
+            <View style={styles.dragHandleContainer}>
+              <View style={[styles.dragHandle, { backgroundColor: colors.textColorSecondary }]} />
+            </View>
 
-          <Text style={[styles.headerTitle, { color: colors.textColor }]}>
-            {note ? t('editNote') : t('newNote')}
-          </Text>
-
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              onPress={() => setPinned(!pinned)}
-              accessibilityRole="button"
-              accessibilityLabel={pinned ? t('unpinNote') : t('pinNote')}
-              style={styles.headerBtn}
-            >
-              <Feather
-                name="bookmark"
-                size={20}
-                color={pinned ? colors.primaryAccent : colors.textColorSecondary}
-              />
-            </TouchableOpacity>
-
-            {note && onDelete && (
+            <View style={styles.header}>
               <TouchableOpacity
-                onPress={() => {
-                  onDelete(note.id);
-                  onClose();
-                }}
+                onPress={onClose}
                 accessibilityRole="button"
-                accessibilityLabel={t('deleteNote')}
+                accessibilityLabel={t('cancelEdit')}
                 style={styles.headerBtn}
               >
-                <Feather name="trash-2" size={20} color={colors.secondaryAccent} />
+                <Feather name="x" size={22} color={colors.textColor} />
               </TouchableOpacity>
-            )}
 
-            <TouchableOpacity
-              onPress={handleSave}
-              accessibilityRole="button"
-              accessibilityLabel={t('saveNote')}
-              style={[styles.saveHeaderBtn, { backgroundColor: colors.primaryAccent }]}
-            >
-              <Feather name="check" size={18} color="#ffffff" />
-            </TouchableOpacity>
+              <Text style={[styles.headerTitle, { color: colors.textColor }]}>
+                {note ? t('editNote') : t('newNote')}
+              </Text>
+
+              <View style={styles.headerActions}>
+                <TouchableOpacity
+                  onPress={() => setPinned(!pinned)}
+                  accessibilityRole="button"
+                  accessibilityLabel={pinned ? t('unpinNote') : t('pinNote')}
+                  style={styles.headerBtn}
+                >
+                  <Feather
+                    name="bookmark"
+                    size={20}
+                    color={pinned ? colors.primaryAccent : colors.textColorSecondary}
+                  />
+                </TouchableOpacity>
+
+                {note && onDelete && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      onDelete(note.id);
+                      onClose();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('deleteNote')}
+                    style={styles.headerBtn}
+                  >
+                    <Feather name="trash-2" size={20} color={colors.secondaryAccent} />
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  onPress={handleSave}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('saveNote')}
+                  style={[styles.saveHeaderBtn, { backgroundColor: colors.primaryAccent }]}
+                >
+                  <Feather name="check" size={18} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        </View>
 
         <ScrollView
           style={styles.contentScroll}
@@ -580,6 +636,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             </View>
           </View>
         </ScrollView>
+        </Animated.View>
       </KeyboardAvoidingView>
 
       {/* Reminder Picker Overlay */}
@@ -803,14 +860,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  headerContainer: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  dragHandleContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingTop: 6,
+    paddingBottom: 8,
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    opacity: 0.35,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 48 : 20,
     paddingBottom: 12,
     paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitle: {
     fontFamily: 'Poppins_600SemiBold',
