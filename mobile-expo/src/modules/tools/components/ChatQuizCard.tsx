@@ -493,25 +493,26 @@ export const ChatQuizCard: React.FC<ChatQuizCardProps> = ({
       style={[
         styles.container,
         {
-          backgroundColor: '#1e1b4b',
-          borderColor: '#4338ca',
+          backgroundColor: colors.surface,
+          borderColor: colors.borderColor,
+          borderWidth: 1,
         },
       ]}
     >
       <View style={styles.topRow}>
-        <View style={styles.iconCircle}>
-          <Feather name="check-circle" size={18} color="#c7d2fe" />
+        <View style={[styles.iconCircle, { backgroundColor: colors.primaryAccent + '18' }]}>
+          <Feather name="help-circle" size={18} color={colors.primaryAccent} />
         </View>
         <View style={styles.infoCol}>
-          <Text style={styles.title}>{displayTitle}</Text>
-          <Text style={styles.meta}>
-            {questionsCount} вопросов • Сложность: {diffLabel}
+          <Text style={[styles.title, { color: colors.textColor }]}>{displayTitle}</Text>
+          <Text style={[styles.meta, { color: colors.textColorSecondary }]}>
+            {questionsCount} вопросов • {diffLabel}
           </Text>
         </View>
       </View>
 
       {effectiveQuiz?.description ? (
-        <Text style={styles.descText} numberOfLines={2}>
+        <Text style={[styles.descText, { color: colors.textColorSecondary }]} numberOfLines={2}>
           {effectiveQuiz.description}
         </Text>
       ) : null}
@@ -523,15 +524,22 @@ export const ChatQuizCard: React.FC<ChatQuizCardProps> = ({
           activeOpacity={0.8}
         >
           <Feather name="play" size={15} color="#ffffff" />
-          <Text style={styles.startBtnText}>Пройти тест прямо в чате</Text>
+          <Text style={styles.startBtnText}>Открыть тест</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.fullscreenBtn}
+          style={[
+            styles.fullscreenBtn,
+            {
+              backgroundColor: colors.componentBackground,
+              borderColor: colors.borderColor,
+            },
+          ]}
           onPress={handleOpenFullscreen}
           activeOpacity={0.7}
+          accessibilityLabel="Развернуть тест на весь экран"
         >
-          <Feather name="maximize-2" size={15} color="#c7d2fe" />
+          <Feather name="maximize-2" size={15} color={colors.textColorSecondary} />
         </TouchableOpacity>
       </View>
     </View>
@@ -602,7 +610,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

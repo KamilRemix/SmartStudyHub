@@ -486,7 +486,10 @@ export const AIAssistantScreen: React.FC = () => {
     } else if (action === 'test') {
       handleSend('Помоги подготовиться к контрольной работе: составь план и ключевые вопросы');
     } else if (action === 'quiz') {
-      setShowQuizModal(true);
+      const prompt = messages.length > 0
+        ? 'Составь интерактивный тест по обсуждаемой теме для проверки знаний из 5 вопросов с вариантами ответов.'
+        : 'Составь интерактивный тест для самопроверки по математике и естественным наукам из 5 вопросов с вариантами ответов.';
+      handleSend(prompt);
     }
   };
 
@@ -1134,12 +1137,7 @@ export const AIAssistantScreen: React.FC = () => {
                     },
                   ]}
                   onPress={() => {
-                    if (!isRegisteredUser) {
-                      setAuthInitialScreen('login');
-                      setShowAuthModal(true);
-                      return;
-                    }
-                    setShowQuizModal(true);
+                    handleQuickPrompt('quiz');
                   }}
                   accessibilityLabel="Создать тест"
                 >
