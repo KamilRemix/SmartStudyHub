@@ -12,7 +12,6 @@ export interface SubjectDetailCardProps {
   period: PeriodType;
   thresholds: ThresholdSettings;
   onDeleteGrade: (gradeId: string) => void;
-  onOpenWhatIf: () => void;
   onDeleteSubject: () => void;
 }
 
@@ -22,7 +21,6 @@ export const SubjectDetailCard: React.FC<SubjectDetailCardProps> = ({
   period,
   thresholds,
   onDeleteGrade,
-  onOpenWhatIf,
   onDeleteSubject,
 }) => {
   const { colors } = useTheme();
@@ -139,26 +137,6 @@ export const SubjectDetailCard: React.FC<SubjectDetailCardProps> = ({
           </ScrollView>
         )}
       </View>
-
-      {/* What-If Button */}
-      <TouchableOpacity
-        onPress={onOpenWhatIf}
-        accessibilityRole="button"
-        accessibilityLabel={t('whatIfA11y')}
-        style={[
-          styles.whatIfButton,
-          {
-            backgroundColor: colors.surfaceSecondary,
-            borderColor: colors.borderColor,
-          },
-        ]}
-        activeOpacity={0.7}
-      >
-        <Feather name="help-circle" size={16} color={colors.primaryAccent} />
-        <Text style={[styles.whatIfText, { color: colors.primaryAccent }]}>
-          {t('whatIfSimulator')}
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 };
@@ -260,18 +238,5 @@ const styles = StyleSheet.create({
   },
   chipDeleteBtn: {
     padding: 2,
-  },
-  whatIfButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  whatIfText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
   },
 });

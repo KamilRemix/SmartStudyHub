@@ -32,7 +32,6 @@ import { SubjectDetailCard } from './components/SubjectDetailCard';
 import { GradeInputKeypad } from './components/GradeInputKeypad';
 import { StrategyEngineCard } from './components/StrategyEngineCard';
 import { AnnualTableCard } from './components/AnnualTableCard';
-import { WhatIfModal } from './components/WhatIfModal';
 import { AddSubjectModal } from './components/AddSubjectModal';
 import { ThresholdsModal } from './components/ThresholdsModal';
 
@@ -49,7 +48,6 @@ export const GradesScreen: React.FC = () => {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showWhatIfModal, setShowWhatIfModal] = useState(false);
 
   const navigation = useNavigation<any>();
 
@@ -519,7 +517,6 @@ export const GradesScreen: React.FC = () => {
               period={settings.activePeriod}
               thresholds={settings.thresholds}
               onDeleteGrade={handleDeleteGrade}
-              onOpenWhatIf={() => setShowWhatIfModal(true)}
               onDeleteSubject={() => handleDeleteSubject(currentSubject.id)}
             />
 
@@ -559,17 +556,6 @@ export const GradesScreen: React.FC = () => {
       </ScrollView>
 
       {/* Modals */}
-      {currentSubject && (
-        <WhatIfModal
-          visible={showWhatIfModal}
-          subject={currentSubject}
-          system={settings.gradingSystem}
-          period={settings.activePeriod}
-          onClose={() => setShowWhatIfModal(false)}
-          onApplyGrade={handleAddGrade}
-        />
-      )}
-
       <AddSubjectModal
         visible={showAddModal}
         system={settings.gradingSystem}
