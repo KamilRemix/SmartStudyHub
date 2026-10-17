@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Platform, View } from 'react-native';
+import { StyleSheet, Platform, View, Pressable } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -47,6 +47,8 @@ export const BottomTabNavigator: React.FC = () => {
         },
         tabBarActiveTintColor: colors.primaryAccent,
         tabBarInactiveTintColor: '#64748b',
+        tabBarPressColor: 'transparent',
+        tabBarPressOpacity: 0.85,
         tabBarStyle: {
           backgroundColor: colors.componentBackground,
           borderTopColor: dividerColor,

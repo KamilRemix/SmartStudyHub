@@ -307,6 +307,7 @@ export const QuizGeneratorScreen: React.FC = () => {
       });
     } catch (err) {
       console.warn('Share HTML error:', err);
+    }
   };
 
   // Navigate to AI Assistant to discuss missed questions
