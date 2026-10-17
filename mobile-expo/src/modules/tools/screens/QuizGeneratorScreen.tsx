@@ -313,21 +313,22 @@ export const QuizGeneratorScreen: React.FC = () => {
   // Navigate to AI Assistant to discuss missed questions
   const handleDiscussWithAI = () => {
     if (!evaluation || !quiz) return;
+
     const wrongQuestions = evaluation.detailedResults
       .filter((r) => !r.isCorrect)
-      .map(
-        (r, i) =>
-          `${i + 1}. Вопрос: "${r.question.question}". Мой ответ: "${r.userAnswer || 'нет ответа'}". Правильный: "${r.question.correctAnswer}". Пояснение[...]
+      .map((r, i) =>
+        `${i + 1}. Вопрос: "${r.question.question}". Мой ответ: "${r.userAnswer || 'нет ответа'}". Правильный: "${r.question.correctAnswer}". Пояснение: ${r.question.explanation}`
       )
       .join('\n\n');
 
-    const prompt = `Привет! Я прошел тест "${quiz.title}" и набрал ${evaluation.score} из ${evaluation.total}. Помоги разобрать мои ошибки и о�[...]`;
+    const prompt = `Привет! Я прошел тест "${quiz.title}" и набрал ${evaluation.score} из ${evaluation.total}. Помоги разобрать мои ошибки: объясни, где я ошибся и как правильно решать каждый пункт. Ниже — мои неверные ответы:\n\n${wrongQuestions}`;
 
-    navigation.navigate('AIAssistant');
+    // Pass prompt to AIAssistant screen (will receive via route params)
+    navigation.navigate('AIAssistant', { initialPrompt: prompt });
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}> 
       <AppHeader
         title="Тесты и квизы"
         subtitle={
@@ -629,7 +630,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                   ]}
                 >
                   <ActivityIndicator size="small" color={colors.primaryAccent} />
-                  <Text style={[styles.activeStatusText, { color: colors.textColor }]}>
+                  <Text style={[styles.activeStatusText, { color: colors.textColor }]}> 
                     {genStatusText}
                   </Text>
                 </View>
@@ -644,7 +645,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                   ]}
                 >
                   <Feather name="info" size={13} color={colors.primaryAccent} />
-                  <Text style={[styles.generatingNoteText, { color: colors.textColorSecondary }]}>
+                  <Text style={[styles.generatingNoteText, { color: colors.textColorSecondary }]}> 
                     Нейросеть генерирует уникальные вопросы, ключи и формулы LaTeX. В случае высокой нагрузки автомат[...]
                   </Text>
                 </View>
@@ -684,7 +685,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                 ]}
               />
             </View>
-            <Text style={[styles.progressText, { color: colors.textColorSecondary }]}>
+            <Text style={[styles.progressText, { color: colors.textColorSecondary }]}> 
               {currentIndex + 1} / {quiz.questions.length}
             </Text>
           </View>
@@ -705,12 +706,12 @@ export const QuizGeneratorScreen: React.FC = () => {
                 ]}
               >
                 <View style={styles.topicBadge}>
-                  <Text style={[styles.topicBadgeText, { color: colors.primaryAccent }]}>
+                  <Text style={[styles.topicBadgeText, { color: colors.primaryAccent }]}> 
                     {currentQ.topic}
                   </Text>
                 </View>
 
-                <Text style={[styles.questionText, { color: colors.textColor }]}>
+                <Text style={[styles.questionText, { color: colors.textColor }]}> 
                   {formattedQuestion}
                 </Text>
 
@@ -775,7 +776,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                               {letter}
                             </Text>
                           </View>
-                          <Text style={[styles.optionText, { color: textColor }]}>
+                          <Text style={[styles.optionText, { color: textColor }]}> 
                             {formatLatexToReadable(opt)}
                           </Text>
                         </TouchableOpacity>
@@ -804,7 +805,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                     {isEvaluatingOpen && (
                       <View style={styles.evaluatingOpenRow}>
                         <ActivityIndicator size="small" color={colors.primaryAccent} />
-                        <Text style={[styles.evaluatingOpenText, { color: colors.textColorSecondary }]}>
+                        <Text style={[styles.evaluatingOpenText, { color: colors.textColorSecondary }]}> 
                           ИИ проверяет смысл ответа...
                         </Text>
                       </View>
@@ -870,7 +871,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                               : 'Ответ не совсем точен'}
                           </Text>
                         </View>
-                        <Text style={[styles.aiVerdictBody, { color: colors.textColor }]}>
+                        <Text style={[styles.aiVerdictBody, { color: colors.textColor }]}> 
                           {openAnswerEvaluation.feedback}
                         </Text>
                       </View>
@@ -947,7 +948,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                 },
               ]}
             >
-              <Text style={[styles.scoreNumber, { color: colors.textColor }]}>
+              <Text style={[styles.scoreNumber, { color: colors.textColor }]}> 
                 {evaluation.score}/{evaluation.total}
               </Text>
               <Text
@@ -967,14 +968,14 @@ export const QuizGeneratorScreen: React.FC = () => {
               </Text>
             </View>
 
-            <Text style={[styles.resultsTitle, { color: colors.textColor }]}>
+            <Text style={[styles.resultsTitle, { color: colors.textColor }]}> 
               {evaluation.percentage >= 80
                 ? 'Превосходный результат!'
                 : evaluation.percentage >= 50
                 ? 'Хорошая работа, есть что закрепить!'
                 : 'Нужно повторить материал'}
             </Text>
-            <Text style={[styles.resultsSub, { color: colors.textColorSecondary }]}>
+            <Text style={[styles.resultsSub, { color: colors.textColorSecondary }]}> 
               Тест: {quiz.title}
             </Text>
           </View>
@@ -989,7 +990,7 @@ export const QuizGeneratorScreen: React.FC = () => {
               },
             ]}
           >
-            <Text style={[styles.quickExportTitle, { color: colors.textColor }]}>
+            <Text style={[styles.quickExportTitle, { color: colors.textColor }]}> 
               Скачать тест
             </Text>
             <View style={styles.quickExportRow}>
@@ -1009,7 +1010,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                 ) : (
                   <>
                     <Feather name="file-text" size={15} color={colors.primaryAccent} />
-                    <Text style={[styles.quickExportBtnText, { color: colors.textColor }]}>
+                    <Text style={[styles.quickExportBtnText, { color: colors.textColor }]}> 
                       Скачать в PDF
                     </Text>
                   </>
@@ -1032,7 +1033,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                 ) : (
                   <>
                     <Feather name="file" size={15} color="#2563eb" />
-                    <Text style={[styles.quickExportBtnText, { color: colors.textColor }]}>
+                    <Text style={[styles.quickExportBtnText, { color: colors.textColor }]}> 
                       В Word (.doc)
                     </Text>
                   </>
@@ -1058,7 +1059,7 @@ export const QuizGeneratorScreen: React.FC = () => {
               },
             ]}
           >
-            <Text style={[styles.cardTitle, { color: colors.textColor }]}>
+            <Text style={[styles.cardTitle, { color: colors.textColor }]}> 
               AI-Анализ знаний по темам
             </Text>
 
@@ -1070,7 +1071,7 @@ export const QuizGeneratorScreen: React.FC = () => {
                   <Text style={[styles.topicLabel, { color: '#22c55e' }]}>Сильные стороны:</Text>
                 </View>
                 {evaluation.strongTopics.map((top, idx) => (
-                  <Text key={idx} style={[styles.topicItem, { color: colors.textColor }]}>
+                  <Text key={idx} style={[styles.topicItem, { color: colors.textColor }]}> 
                     • {top}
                   </Text>
                 ))}
@@ -1082,12 +1083,12 @@ export const QuizGeneratorScreen: React.FC = () => {
               <View style={[styles.topicBlock, { borderColor: '#ef4444' }]}>
                 <View style={styles.topicRowTitle}>
                   <Feather name="alert-circle" size={14} color="#ef4444" />
-                  <Text style={[styles.topicLabel, { color: '#ef4444' }]}>
+                  <Text style={[styles.topicLabel, { color: '#ef4444' }]}> 
                     Слабые стороны (требуют внимания):
                   </Text>
                 </View>
                 {evaluation.weakTopics.map((top, idx) => (
-                  <Text key={idx} style={[styles.topicItem, { color: colors.textColor }]}>
+                  <Text key={idx} style={[styles.topicItem, { color: colors.textColor }]}> 
                     • {top}
                   </Text>
                 ))}
@@ -1098,7 +1099,7 @@ export const QuizGeneratorScreen: React.FC = () => {
             <View style={styles.recommendationBox}>
               <Feather name="compass" size={15} color={colors.primaryAccent} />
               <View style={{ flex: 1, gap: 4 }}>
-                <Text style={[styles.recommendationTitle, { color: colors.textColor }]}>
+                <Text style={[styles.recommendationTitle, { color: colors.textColor }]}> 
                   Советы по подготовке:
                 </Text>
                 {evaluation.recommendations.map((rec, idx) => (
@@ -1138,7 +1139,7 @@ export const QuizGeneratorScreen: React.FC = () => {
               activeOpacity={0.7}
             >
               <Feather name="share-2" size={16} color={colors.textColor} />
-              <Text style={[styles.secondaryBtnText, { color: colors.textColor }]}>
+              <Text style={[styles.secondaryBtnText, { color: colors.textColor }]}> 
                 Все форматы экспорта (PDF, Word, печать)
               </Text>
             </TouchableOpacity>
@@ -1155,7 +1156,7 @@ export const QuizGeneratorScreen: React.FC = () => {
               activeOpacity={0.7}
             >
               <Feather name="plus-circle" size={16} color={colors.textColor} />
-              <Text style={[styles.secondaryBtnText, { color: colors.textColor }]}>
+              <Text style={[styles.secondaryBtnText, { color: colors.textColor }]}> 
                 Создать новый тест
               </Text>
             </TouchableOpacity>
@@ -1176,7 +1177,7 @@ export const QuizGeneratorScreen: React.FC = () => {
             ]}
           >
             <View style={styles.exportModalHeader}>
-              <Text style={[styles.exportModalTitle, { color: colors.textColor }]}>
+              <Text style={[styles.exportModalTitle, { color: colors.textColor }]}> 
                 Экспорт теста
               </Text>
               <TouchableOpacity onPress={() => setExportModalVisible(false)}>
@@ -1184,17 +1185,17 @@ export const QuizGeneratorScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.exportModalDesc, { color: colors.textColorSecondary }]}>
+            <Text style={[styles.exportModalDesc, { color: colors.textColorSecondary }]}> 
               Скачайте файл в формате PDF, Word (.doc) или скопируйте бланк:
             </Text>
 
             {/* Teacher Mode */}
             <View style={[styles.exportOption, { borderColor: colors.borderColor }]}>
               <View style={{ flex: 1, marginBottom: 8 }}>
-                <Text style={[styles.exportOptionName, { color: colors.textColor }]}>
+                <Text style={[styles.exportOptionName, { color: colors.textColor }]}> 
                   Вариант для преподавателя
                 </Text>
-                <Text style={[styles.exportOptionSub, { color: colors.textColorSecondary }]}>
+                <Text style={[styles.exportOptionSub, { color: colors.textColorSecondary }]}> 
                   Вопросы + ключи ответов, темы и подробные пояснения
                 </Text>
               </View>
@@ -1258,10 +1259,10 @@ export const QuizGeneratorScreen: React.FC = () => {
             {/* Student Mode */}
             <View style={[styles.exportOption, { borderColor: colors.borderColor }]}>
               <View style={{ flex: 1, marginBottom: 8 }}>
-                <Text style={[styles.exportOptionName, { color: colors.textColor }]}>
+                <Text style={[styles.exportOptionName, { color: colors.textColor }]}> 
                   Бланк для учеников
                 </Text>
-                <Text style={[styles.exportOptionSub, { color: colors.textColorSecondary }]}>
+                <Text style={[styles.exportOptionSub, { color: colors.textColorSecondary }]}> 
                   Чистые задания для самостоятельного решения или контрольной
                 </Text>
               </View>
@@ -1325,7 +1326,7 @@ export const QuizGeneratorScreen: React.FC = () => {
             {/* Export formats explanation */}
             <View style={[styles.exportHintBox, { backgroundColor: colors.background }]}>
               <Feather name="info" size={12} color={colors.primaryAccent} />
-              <Text style={[styles.exportHintText, { color: colors.textColorSecondary }]}>
+              <Text style={[styles.exportHintText, { color: colors.textColorSecondary }]}> 
                 PDF и Word (.doc) скачиваются на устройство и поддерживают открытие в Word, Google Docs и печать.
               </Text>
             </View>
@@ -1334,7 +1335,7 @@ export const QuizGeneratorScreen: React.FC = () => {
               <Text style={styles.copiedBanner}>Тест успешно скопирован в буфер обмена!</Text>
             )}
             {exportBanner && (
-              <Text style={[styles.copiedBanner, { backgroundColor: '#22c55e22', color: '#22c55e' }]}>
+              <Text style={[styles.copiedBanner, { backgroundColor: '#22c55e22', color: '#22c55e' }]}> 
                 {exportBanner}
               </Text>
             )}
@@ -1348,8 +1349,8 @@ export const QuizGeneratorScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => setShowAuthModal(false)}
       >
-        <SafeAreaView style={[styles.authModalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.authModalHeader, { borderBottomColor: colors.borderColor }]}>
+        <SafeAreaView style={[styles.authModalContainer, { backgroundColor: colors.background }]}> 
+          <View style={[styles.authModalHeader, { borderBottomColor: colors.borderColor }]}> 
             <PressableScale
               style={[styles.authModalCloseBtn, { backgroundColor: colors.componentBackground }]}
               onPress={() => setShowAuthModal(false)}
@@ -1357,7 +1358,7 @@ export const QuizGeneratorScreen: React.FC = () => {
             >
               <Feather name="x" size={20} color={colors.textColor} />
             </PressableScale>
-            <Text style={[styles.authModalTitle, { color: colors.textColor }]}>
+            <Text style={[styles.authModalTitle, { color: colors.textColor }]}> 
               {authInitialScreen === 'register' ? 'Регистрация' : 'Вход в аккаунт'}
             </Text>
             <View style={{ width: 36 }} />
