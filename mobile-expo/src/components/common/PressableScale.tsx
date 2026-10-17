@@ -5,6 +5,7 @@ import {
   PressableProps,
   StyleProp,
   ViewStyle,
+  StyleSheet,
 } from 'react-native';
 
 export interface PressableScaleProps extends Omit<PressableProps, 'style'> {
@@ -51,9 +52,21 @@ export const PressableScale: React.FC<PressableScaleProps> = ({
     onPressOut?.(e);
   };
 
+  const flat = StyleSheet.flatten(style);
+  const outerStyle: ViewStyle = {};
+  if (flat) {
+    if (flat.flex !== undefined) outerStyle.flex = flat.flex;
+    if (flat.flexGrow !== undefined) outerStyle.flexGrow = flat.flexGrow;
+    if (flat.flexShrink !== undefined) outerStyle.flexShrink = flat.flexShrink;
+    if (flat.alignSelf !== undefined) outerStyle.alignSelf = flat.alignSelf;
+    if (flat.width !== undefined) outerStyle.width = flat.width;
+    if (flat.minWidth !== undefined) outerStyle.minWidth = flat.minWidth;
+  }
+
   return (
     <Pressable
       {...props}
+      style={outerStyle}
       disabled={disabled}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}

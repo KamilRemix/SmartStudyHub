@@ -225,6 +225,9 @@ export const AIAssistantScreen: React.FC = () => {
           Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5
         );
       },
+      onPanResponderGrant: () => {
+        setDrawerOpen(true);
+      },
       onPanResponderMove: (_, gesture) => {
         const offset = Math.min(0, -DRAWER_WIDTH + gesture.dx);
         drawerAnim.setValue(offset);
@@ -246,7 +249,7 @@ export const AIAssistantScreen: React.FC = () => {
               duration: 150,
               useNativeDriver: true,
             }),
-          ]).start();
+          ]).start(() => setDrawerOpen(false));
         }
       },
     })
@@ -448,10 +451,11 @@ export const AIAssistantScreen: React.FC = () => {
       let sid = activeSessionId;
       if (!sid) {
         const created = await createNewChatSession(
-          `Тест: ${generated.title.substring(0, 24)}`,
-          nextMessages
+          `Тест: ${generated.title.substring(0, 24)}`
         );
         sid = created.id;
+        await updateSessionMessages(sid, nextMessages);
+        created.messages = nextMessages;
         setActiveSessionIdState(sid);
         await setActiveSessionId(sid);
         setSessions((prev) => [created, ...prev]);
@@ -1183,9 +1187,8 @@ export const AIAssistantScreen: React.FC = () => {
       </KeyboardAvoidingView>
 
       {/* ═══ Side Drawer ═══ */}
-      {drawerOpen && (
-        <>
-          {/* Backdrop */}
+      <View pointerEvents={drawerOpen ? 'auto' : 'none'} style={StyleSheet.absoluteFillObject}>
+        {/* Backdrop */}
           <TouchableWithoutFeedback onPress={closeDrawer} accessibilityLabel="Закрыть меню">
             <Animated.View
               style={[
@@ -1360,8 +1363,7 @@ export const AIAssistantScreen: React.FC = () => {
               </PressableScale>
             </View>
           </Animated.View>
-        </>
-      )}
+        </View>
 
       {/* ═══ Attach Modal ═══ */}
       <Modal
@@ -1993,6 +1995,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    minWidth: 0,
   },
   drawerSessionIconBox: {
     width: 28,
@@ -2000,8 +2003,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
-  drawerSessionInfo: { flex: 1 },
+  drawerSessionInfo: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
   drawerSessionTitle: {
     fontSize: 13,
     lineHeight: 18,
@@ -2123,6 +2131,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
     marginLeft: 6,
+    flexShrink: 0,
   },
   drawerItemActionBtn: {
     width: 28,
