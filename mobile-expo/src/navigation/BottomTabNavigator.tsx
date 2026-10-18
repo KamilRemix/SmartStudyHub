@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Platform, View, Pressable } from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 
@@ -48,7 +48,28 @@ export const BottomTabNavigator: React.FC = () => {
         tabBarActiveTintColor: colors.primaryAccent,
         tabBarInactiveTintColor: '#64748b',
         tabBarPressColor: 'transparent',
-        tabBarPressOpacity: 0.85,
+        tabBarPressOpacity: 1,
+        tabBarButton: ({ style, ref: _ref, ...buttonProps }: BottomTabBarButtonProps) => (
+          <Pressable
+            {...buttonProps}
+            android_ripple={null}
+            style={(state) => [
+              style,
+              {
+                backgroundColor: 'transparent',
+                transform: [{ scale: state.pressed ? 0.94 : 1 }],
+                opacity: state.pressed ? 0.75 : 1,
+              },
+              Platform.OS === 'web'
+                ? ({
+                    outline: 'none',
+                    outlineStyle: 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                  } as any)
+                : null,
+            ]}
+          />
+        ),
         tabBarStyle: {
           backgroundColor: colors.componentBackground,
           borderTopColor: dividerColor,
@@ -65,6 +86,7 @@ export const BottomTabNavigator: React.FC = () => {
         tabBarItemStyle: {
           paddingVertical: 2,
           paddingHorizontal: 0,
+          backgroundColor: 'transparent',
         },
         tabBarLabelStyle: {
           fontFamily: 'Inter_600SemiBold',
