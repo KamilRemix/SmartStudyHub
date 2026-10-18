@@ -12,7 +12,7 @@ import {
   Modal,
   SafeAreaView,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -40,10 +40,12 @@ import {
 import { formatLatexToReadable } from '../utils/latexFormatter';
 
 type NavProp = NativeStackNavigationProp<ToolsStackParamList>;
+type ScreenRouteProp = RouteProp<ToolsStackParamList, 'QuizGenerator'>;
 
 export const QuizGeneratorScreen: React.FC = () => {
   const { colors } = useTheme();
   const navigation = useNavigation<NavProp>();
+  const route = useRoute<ScreenRouteProp>();
   const { user } = useAuth();
   const isRegisteredUser = Boolean(user && !user.isAnonymous && !user.isOfflineDemo);
 
@@ -82,6 +84,24 @@ export const QuizGeneratorScreen: React.FC = () => {
   const [copiedExport, setCopiedExport] = useState(false);
   const [exportLoading, setExportLoading] = useState<string | null>(null);
   const [exportBanner, setExportBanner] = useState<string | null>(null);
+
+  // Auto-load initial quiz from AI Assistant chat or deep links
+  React.useEffect(() => {
+    const passedQuiz = route.params?.initialQuiz;
+    if (passedQuiz && passedQuiz.questions && passedQuiz.questions.length > 0) {
+      setQuiz(passedQuiz);
+      setTopic(passedQuiz.title || '');
+      setQuestionCount(passedQuiz.questions.length);
+      setCurrentIndex(0);
+      setUserAnswers({});
+      setSelectedOption(null);
+      setOpenInputText('');
+      setShowExplanation(false);
+      setOpenAnswerEvaluation(null);
+      setEvaluation(null);
+      setPhase('playing');
+    }
+  }, [route.params?.initialQuiz]);
 
   // Handlers for image attachment in quiz
   const handlePickImage = async () => {
@@ -340,7 +360,9 @@ export const QuizGeneratorScreen: React.FC = () => {
         leftAction={{
           icon: 'arrow-left',
           onPress: () => {
-            if (phase === 'playing' || phase === 'results') {
+            if (route.params?.initialQuiz && phase === 'playing') {
+              navigation.goBack();
+            } else if (phase === 'playing' || phase === 'results') {
               setPhase('setup');
             } else {
               navigation.goBack();

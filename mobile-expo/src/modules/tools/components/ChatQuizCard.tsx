@@ -70,7 +70,11 @@ export const ChatQuizCard: React.FC<ChatQuizCardProps> = ({
       : 'Средний';
 
   const handleOpenFullscreen = () => {
-    navigation.navigate('QuizGenerator');
+    if (effectiveQuiz && effectiveQuiz.questions && effectiveQuiz.questions.length > 0) {
+      navigation.navigate('QuizGenerator', { initialQuiz: effectiveQuiz, autoPlay: true });
+    } else {
+      navigation.navigate('QuizGenerator');
+    }
   };
 
   const handleStartInChat = () => {
@@ -307,9 +311,14 @@ export const ChatQuizCard: React.FC<ChatQuizCardProps> = ({
               {currentQ.topic || diffLabel}
             </Text>
           </View>
-          <TouchableOpacity onPress={() => setIsPlaying(false)} activeOpacity={0.7}>
-            <Feather name="x" size={18} color={colors.textColorSecondary} />
-          </TouchableOpacity>
+          <View style={styles.headerControls}>
+            <TouchableOpacity onPress={handleOpenFullscreen} activeOpacity={0.7} accessibilityLabel="На весь экран">
+              <Feather name="maximize-2" size={16} color={colors.textColorSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setIsPlaying(false)} activeOpacity={0.7} accessibilityLabel="Закрыть">
+              <Feather name="x" size={18} color={colors.textColorSecondary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Question Text */}
@@ -520,27 +529,29 @@ export const ChatQuizCard: React.FC<ChatQuizCardProps> = ({
       <View style={styles.actionsRow}>
         <TouchableOpacity
           style={[styles.startBtn, { backgroundColor: colors.primaryAccent }]}
-          onPress={effectiveQuiz ? handleStartInChat : handleOpenFullscreen}
+          onPress={handleOpenFullscreen}
           activeOpacity={0.8}
         >
           <Feather name="play" size={15} color="#ffffff" />
-          <Text style={styles.startBtnText}>Открыть тест</Text>
+          <Text style={styles.startBtnText}>Пройти тест</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.fullscreenBtn,
-            {
-              backgroundColor: colors.componentBackground,
-              borderColor: colors.borderColor,
-            },
-          ]}
-          onPress={handleOpenFullscreen}
-          activeOpacity={0.7}
-          accessibilityLabel="Развернуть тест на весь экран"
-        >
-          <Feather name="maximize-2" size={15} color={colors.textColorSecondary} />
-        </TouchableOpacity>
+        {effectiveQuiz?.questions && effectiveQuiz.questions.length > 0 && (
+          <TouchableOpacity
+            style={[
+              styles.inlineChatBtn,
+              {
+                backgroundColor: colors.componentBackground,
+                borderColor: colors.borderColor,
+              },
+            ]}
+            onPress={handleStartInChat}
+            activeOpacity={0.7}
+          >
+            <Feather name="message-square" size={14} color={colors.textColor} />
+            <Text style={[styles.inlineChatBtnText, { color: colors.textColor }]}>В чате</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -606,6 +617,20 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 13,
   },
+  inlineChatBtn: {
+    height: 42,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  inlineChatBtnText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 13,
+  },
   fullscreenBtn: {
     width: 42,
     height: 42,
@@ -618,6 +643,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   badgeRow: {
     flexDirection: 'row',

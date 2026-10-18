@@ -6,6 +6,7 @@ import { CodeBlock } from './CodeBlock';
 import { MathFormulaBlock } from './MathFormulaBlock';
 import { ChatQuizCard } from './ChatQuizCard';
 import { formatLatexToReadable } from '../utils/latexFormatter';
+import { extractQuizFromPlainText } from '../utils/quizTextParser';
 import { WebSearchResult } from '../../../services/aiService';
 
 interface ChatMessageRendererProps {
@@ -95,10 +96,36 @@ export function parseMessageBlocks(content: string): BlockType[] {
         }
       } catch {}
     }
+
+    // Try extracting informal numbered quiz from plain text
+    const extracted = extractQuizFromPlainText(blocks[0].text);
+    if (extracted && extracted.questions.length >= 2) {
+      return [
+        {
+          type: 'quiz',
+          title: extracted.title,
+          questionCount: extracted.questions.length,
+          difficulty: extracted.difficulty,
+          quiz: extracted,
+        },
+      ];
+    }
   }
 
   // If no blocks parsed, treat whole message as text
   if (blocks.length === 0) {
+    const extracted = extractQuizFromPlainText(content);
+    if (extracted && extracted.questions.length >= 2) {
+      return [
+        {
+          type: 'quiz',
+          title: extracted.title,
+          questionCount: extracted.questions.length,
+          difficulty: extracted.difficulty,
+          quiz: extracted,
+        },
+      ];
+    }
     blocks.push({ type: 'text', text: content });
   }
 

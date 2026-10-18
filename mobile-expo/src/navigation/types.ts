@@ -3,10 +3,12 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 
+import { Quiz } from '../services/quizService';
+
 export type ToolsStackParamList = {
   ToolsHome: undefined;
   AIAssistant: undefined;
-  QuizGenerator: undefined;
+  QuizGenerator: { initialQuiz?: Quiz; autoPlay?: boolean } | undefined;
   UnitConverter: undefined;
   CurrencyConverter: undefined;
   Translator: undefined;
