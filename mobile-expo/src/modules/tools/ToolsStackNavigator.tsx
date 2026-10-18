@@ -15,7 +15,12 @@ export const ToolsStackNavigator: React.FC = () => {
   return (
     <Stack.Navigator
       initialRouteName="ToolsHome"
-      screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+        gestureEnabled: true,
+        fullScreenGestureEnabled: false,
+      }}
     >
       <Stack.Screen name="ToolsHome" component={ToolsScreen} />
       <Stack.Screen name="AIAssistant" component={AIAssistantScreen} />

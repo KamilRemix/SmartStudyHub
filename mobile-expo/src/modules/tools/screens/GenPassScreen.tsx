@@ -15,6 +15,7 @@ import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../theme';
 import { AppHeader } from '../../../components/common/AppHeader';
+import { SwipeBackView } from '../../../components/common/SwipeBackView';
 import { useAuth } from '../../../context/AuthContext';
 import { cloudSyncService } from '../../../services/cloudSync';
 import { useI18n } from '../../../i18n';
@@ -483,7 +484,7 @@ export const GenPassScreen: React.FC = () => {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SwipeBackView style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader
         title="GenPass"
         subtitle="Генератор и хранилище паролей"
@@ -1023,7 +1024,7 @@ export const GenPassScreen: React.FC = () => {
           </>
         )}
       </ScrollView>
-    </View>
+    </SwipeBackView>
   );
 };
 

@@ -21,6 +21,7 @@ import { useTheme } from '../../../theme';
 import { useAuth } from '../../../context/AuthContext';
 import { AppHeader } from '../../../components/common/AppHeader';
 import { PressableScale } from '../../../components/common/PressableScale';
+import { SwipeBackView } from '../../../components/common/SwipeBackView';
 import { AIAuthGate } from '../components/AIAuthGate';
 import { AuthNavigator } from '../../auth/AuthNavigator';
 import { performGoogleSignIn } from '../../../services/googleAuth';
@@ -346,8 +347,21 @@ export const QuizGeneratorScreen: React.FC = () => {
     navigation.navigate('AIAssistant');
   };
 
+  const handleSwipeBack = () => {
+    if (route.params?.initialQuiz && phase === 'playing') {
+      navigation.goBack();
+    } else if (phase === 'playing' || phase === 'results') {
+      setPhase('setup');
+    } else {
+      navigation.goBack();
+    }
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SwipeBackView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      onSwipeBack={handleSwipeBack}
+    >
       <AppHeader
         title="Тесты и квизы"
         subtitle={
@@ -1387,7 +1401,7 @@ export const QuizGeneratorScreen: React.FC = () => {
           <AuthNavigator initialScreen={authInitialScreen} />
         </SafeAreaView>
       </Modal>
-    </View>
+    </SwipeBackView>
   );
 };
 

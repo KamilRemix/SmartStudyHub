@@ -19,6 +19,7 @@ import {
   PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
@@ -96,6 +97,7 @@ export const AIAssistantScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
   const { t } = useI18n();
   const { user } = useAuth();
+  const navigation = useNavigation();
   const isRegisteredUser = Boolean(user && !user.isAnonymous && !user.isOfflineDemo);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authInitialScreen, setAuthInitialScreen] = useState<'login' | 'register'>('login');
@@ -867,14 +869,28 @@ export const AIAssistantScreen: React.FC = () => {
             { backgroundColor: colors.background, borderBottomColor: colors.borderColor },
           ]}
         >
-          {/* Left: Hamburger */}
-          <PressableScale
-            style={[styles.navIconBtn, { backgroundColor: colors.componentBackground }]}
-            onPress={openDrawer}
-            accessibilityLabel="Открыть меню"
-          >
-            <Feather name="menu" size={18} color={colors.textColor} />
-          </PressableScale>
+          {/* Left: Back to tools + Drawer Hamburger */}
+          <View style={styles.headerLeftActions}>
+            <PressableScale
+              style={[styles.navIconBtn, { backgroundColor: colors.componentBackground }]}
+              onPress={() => {
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                }
+              }}
+              accessibilityLabel="Назад к инструментам"
+            >
+              <Feather name="arrow-left" size={18} color={colors.textColor} />
+            </PressableScale>
+
+            <PressableScale
+              style={[styles.navIconBtn, { backgroundColor: colors.componentBackground }]}
+              onPress={openDrawer}
+              accessibilityLabel="Открыть меню"
+            >
+              <Feather name="menu" size={18} color={colors.textColor} />
+            </PressableScale>
+          </View>
 
           {/* Center: Model selector */}
           <PressableScale
@@ -1618,6 +1634,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerLeftActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   navIconBtn: {
     width: 38,
