@@ -32,6 +32,9 @@ interface LoginScreenProps {
   onNavigateToRegister: () => void;
 }
 
+// Временно скрыто для мобильной версии, вернемся в следующих обновлениях
+const SHOW_GITHUB_AUTH = false;
+
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }) => {
   const { colors } = useTheme();
   const { t } = useI18n();
@@ -207,25 +210,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.socialBtn, styles.githubBtn]}
-            onPress={handleGithubSignIn}
-            disabled={socialLoading !== null}
-            activeOpacity={0.8}
-          >
-            {socialLoading === 'github' ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <>
-                <View style={styles.socialIconWrap}>
-                  <Feather name="github" size={18} color="#ffffff" />
-                </View>
-                <Text style={[styles.socialBtnText, { color: '#ffffff' }]}>
-                  {t('signInWithGithub')}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {/* GitHub Sign-In (временно скрыто для мобильной версии, вернем в следующих обновлениях) */}
+          {SHOW_GITHUB_AUTH && (
+            <TouchableOpacity
+              style={[styles.socialBtn, styles.githubBtn]}
+              onPress={handleGithubSignIn}
+              disabled={socialLoading !== null}
+              activeOpacity={0.8}
+            >
+              {socialLoading === 'github' ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <>
+                  <View style={styles.socialIconWrap}>
+                    <Feather name="github" size={18} color="#ffffff" />
+                  </View>
+                  <Text style={[styles.socialBtnText, { color: '#ffffff' }]}>
+                    {t('signInWithGithub')}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* Divider */}
           <View style={styles.dividerRow}>
