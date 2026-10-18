@@ -162,7 +162,12 @@ export const AIAssistantScreen: React.FC = () => {
         const allSessions = await loadAllChatSessions();
         setSessions(allSessions);
         const savedActiveId = await getActiveSessionId();
-        const current = allSessions.find((s) => s.id === savedActiveId) || allSessions[0];
+        const savedActive = allSessions.find((s) => s.id === savedActiveId);
+        const sessionWithMessages = allSessions.find((s) => s.messages && s.messages.length > 0 && !(s.messages.length === 1 && s.messages[0].id === 'welcome'));
+        const current =
+          (savedActive && savedActive.messages && savedActive.messages.length > 0
+            ? savedActive
+            : sessionWithMessages) || savedActive || allSessions[0];
         if (current) {
           setActiveSessionIdState(current.id);
           setMessages(current.messages || []);
@@ -911,7 +916,7 @@ export const AIAssistantScreen: React.FC = () => {
         </View>
 
         {/* ── Messages or Auth Gate ── */}
-        {!isRegisteredUser ? (
+        {!isRegisteredUser && isConversationEmpty ? (
           <AIAuthGate
             onOpenAuth={(mode) => {
               setAuthInitialScreen(mode || 'login');
@@ -919,6 +924,8 @@ export const AIAssistantScreen: React.FC = () => {
             }}
             onGoogleSignIn={handleGoogleSignInFromGate}
             isGoogleLoading={isGoogleSigningIn}
+            hasSavedHistory={sessions.some((s) => s.messages && s.messages.length > 0 && !(s.messages.length === 1 && s.messages[0].id === 'welcome'))}
+            onOpenHistory={openDrawer}
           />
         ) : (
           <FlatList

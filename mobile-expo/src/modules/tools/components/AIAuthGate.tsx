@@ -16,12 +16,16 @@ interface AIAuthGateProps {
   onOpenAuth: (mode?: 'login' | 'register') => void;
   onGoogleSignIn?: () => void;
   isGoogleLoading?: boolean;
+  hasSavedHistory?: boolean;
+  onOpenHistory?: () => void;
 }
 
 export const AIAuthGate: React.FC<AIAuthGateProps> = ({
   onOpenAuth,
   onGoogleSignIn,
   isGoogleLoading = false,
+  hasSavedHistory = false,
+  onOpenHistory,
 }) => {
   const { colors, isDark } = useTheme();
   const { t } = useI18n();
@@ -197,6 +201,28 @@ export const AIAuthGate: React.FC<AIAuthGateProps> = ({
             Создать новый аккаунт
           </Text>
         </PressableScale>
+
+        {/* Local history button if user has saved chats */}
+        {hasSavedHistory && onOpenHistory && (
+          <PressableScale
+            style={[
+              styles.btn,
+              styles.registerBtn,
+              {
+                backgroundColor: colors.componentBackground,
+                borderColor: colors.borderColor,
+                marginTop: 6,
+              },
+            ]}
+            onPress={onOpenHistory}
+            accessibilityLabel="Открыть сохраненную историю диалогов"
+          >
+            <Feather name="message-square" size={16} color={colors.primaryAccent} style={styles.btnIcon} />
+            <Text style={[styles.registerBtnText, { color: colors.textColor }]}>
+              История диалогов
+            </Text>
+          </PressableScale>
+        )}
       </View>
     </ScrollView>
   );
