@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Image,
   Modal,
-  SafeAreaView,
   StatusBar,
   Animated,
   Dimensions,
@@ -19,6 +18,7 @@ import {
   TouchableOpacity,
   PanResponder,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';

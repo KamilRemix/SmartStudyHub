@@ -49,22 +49,28 @@ async function getStoredItemWithFallback(primaryKey: string, legacyKey?: string)
  * Recursively strips undefined values from objects and arrays so Firestore setDoc / RTDB set don't reject them.
  */
 function sanitizeForCloud<T>(value: T): T {
-  if (value === undefined) {
+  if (value === undefined || value === null) {
     return null as unknown as T;
   }
-  if (value === null || typeof value !== 'object') {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value.map((item) => sanitizeForCloud(item)) as unknown as T;
-  }
-  const cleanObj: Record<string, any> = {};
-  for (const [key, val] of Object.entries(value)) {
-    if (val !== undefined) {
-      cleanObj[key] = sanitizeForCloud(val);
+  try {
+    return JSON.parse(
+      JSON.stringify(value, (_, v) => (v === undefined ? null : v))
+    );
+  } catch {
+    if (typeof value !== 'object') {
+      return value;
     }
+    if (Array.isArray(value)) {
+      return value.map((item) => (item === undefined ? null : sanitizeForCloud(item))) as unknown as T;
+    }
+    const cleanObj: Record<string, any> = {};
+    for (const [key, val] of Object.entries(value)) {
+      if (val !== undefined) {
+        cleanObj[key] = sanitizeForCloud(val);
+      }
+    }
+    return cleanObj as T;
   }
-  return cleanObj as T;
 }
 
 class CloudSyncService {
