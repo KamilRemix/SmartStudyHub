@@ -45,6 +45,28 @@ async function getStoredItemWithFallback(primaryKey: string, legacyKey?: string)
   }
 }
 
+/**
+ * Recursively strips undefined values from objects and arrays so Firestore setDoc / RTDB set don't reject them.
+ */
+function sanitizeForCloud<T>(value: T): T {
+  if (value === undefined) {
+    return null as unknown as T;
+  }
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeForCloud(item)) as unknown as T;
+  }
+  const cleanObj: Record<string, any> = {};
+  for (const [key, val] of Object.entries(value)) {
+    if (val !== undefined) {
+      cleanObj[key] = sanitizeForCloud(val);
+    }
+  }
+  return cleanObj as T;
+}
+
 class CloudSyncService {
   private isSyncing = false;
   private listeners: Set<(status: SyncStatus) => void> = new Set();
@@ -264,14 +286,15 @@ class CloudSyncService {
       const capped = combined.slice(0, 50);
 
       await AsyncStorage.setItem(SYNC_KEYS.CALC_HISTORY, JSON.stringify(capped));
+      const cleanCapped = sanitizeForCloud(capped);
       try {
-        await set(ref(database, `users/${uid}/calcHistory`), capped);
+        await set(ref(database, `users/${uid}/calcHistory`), cleanCapped);
       } catch (e) {
         console.warn('[CloudSync] RTDB calcHistory write error:', e);
       }
       try {
         if (firestore) {
-          await setDoc(doc(firestore, 'users', uid), { calcHistory: capped }, { merge: true });
+          await setDoc(doc(firestore, 'users', uid), { calcHistory: cleanCapped }, { merge: true });
         }
       } catch (e) {
         console.warn('[CloudSync] Firestore calcHistory write error:', e);
@@ -365,14 +388,15 @@ class CloudSyncService {
       }
 
       if (dataToSave) {
+        const cleanGrades = sanitizeForCloud(dataToSave);
         try {
-          await set(ref(database, `users/${uid}/grades`), dataToSave);
+          await set(ref(database, `users/${uid}/grades`), cleanGrades);
         } catch (e) {
           console.warn('[CloudSync] RTDB grades write error:', e);
         }
         try {
           if (firestore) {
-            await setDoc(doc(firestore, 'users', uid), { grades: dataToSave }, { merge: true });
+            await setDoc(doc(firestore, 'users', uid), { grades: cleanGrades }, { merge: true });
           }
         } catch (e) {
           console.warn('[CloudSync] Firestore grades write error:', e);
@@ -411,14 +435,15 @@ class CloudSyncService {
     if (deletedNoteId) {
       await this.markNoteDeleted(deletedNoteId);
     }
+    const cleanNotes = sanitizeForCloud(localNotes);
     try {
-      await set(ref(database, `users/${uid}/notes`), localNotes);
+      await set(ref(database, `users/${uid}/notes`), cleanNotes);
     } catch (e) {
       console.warn('[CloudSync] RTDB notes direct write error:', e);
     }
     try {
       if (firestore) {
-        await setDoc(doc(firestore, 'users', uid), { notes: localNotes }, { merge: true });
+        await setDoc(doc(firestore, 'users', uid), { notes: cleanNotes }, { merge: true });
       }
     } catch (e) {
       console.warn('[CloudSync] Firestore notes direct write error:', e);
@@ -457,14 +482,15 @@ class CloudSyncService {
 
       const merged = Array.from(map.values());
       await AsyncStorage.setItem(SYNC_KEYS.NOTES, JSON.stringify(merged));
+      const cleanMergedNotes = sanitizeForCloud(merged);
       try {
-        await set(ref(database, `users/${uid}/notes`), merged);
+        await set(ref(database, `users/${uid}/notes`), cleanMergedNotes);
       } catch (e) {
         console.warn('[CloudSync] RTDB notes write error:', e);
       }
       try {
         if (firestore) {
-          await setDoc(doc(firestore, 'users', uid), { notes: merged }, { merge: true });
+          await setDoc(doc(firestore, 'users', uid), { notes: cleanMergedNotes }, { merge: true });
         }
       } catch (e) {
         console.warn('[CloudSync] Firestore notes write error:', e);
@@ -493,15 +519,16 @@ class CloudSyncService {
 
       const merged = Array.from(map.values());
       await AsyncStorage.setItem(SYNC_KEYS.VAULT, JSON.stringify(merged));
+      const cleanVault = sanitizeForCloud(merged);
       try {
-        await set(ref(database, `users/${uid}/passwordVault`), merged);
-        await set(ref(database, `users/${uid}/passwords`), merged);
+        await set(ref(database, `users/${uid}/passwordVault`), cleanVault);
+        await set(ref(database, `users/${uid}/passwords`), cleanVault);
       } catch (e) {
         console.warn('[CloudSync] RTDB vault write error:', e);
       }
       try {
         if (firestore) {
-          await setDoc(doc(firestore, 'users', uid), { passwordVault: merged, passwords: merged }, { merge: true });
+          await setDoc(doc(firestore, 'users', uid), { passwordVault: cleanVault, passwords: cleanVault }, { merge: true });
         }
       } catch (e) {
         console.warn('[CloudSync] Firestore vault write error:', e);
@@ -513,14 +540,15 @@ class CloudSyncService {
 
   public async syncAiChatsDirect(uid: string, localSessions: any[]) {
     if (!uid || !Array.isArray(localSessions)) return;
+    const cleanSessions = sanitizeForCloud(localSessions);
     try {
-      await set(ref(database, `users/${uid}/ai_chats`), localSessions);
+      await set(ref(database, `users/${uid}/ai_chats`), cleanSessions);
     } catch (e) {
       console.warn('[CloudSync] RTDB ai_chats direct write error:', e);
     }
     try {
       if (firestore) {
-        await setDoc(doc(firestore, 'users', uid), { ai_chats: localSessions }, { merge: true });
+        await setDoc(doc(firestore, 'users', uid), { ai_chats: cleanSessions }, { merge: true });
       }
     } catch (e) {
       console.warn('[CloudSync] Firestore ai_chats direct write error:', e);
@@ -550,15 +578,16 @@ class CloudSyncService {
       );
 
       await AsyncStorage.setItem(SYNC_KEYS.AI_CHATS, JSON.stringify(merged));
+      const cleanChats = sanitizeForCloud(merged);
 
       try {
-        await set(ref(database, `users/${uid}/ai_chats`), merged);
+        await set(ref(database, `users/${uid}/ai_chats`), cleanChats);
       } catch (e) {
         console.warn('[CloudSync] RTDB ai_chats write error:', e);
       }
       try {
         if (firestore) {
-          await setDoc(doc(firestore, 'users', uid), { ai_chats: merged }, { merge: true });
+          await setDoc(doc(firestore, 'users', uid), { ai_chats: cleanChats }, { merge: true });
         }
       } catch (e) {
         console.warn('[CloudSync] Firestore ai_chats write error:', e);
