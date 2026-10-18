@@ -395,17 +395,20 @@ class CloudSyncService {
 
       if (dataToSave) {
         const cleanGrades = sanitizeForCloud(dataToSave);
-        try {
-          await set(ref(database, `users/${uid}/grades`), cleanGrades);
-        } catch (e) {
-          console.warn('[CloudSync] RTDB grades write error:', e);
-        }
-        try {
-          if (firestore) {
-            await setDoc(doc(firestore, 'users', uid), { grades: cleanGrades }, { merge: true });
+        if (cleanGrades) {
+          try {
+            await set(ref(database, `users/${uid}/grades`), cleanGrades);
+          } catch (e) {
+            console.warn('[CloudSync] RTDB grades write error:', e);
           }
-        } catch (e) {
-          console.warn('[CloudSync] Firestore grades write error:', e);
+          try {
+            if (firestore) {
+              const payload = sanitizeForCloud({ grades: cleanGrades });
+              await setDoc(doc(firestore, 'users', uid), payload, { merge: true });
+            }
+          } catch (e) {
+            console.warn('[CloudSync] Firestore grades write error:', e);
+          }
         }
       }
     } catch (e) {
