@@ -172,9 +172,13 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (_, gesture) => {
-        return gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.3;
+        return gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.1;
+      },
+      onMoveShouldSetPanResponderCapture: (_, gesture) => {
+        return gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.1;
       },
       onPanResponderMove: (_, gesture) => {
         if (gesture.dy > 0) {
@@ -182,7 +186,7 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
         }
       },
       onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > 90 || gesture.vy > 0.4) {
+        if (gesture.dy > 80 || gesture.vy > 0.35) {
           Animated.timing(translateY, {
             toValue: 600,
             duration: 180,
@@ -238,9 +242,9 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ width: '100%', alignItems: 'center' }}
+          style={styles.keyboardAvoid}
         >
-          {/* Backdrop tap to dismiss */}
+          {/* Backdrop tap to dismiss on empty space */}
           <Pressable
             style={styles.backdropDismissArea}
             onPress={onClose}
@@ -562,6 +566,11 @@ const styles = StyleSheet.create({
   },
   backdropDismissArea: {
     flex: 1,
+  },
+  keyboardAvoid: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'flex-end',
   },
   modalContent: {
     maxHeight: '90%',

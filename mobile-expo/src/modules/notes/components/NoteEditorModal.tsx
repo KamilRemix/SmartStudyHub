@@ -79,9 +79,13 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => false,
         onMoveShouldSetPanResponder: (_, gestureState) => {
-          return gestureState.dy > 6 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.2;
+          return gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.1;
+        },
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+          return gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.1;
         },
         onPanResponderMove: (_, gestureState) => {
           if (gestureState.dy > 0) {
@@ -89,9 +93,9 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           }
         },
         onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.dy > 100 || gestureState.vy > 0.45) {
+          if (gestureState.dy > 80 || gestureState.vy > 0.35) {
             Animated.timing(panY, {
-              toValue: 800,
+              toValue: 900,
               duration: 180,
               useNativeDriver: true,
             }).start(() => {
@@ -872,13 +876,15 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     paddingTop: 8,
-    paddingBottom: 12,
+    paddingBottom: 16,
+    minHeight: 36,
+    justifyContent: 'center',
   },
   dragHandle: {
-    width: 40,
+    width: 44,
     height: 5,
     borderRadius: 2.5,
-    opacity: 0.45,
+    opacity: 0.5,
   },
   header: {
     flexDirection: 'row',

@@ -60,9 +60,13 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (_, gesture) => {
-        return gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2;
+        return gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.1;
+      },
+      onMoveShouldSetPanResponderCapture: (_, gesture) => {
+        return gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.1;
       },
       onPanResponderMove: (_, gesture) => {
         if (gesture.dy > 0) {
@@ -70,7 +74,7 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
         }
       },
       onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > 90 || gesture.vy > 0.4) {
+        if (gesture.dy > 80 || gesture.vy > 0.35) {
           Animated.timing(translateY, {
             toValue: 500,
             duration: 180,
