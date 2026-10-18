@@ -79,3 +79,15 @@
 - Поддержка специализированных заголовков для прикрепленных фото ("Анализ фото: ...") и распознавание ссылок на сервисы (Google Docs, Wikipedia, Habr, GitHub).
 - Обязательная возможность ручного переименования (`renameChatSession`) и удаления (`deleteChatSession`) сессий диалогов прямо из боковой шторки истории.
 
+## Mandatory Skills & Engine Guidelines (СТРОГОЕ ПРАВИЛО)
+- Любой ИИ-агент ОБЯЗАН при работе с кодовой базой `SmartStudyHub` / `mobile-expo` использовать навыки из каталогов проекта:
+  - `c:\projects\SmartStudyHub\.agents\skills/`
+  - `c:\projects\SmartStudyHub\.agent\skills/`
+  - Глобальный путь пользователя: `C:\Users\samsu\.agents\skills/`
+- При решении задач по Expo, анимациям, жестам и UI строго руководствоваться профильными навыками:
+  - `expo-overview` — архитектура и правила Expo
+  - `expo-animation` и `animate-expo` — физика жестов, Reanimated, Gesture Handler, устранение дрожания и фризов на физических устройствах
+  - `emil-design-eng` — принципы дизайна и тактильного отклика Эмиля Ковальски (scale: 0.97, правильные кривые ease, spring bounciness: 4 / speed: 14)
+  - `apple-design` — нативные гайдлайны iOS, непрерывность жестов 1:1, естественное затухание оверлеев
+  - `expo-router` & `expo-ui` — организация навигации и нативных компонентов
+
