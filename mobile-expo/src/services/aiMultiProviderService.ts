@@ -488,7 +488,7 @@ export async function executeMultiProviderCascade(params: {
         const text = typeof res === 'string' ? res : res.text;
         return { text, modelUsed: `Gemini (${m})` };
       } catch (e: any) {
-        console.warn(`[AI Cascade] Gemini ${m} image failed:`, e?.message);
+        console.log(`[AI Cascade] Gemini ${m} image retry:`, e?.message);
       }
     }
 
@@ -501,7 +501,7 @@ export async function executeMultiProviderCascade(params: {
       );
       return { text, modelUsed: 'OpenRouter (nemotron-vision)' };
     } catch (e: any) {
-      console.warn('[AI Cascade] OpenRouter vision failed:', e?.message);
+      console.log('[AI Cascade] OpenRouter vision retry:', e?.message);
     }
 
     throw new Error(
@@ -553,7 +553,7 @@ export async function executeMultiProviderCascade(params: {
               const webSources = typeof res === 'object' ? res.webSources : undefined;
               return { text, modelUsed: `Gemini (${m})`, webSources };
             } catch (gemErr: any) {
-              console.warn(`[AI Cascade] Gemini ${m} failed:`, gemErr?.message);
+              console.log(`[AI Cascade] Gemini ${m} retry:`, gemErr?.message);
             }
           }
           throw new Error('Все модели Gemini временно недоступны');
@@ -566,10 +566,11 @@ export async function executeMultiProviderCascade(params: {
 
         case 'openrouter': {
           const openRouterModels = [
-            'google/gemma-4-31b-it:free',
+            'meta-llama/llama-3.3-70b-instruct:free',
+            'mistralai/mistral-7b-instruct:free',
+            'deepseek/deepseek-r1:free',
             'google/gemma-4-26b-a4b-it:free',
             'nvidia/nemotron-3.5-super-vl:free',
-            'liquid/lfm-2.5-2.6b:free',
           ];
           for (const m of openRouterModels) {
             try {
@@ -580,7 +581,7 @@ export async function executeMultiProviderCascade(params: {
               );
               return { text, modelUsed: `OpenRouter (${m.split('/')[1] || m})` };
             } catch (err: any) {
-              console.warn(`[AI Cascade] OpenRouter ${m} error:`, err?.message);
+              console.log(`[AI Cascade] OpenRouter ${m} retry:`, err?.message);
             }
           }
           // Ultra-fast free fallback via Pollinations AI
@@ -616,7 +617,7 @@ export async function executeMultiProviderCascade(params: {
         }
       }
     } catch (err: any) {
-      console.warn(`[AI Cascade] Provider ${provider} failed:`, err?.message);
+      console.log(`[AI Cascade] Provider ${provider} switch:`, err?.message);
       errors.push(`${provider}: ${err?.message || 'error'}`);
     }
   }

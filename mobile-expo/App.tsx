@@ -5,9 +5,18 @@ import {
   ActivityIndicator,
   Platform,
   useWindowDimensions,
+  LogBox,
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+
+LogBox.ignoreLogs([
+  '[AI Cascade]',
+  'OpenRouter',
+  'is temporarily rate-limited',
+  'Cannot connect to Expo CLI',
+  'SafeAreaView has been deprecated',
+]);
 import { ThemeProvider, useTheme, useAppFonts } from './src/theme';
 import { RootNavigator } from './src/navigation';
 import { AuthProvider } from './src/context/AuthContext';
