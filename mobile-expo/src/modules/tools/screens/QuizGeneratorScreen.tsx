@@ -348,13 +348,7 @@ export const QuizGeneratorScreen: React.FC = () => {
   };
 
   const handleSwipeBack = () => {
-    if (route.params?.initialQuiz && phase === 'playing') {
-      navigation.goBack();
-    } else if (phase === 'playing' || phase === 'results') {
-      setPhase('setup');
-    } else {
-      navigation.goBack();
-    }
+    navigation.goBack();
   };
 
   return (
