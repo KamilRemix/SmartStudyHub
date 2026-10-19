@@ -569,7 +569,6 @@ export async function executeMultiProviderCascade(params: {
             'meta-llama/llama-3.3-70b-instruct:free',
             'mistralai/mistral-7b-instruct:free',
             'deepseek/deepseek-r1:free',
-            'google/gemma-4-26b-a4b-it:free',
             'nvidia/nemotron-3.5-super-vl:free',
           ];
           for (const m of openRouterModels) {
