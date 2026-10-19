@@ -21,7 +21,6 @@ import { useTheme } from '../../../theme';
 import { useAuth } from '../../../context/AuthContext';
 import { AppHeader } from '../../../components/common/AppHeader';
 import { PressableScale } from '../../../components/common/PressableScale';
-import { SwipeBackView } from '../../../components/common/SwipeBackView';
 import { AIAuthGate } from '../components/AIAuthGate';
 import { AuthNavigator } from '../../auth/AuthNavigator';
 import { performGoogleSignIn } from '../../../services/googleAuth';
@@ -352,9 +351,8 @@ export const QuizGeneratorScreen: React.FC = () => {
   };
 
   return (
-    <SwipeBackView
+    <View
       style={[styles.container, { backgroundColor: colors.background }]}
-      onSwipeBack={handleSwipeBack}
     >
       <AppHeader
         title="Тесты и квизы"
@@ -1395,7 +1393,7 @@ export const QuizGeneratorScreen: React.FC = () => {
           <AuthNavigator initialScreen={authInitialScreen} />
         </SafeAreaView>
       </Modal>
-    </SwipeBackView>
+    </View>
   );
 };
 

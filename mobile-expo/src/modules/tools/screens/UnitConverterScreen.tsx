@@ -17,7 +17,6 @@ import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../../theme';
 import { useI18n } from '../../../i18n';
 import { AppHeader } from '../../../components/common/AppHeader';
-import { SwipeBackView } from '../../../components/common/SwipeBackView';
 
 // --- Unit definitions ---
 
@@ -278,7 +277,7 @@ export const UnitConverterScreen: React.FC = () => {
   const getUnitLabel = (id: string) => category.units.find((u) => u.id === id);
 
   return (
-    <SwipeBackView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader
         title={t('unitConverter')}
         subtitle={category.label}
@@ -418,7 +417,7 @@ export const UnitConverterScreen: React.FC = () => {
         onClose={() => setPickerTarget(null)}
         title={t('selectUnitCategory', { category: category.label })}
       />
-    </SwipeBackView>
+    </View>
   );
 };
 

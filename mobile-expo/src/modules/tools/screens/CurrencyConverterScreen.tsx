@@ -17,7 +17,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../theme';
 import { useI18n } from '../../../i18n';
 import { AppHeader } from '../../../components/common/AppHeader';
-import { SwipeBackView } from '../../../components/common/SwipeBackView';
 
 // --- Currency definitions ---
 
@@ -293,7 +292,7 @@ export const CurrencyConverterScreen: React.FC = () => {
   const getCurrencyInfo = (code: string) => currencies.find((c) => c.code === code);
 
   return (
-    <SwipeBackView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader
         title={t('currencyConverterTitle')}
         subtitle={t('realTimeConversion')}
@@ -480,7 +479,7 @@ export const CurrencyConverterScreen: React.FC = () => {
         }}
         onClose={() => setPickerTarget(null)}
       />
-    </SwipeBackView>
+    </View>
   );
 };
 

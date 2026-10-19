@@ -20,8 +20,10 @@ export const ToolsStackNavigator: React.FC = () => {
       initialRouteName="ToolsHome"
       screenOptions={{
         headerShown: false,
-        animation: 'none',
+        animation: 'slide_from_right',
+        gestureEnabled: true,
         contentStyle: { backgroundColor: colors.background },
+        fullScreenGestureEnabled: true,
       }}
     >
       <Stack.Screen name="ToolsHome" component={ToolsScreen} />

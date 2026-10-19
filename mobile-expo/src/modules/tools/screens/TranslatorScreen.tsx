@@ -19,7 +19,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../theme';
 import { useI18n } from '../../../i18n';
 import { AppHeader } from '../../../components/common/AppHeader';
-import { SwipeBackView } from '../../../components/common/SwipeBackView';
 import { TranslationService } from '../../../services/TranslationService';
 
 // --- Language definitions ---
@@ -304,7 +303,7 @@ export const TranslatorScreen: React.FC = () => {
   const getLangName = (code: string) => languages.find((l) => l.code === code)?.nativeName || code;
 
   return (
-    <SwipeBackView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader
         title={t('translator')}
         subtitle={`${getLangName(fromLang)} - ${getLangName(toLang)}`}
@@ -492,7 +491,7 @@ export const TranslatorScreen: React.FC = () => {
         }}
         onClose={() => setPickerTarget(null)}
       />
-    </SwipeBackView>
+    </View>
   );
 };
 
