@@ -9,6 +9,7 @@ import {
   TouchableWithoutFeedback,
   Animated,
   PanResponder,
+  Keyboard,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme';
@@ -50,9 +51,16 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (_, gesture) => {
-        return gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2;
+        return gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.1;
+      },
+      onMoveShouldSetPanResponderCapture: (_, gesture) => {
+        return gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.1;
+      },
+      onPanResponderGrant: () => {
+        Keyboard.dismiss();
       },
       onPanResponderMove: (_, gesture) => {
         if (gesture.dy > 0) {
@@ -60,7 +68,7 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
         }
       },
       onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > 90 || gesture.vy > 0.4) {
+        if (gesture.dy > 70 || gesture.vy > 0.3) {
           Animated.timing(translateY, {
             toValue: 500,
             duration: 180,
@@ -237,13 +245,13 @@ const styles = StyleSheet.create({
   },
   handleWrap: {
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 10,
     marginBottom: 4,
   },
   handleBar: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
+    width: 40,
+    height: 5,
+    borderRadius: 3,
   },
   header: {
     flexDirection: 'row',
