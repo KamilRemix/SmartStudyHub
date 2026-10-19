@@ -4,7 +4,7 @@ import {
   BUILTIN_GIGACHAT_CREDS,
   BUILTIN_SAMBANOVA_KEY,
   BUILTIN_GEMINI_KEY,
-} from './aiMultiProviderService';
+} from './aiProviderConstants';
 
 export interface ProviderHealthStatus {
   id: AIProviderId;
