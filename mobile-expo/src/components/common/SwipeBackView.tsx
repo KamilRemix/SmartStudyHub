@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   Animated,
   Dimensions,
@@ -9,6 +9,7 @@ import {
   StyleProp,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTheme } from '../../theme';
 import { ToolsScreen } from '../../modules/tools/ToolsScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -27,6 +28,7 @@ export interface SwipeBackViewProps {
 
 /**
  * iOS-style edge swipe-to-go-back gesture wrapper with live underlay preview.
+ * - Smooth 60fps entrance animation on mount with zero native fragment flash.
  * - Captures touches in the capture phase so vertical ScrollViews/FlatLists never hijack the swipe.
  * - Displays the underlying screen (ToolsScreen) with Apple-grade parallax and dimming.
  * - Spring physics inspired by Emil Kowalski (bounciness: 4, speed: 14).
@@ -40,8 +42,20 @@ export const SwipeBackView: React.FC<SwipeBackViewProps> = ({
   underlay,
 }) => {
   const navigation = useNavigation();
-  const translateX = useRef(new Animated.Value(0)).current;
+  const { colors } = useTheme();
+
+  // Start at SCREEN_WIDTH for a seamless native-feeling entrance
+  const translateX = useRef(new Animated.Value(SCREEN_WIDTH)).current;
   const isDismissing = useRef(false);
+
+  useEffect(() => {
+    // Smooth iOS-style slide in on mount
+    Animated.timing(translateX, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [translateX]);
 
   const handleDismiss = () => {
     if (isDismissing.current) return;
@@ -49,7 +63,7 @@ export const SwipeBackView: React.FC<SwipeBackViewProps> = ({
 
     Animated.timing(translateX, {
       toValue: SCREEN_WIDTH,
-      duration: 180,
+      duration: 170,
       useNativeDriver: true,
     }).start(() => {
       if (onSwipeBack) {
@@ -146,7 +160,10 @@ export const SwipeBackView: React.FC<SwipeBackViewProps> = ({
   });
 
   return (
-    <View style={styles.rootContainer} {...panResponder.panHandlers}>
+    <View
+      style={[styles.rootContainer, { backgroundColor: colors.background }]}
+      {...panResponder.panHandlers}
+    >
       {/* Underlying screen (ToolsScreen) with iOS-style parallax */}
       <Animated.View
         pointerEvents="none"
@@ -174,6 +191,7 @@ export const SwipeBackView: React.FC<SwipeBackViewProps> = ({
       <Animated.View
         style={[
           styles.contentContainer,
+          { backgroundColor: colors.background },
           style,
           {
             transform: [{ translateX }],
@@ -192,7 +210,6 @@ const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
     overflow: 'hidden',
-    backgroundColor: '#000000',
   },
   underlayContainer: {
     overflow: 'hidden',

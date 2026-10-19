@@ -1,5 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useTheme } from '../../theme';
 import { ToolsStackParamList } from '../../navigation/types';
 import { ToolsScreen } from './ToolsScreen';
 import { AIAssistantScreen } from './screens/AIAssistantScreen';
@@ -12,14 +13,15 @@ import { GenPassScreen } from './screens/GenPassScreen';
 const Stack = createNativeStackNavigator<ToolsStackParamList>();
 
 export const ToolsStackNavigator: React.FC = () => {
+  const { colors } = useTheme();
+
   return (
     <Stack.Navigator
       initialRouteName="ToolsHome"
       screenOptions={{
         headerShown: false,
-        animation: 'slide_from_right',
-        gestureEnabled: true,
-        fullScreenGestureEnabled: false,
+        animation: 'none',
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <Stack.Screen name="ToolsHome" component={ToolsScreen} />
