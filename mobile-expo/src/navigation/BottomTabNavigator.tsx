@@ -35,6 +35,7 @@ export const BottomTabNavigator: React.FC = () => {
     <Tab.Navigator
       initialRouteName="Calculator"
       screenOptions={({ route }) => ({
+        sceneStyle: { backgroundColor: colors.background },
         headerShown: false,
         tabBarIcon: ({ focused }) => {
           const iconName = TAB_ICONS[route.name];

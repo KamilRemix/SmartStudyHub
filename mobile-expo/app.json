@@ -11,6 +11,7 @@
     "splash": {
       "backgroundColor": "#121212"
     },
+    "backgroundColor": "#090d16",
     "notification": {
       "icon": "./assets/notification-icon.png",
       "color": "#007aff"
@@ -20,6 +21,7 @@
       "bundleIdentifier": "com.smartstudyhub.mobile"
     },
     "android": {
+      "backgroundColor": "#090d16",
       "versionCode": 5,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

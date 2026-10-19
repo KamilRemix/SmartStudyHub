@@ -21,7 +21,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
-import { SwipeBackView } from '../../../components/common/SwipeBackView';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../../theme';
@@ -225,12 +224,21 @@ export const AIAssistantScreen: React.FC = () => {
   const mainPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponderCapture: (_, gesture) => {
+        return (
+          !drawerOpen &&
+          gesture.x0 < 70 &&
+          gesture.dx > 8 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.1
+        );
+      },
       onMoveShouldSetPanResponder: (_, gesture) => {
         return (
           !drawerOpen &&
           gesture.x0 < 70 &&
-          gesture.dx > 15 &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5
+          gesture.dx > 8 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.1
         );
       },
       onPanResponderMove: (_, gesture) => {
@@ -851,21 +859,18 @@ export const AIAssistantScreen: React.FC = () => {
 
   // ─── Main render ──────────────────────────────────────────────────────────
   return (
-    <SwipeBackView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      disabled={drawerOpen}
-    >
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-        <StatusBar
-          barStyle={isDark ? 'light-content' : 'dark-content'}
-          backgroundColor={colors.background}
-        />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.background}
+      />
 
-        <KeyboardAvoidingView
-          style={[styles.container, { backgroundColor: colors.background }]}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
-        >
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
+        {...mainPanResponder.panHandlers}
+      >
         {/* ── Header ── */}
         <View
           style={[
@@ -1621,8 +1626,7 @@ export const AIAssistantScreen: React.FC = () => {
           <AuthNavigator initialScreen={authInitialScreen} />
         </SafeAreaView>
       </Modal>
-      </SafeAreaView>
-    </SwipeBackView>
+    </SafeAreaView>
   );
 };
 
