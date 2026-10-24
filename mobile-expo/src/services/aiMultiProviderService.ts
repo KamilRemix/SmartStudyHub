@@ -557,12 +557,12 @@ export async function executeMultiProviderCascade(params: {
     providerSequence.push(preferredProvider);
   }
 
-  // Dynamic ranking: Groq & OpenRouter first because they NEVER block Russian IP addresses
+  // Primary: Google Gemini (Active, 200 OK, full Search and Vision capabilities)
   const baseOrder: AIProviderId[] = [
+    'gemini',
     'groq',
     'openrouter',
     'sambanova',
-    'gemini',
     'gigachat',
     'huggingface',
   ];
