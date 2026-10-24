@@ -63,6 +63,8 @@ import { generateQuizFromAI } from '../../../services/quizService';
 import { AuthNavigator } from '../../auth/AuthNavigator';
 import { performGoogleSignIn } from '../../../services/googleAuth';
 import { cloudSyncService } from '../../../services/cloudSync';
+import { PromoActivationModal } from '../components/PromoActivationModal';
+import { aiUsageService } from '../../../services/aiUsageService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 340);
@@ -134,6 +136,13 @@ export const AIAssistantScreen: React.FC = () => {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAttachModal, setShowAttachModal] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
+  const [showPromoModal, setShowPromoModal] = useState(false);
+  const [promoInitialCode, setPromoInitialCode] = useState('');
+  const [usageSummary, setUsageSummary] = useState<{ remaining: number; max: number; isPro: boolean }>({
+    remaining: 15,
+    max: 15,
+    isPro: false,
+  });
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [selectedProvider, setSelectedProviderState] = useState<AIProviderId>('auto');
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
@@ -179,6 +188,15 @@ export const AIAssistantScreen: React.FC = () => {
         const prov = await getSelectedProvider();
         setSelectedProviderState(prov);
         pingAllProviders(false).catch(() => {});
+
+        // Initialize AI Fair Use usage service
+        await aiUsageService.initUser(user?.uid || null);
+        const summary = await aiUsageService.getRemainingSummary();
+        setUsageSummary({
+          remaining: summary.text.remaining,
+          max: summary.text.max,
+          isPro: summary.isPro,
+        });
       } catch (err) {
         console.warn('[AIAssistantScreen] Init error:', err);
       }
@@ -437,6 +455,13 @@ export const AIAssistantScreen: React.FC = () => {
       setShowAuthModal(true);
       return;
     }
+
+    const limitCheck = await aiUsageService.checkCanExecuteRequest('quiz');
+    if (!limitCheck.allowed) {
+      setShowPromoModal(true);
+      return;
+    }
+
     setIsGeneratingQuiz(true);
     try {
       const generated = await generateQuizFromAI({
@@ -445,6 +470,9 @@ export const AIAssistantScreen: React.FC = () => {
         type: params.type,
         difficulty: params.difficulty,
       });
+
+      // Record successful quiz generation
+      await aiUsageService.recordSuccessfulUsage('quiz');
 
       const quizJson = JSON.stringify(generated, null, 2);
       const content = `Вот интерактивный тест по теме «${generated.title}» (${generated.questions.length} вопросов):\n\n\`\`\`quiz\n${quizJson}\n\`\`\`\n\nВы можете отвечать прямо в интерактивной карточке теста выше, и ИИ проверит ваши ответы!`;
@@ -514,6 +542,14 @@ export const AIAssistantScreen: React.FC = () => {
     const text = (textToSend || inputText).trim();
     if ((!text && !attachedImage) || isLoading) return;
 
+    // Check Fair Use limits before executing
+    const reqType = attachedImage ? 'vision' : 'text';
+    const limitCheck = await aiUsageService.checkCanExecuteRequest(reqType);
+    if (!limitCheck.allowed) {
+      setShowPromoModal(true);
+      return;
+    }
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -543,6 +579,16 @@ export const AIAssistantScreen: React.FC = () => {
         webSearchEnabled,
         (q) => setSearchQueryStatus(q)
       );
+
+      // Record successful usage strictly AFTER successful AI response
+      await aiUsageService.recordSuccessfulUsage(reqType);
+      const updatedSummary = await aiUsageService.getRemainingSummary();
+      setUsageSummary({
+        remaining: updatedSummary.text.remaining,
+        max: updatedSummary.text.max,
+        isPro: updatedSummary.isPro,
+      });
+
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'model',
@@ -930,14 +976,46 @@ export const AIAssistantScreen: React.FC = () => {
             />
           </PressableScale>
 
-          {/* Right: New chat */}
-          <PressableScale
-            style={[styles.navIconBtn, { backgroundColor: colors.componentBackground }]}
-            onPress={handleNewChat}
-            accessibilityLabel="Новый чат"
-          >
-            <Feather name="edit-2" size={17} color={colors.primaryAccent} />
-          </PressableScale>
+          {/* Right: Limits pill + New chat */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <PressableScale
+              style={[
+                styles.navIconBtn,
+                {
+                  backgroundColor: usageSummary.isPro ? 'rgba(16, 185, 129, 0.15)' : colors.componentBackground,
+                  paddingHorizontal: 8,
+                  width: 'auto',
+                },
+              ]}
+              onPress={() => setShowPromoModal(true)}
+              accessibilityLabel="Лимиты и партнерский доступ"
+            >
+              <Feather
+                name={usageSummary.isPro ? 'shield' : 'zap'}
+                size={13}
+                color={usageSummary.isPro ? '#10B981' : colors.primaryAccent}
+              />
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '600',
+                  marginLeft: 4,
+                  color: usageSummary.isPro ? '#10B981' : colors.textColor,
+                  fontFamily: 'Inter',
+                }}
+              >
+                {usageSummary.isPro ? `PRO ${usageSummary.remaining}` : `${usageSummary.remaining}/${usageSummary.max}`}
+              </Text>
+            </PressableScale>
+
+            <PressableScale
+              style={[styles.navIconBtn, { backgroundColor: colors.componentBackground }]}
+              onPress={handleNewChat}
+              accessibilityLabel="Новый чат"
+            >
+              <Feather name="edit-2" size={17} color={colors.primaryAccent} />
+            </PressableScale>
+          </View>
         </View>
 
         {/* ── Messages or Auth Gate ── */}
@@ -1601,6 +1679,22 @@ export const AIAssistantScreen: React.FC = () => {
         onClose={() => setShowQuizModal(false)}
         onGenerate={handleGenerateQuizFromModal}
         isLoading={isGeneratingQuiz}
+      />
+
+      {/* Promo Activation Modal */}
+      <PromoActivationModal
+        visible={showPromoModal}
+        onClose={() => setShowPromoModal(false)}
+        uid={user?.uid || null}
+        initialCode={promoInitialCode}
+        onSuccess={async () => {
+          const summary = await aiUsageService.getRemainingSummary();
+          setUsageSummary({
+            remaining: summary.text.remaining,
+            max: summary.text.max,
+            isPro: summary.isPro,
+          });
+        }}
       />
 
       {/* ═══ Auth Modal (Login / Register) ═══ */}

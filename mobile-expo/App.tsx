@@ -17,10 +17,13 @@ LogBox.ignoreLogs([
   'Cannot connect to Expo CLI',
   'SafeAreaView has been deprecated',
 ]);
+import * as Linking from 'expo-linking';
 import { ThemeProvider, useTheme, useAppFonts } from './src/theme';
 import { RootNavigator } from './src/navigation';
-import { AuthProvider } from './src/context/AuthContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { I18nProvider } from './src/i18n';
+import { redeemPromoCode } from './src/services/promoCodeService';
+import { PromoActivationModal } from './src/modules/tools/components/PromoActivationModal';
 
 import { OfflineBanner } from './src/components/common/OfflineBanner';
 
@@ -29,6 +32,32 @@ function AppContent() {
   const { isReady } = useAppFonts();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+
+  const [deepLinkCode, setDeepLinkCode] = React.useState<string>('');
+  const [showDeepLinkModal, setShowDeepLinkModal] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      if (!url) return;
+      try {
+        const parsed = Linking.parse(url);
+        if (parsed.path === 'activate' || parsed.hostname === 'activate') {
+          const code = parsed.queryParams?.code;
+          if (typeof code === 'string' && code.trim().length > 0) {
+            setDeepLinkCode(code.trim());
+            setShowDeepLinkModal(true);
+          }
+        }
+      } catch (e) {
+        console.warn('[DeepLink] Parse error:', e);
+      }
+    };
+
+    Linking.getInitialURL().then(handleUrl);
+    const sub = Linking.addEventListener('url', (event) => handleUrl(event.url));
+    return () => sub.remove();
+  }, []);
 
   if (!isReady || isLoading) {
     return (
@@ -79,6 +108,12 @@ function AppContent() {
       >
         <OfflineBanner />
         <RootNavigator />
+        <PromoActivationModal
+          visible={showDeepLinkModal}
+          onClose={() => setShowDeepLinkModal(false)}
+          uid={user?.uid || null}
+          initialCode={deepLinkCode}
+        />
       </View>
     </View>
   );
