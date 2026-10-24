@@ -8,11 +8,19 @@ service cloud.firestore {
       }
     }
     match /activation_codes/{codeId} {
-      allow read: if request.auth != null;
+      // Разрешено читать ТОЛЬКО один конкретный документ по известному ID (коду)
+      allow get: if request.auth != null;
+
+      // Категорически запрещено выгружать список кодов или выполнять поиск по коллекции
+      allow list: if false;
+
+      // Обновление разрешено только для перехода isUsed: false -> true текущим авторизованным пользователем
       allow update: if request.auth != null 
-                    && resource.data.isUsed == false 
-                    && request.resource.data.isUsed == true 
-                    && request.resource.data.usedByUid == request.auth.uid;
+        && resource.data.isUsed == false 
+        && request.resource.data.isUsed == true 
+        && request.resource.data.usedByUid == request.auth.uid;
+
+      // Создание и удаление с клиента запрещены
       allow create, delete: if false;
     }
     match /{document=**} {

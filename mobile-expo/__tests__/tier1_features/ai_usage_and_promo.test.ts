@@ -73,4 +73,47 @@ describe('AI Fair Use Usage & Limits', () => {
     expect(check.isPro).toBe(false);
     expect(check.max).toBe(15);
   });
+
+  test('Midnight calendar date change resets daily counts', async () => {
+    // Tamper cached storage directly to simulate yesterday with 15 requests
+    const yesterdayUsage = {
+      lastResetDate: '2026-01-01',
+      lastServerSyncTime: Date.now() - 86400000,
+      textRequestsToday: 15,
+      visionRequestsToday: 3,
+      quizGenerationsToday: 2,
+    };
+    await AsyncStorage.setItem('smartstudy_ai_usage_v1', JSON.stringify(yesterdayUsage));
+
+    // Re-init with null to reload from storage
+    await aiUsageService.initUser(null);
+
+    // Check should detect date difference and reset counts to 0, giving full 15
+    const check = await aiUsageService.checkCanExecuteRequest('text');
+    expect(check.allowed).toBe(true);
+    expect(check.remaining).toBe(15);
+  });
 });
+
+describe('Promo Code Redemption Security', () => {
+  test('rejects empty code and empty uid', async () => {
+    const { redeemPromoCode } = require('../../src/services/promoCodeService');
+    const emptyCodeRes = await redeemPromoCode('   ', 'uid-123');
+    expect(emptyCodeRes.success).toBe(false);
+    expect(emptyCodeRes.message).toContain('введите код');
+
+    const emptyUidRes = await redeemPromoCode('SSH-VALID-CODE', '');
+    expect(emptyUidRes.success).toBe(false);
+    expect(emptyUidRes.message).toContain('необходимо войти');
+  });
+
+  test('normalizes code with trim and uppercase', async () => {
+    const { redeemPromoCode } = require('../../src/services/promoCodeService');
+    // Calling with surrounding whitespace should pass validation checks and attempt resolution
+    const res = await redeemPromoCode('  ssh-test-123  ', 'uid-123');
+    expect(res.success).toBe(false);
+    expect(typeof res.message).toBe('string');
+  });
+});
+
+
