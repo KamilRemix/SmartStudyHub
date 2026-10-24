@@ -474,42 +474,43 @@ export async function executeMultiProviderCascade(params: {
     openRouterMessages.push({ role: 'user', content: newPrompt });
   }
 
-  // ── 0. Serverless Backend Proxy (Bypasses RU Geo-blocks & Russian CA issues) ──
-  const BACKEND_PROXY_URL = process.env.EXPO_PUBLIC_AI_PROXY_URL || 'https://smartstudyhub-ai.vercel.app/api/chat';
-  try {
-    const proxyRes = await fetchWithTimeout(
-      BACKEND_PROXY_URL,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: standardMessages,
-          systemInstruction,
-          image: imageAttachment
-            ? {
-                base64: imageAttachment.base64,
-                mimeType: imageAttachment.mimeType || 'image/jpeg',
-              }
-            : undefined,
-          preferredProvider,
-        }),
-      },
-      16000
-    );
+  // ── 0. Serverless Backend Proxy (if explicitly configured via EXPO_PUBLIC_AI_PROXY_URL) ──
+  const BACKEND_PROXY_URL = process.env.EXPO_PUBLIC_AI_PROXY_URL;
+  if (BACKEND_PROXY_URL) {
+    try {
+      const proxyRes = await fetchWithTimeout(
+        BACKEND_PROXY_URL,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: standardMessages,
+            systemInstruction,
+            image: imageAttachment
+              ? {
+                  base64: imageAttachment.base64,
+                  mimeType: imageAttachment.mimeType || 'image/jpeg',
+                }
+              : undefined,
+            preferredProvider,
+          }),
+        },
+        12000
+      );
 
-    if (proxyRes.ok) {
-      const data = await proxyRes.json();
-      if (data && data.text) {
-        return {
-          text: data.text,
-          modelUsed: data.modelUsed || 'SmartStudy AI Cloud',
-          webSources: data.webSources,
-        };
+      if (proxyRes.ok) {
+        const data = await proxyRes.json();
+        if (data && data.text) {
+          return {
+            text: data.text,
+            modelUsed: data.modelUsed || 'SmartStudy AI Cloud',
+            webSources: data.webSources,
+          };
+        }
       }
+    } catch (proxyErr: any) {
+      console.log('[AI Cascade] Serverless backend proxy unavailable, using direct cascade:', proxyErr?.message);
     }
-  } catch (proxyErr: any) {
-    // If backend proxy is not yet deployed or unreachable, fall back seamlessly to client cascade
-    console.log('[AI Cascade] Serverless backend proxy unavailable, using client fallback:', proxyErr?.message);
   }
 
   // MULTIMODAL ROUTE (Images attached): only Gemini & OpenRouter Multimodal
@@ -556,14 +557,13 @@ export async function executeMultiProviderCascade(params: {
     providerSequence.push(preferredProvider);
   }
 
-  // Dynamic ranking based on live latency and health:
-  // Fastest online providers are placed at the front of the cascade
+  // Dynamic ranking: Groq & OpenRouter first because they NEVER block Russian IP addresses
   const baseOrder: AIProviderId[] = [
+    'groq',
+    'openrouter',
+    'sambanova',
     'gemini',
     'gigachat',
-    'groq',
-    'sambanova',
-    'openrouter',
     'huggingface',
   ];
   const rankedOrder = getSortedProviderSequence(baseOrder);
