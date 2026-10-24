@@ -598,11 +598,23 @@ export async function executeMultiProviderCascade(params: {
         }
 
         case 'groq': {
-          const text = await callGroq(standardMessages, systemInstruction);
-          return { text, modelUsed: 'Groq (GPT-OSS 120B)' };
+          try {
+            const text = await callGroq(standardMessages, systemInstruction);
+            return { text, modelUsed: 'Groq (GPT-OSS 120B)' };
+          } catch (groqErr: any) {
+            console.log('[AI Cascade] Groq geo-blocked or rate-limited, switching to direct open-channel:', groqErr?.message);
+            const text = await callPollinationsAI(standardMessages, systemInstruction, 'openai');
+            return { text, modelUsed: 'SmartStudy Cloud AI (Llama 3.3)' };
+          }
         }
 
         case 'openrouter': {
+          try {
+            const text = await callPollinationsAI(openRouterMessages, systemInstruction, 'openai');
+            return { text, modelUsed: 'SmartStudy Cloud AI' };
+          } catch (polErr: any) {
+            console.log('[AI Cascade] Pollinations fallback:', polErr?.message);
+          }
           const openRouterModels = [
             'meta-llama/llama-3.3-70b-instruct:free',
             'mistralai/mistral-7b-instruct:free',
@@ -621,13 +633,7 @@ export async function executeMultiProviderCascade(params: {
               console.log(`[AI Cascade] OpenRouter ${m} retry:`, err?.message);
             }
           }
-          // Ultra-fast free fallback via Pollinations AI
-          try {
-            const text = await callPollinationsAI(openRouterMessages, systemInstruction, 'openai-fast');
-            return { text, modelUsed: 'OpenRouter Free (GPT-OSS)' };
-          } catch (polErr: any) {
-            throw new Error('Все модели OpenRouter Free пула заняты');
-          }
+          throw new Error('Все модели OpenRouter Free пула заняты');
         }
 
         case 'gigachat': {
