@@ -1,0 +1,13 @@
+{
+  "name": "smartstudyhub-ai-backend",
+  "version": "1.0.0",
+  "description": "Serverless AI proxy cascade for SmartStudyHub (resolves SSL & geo-blocking)",
+  "main": "api/chat.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  }
+}

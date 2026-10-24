@@ -474,6 +474,44 @@ export async function executeMultiProviderCascade(params: {
     openRouterMessages.push({ role: 'user', content: newPrompt });
   }
 
+  // ── 0. Serverless Backend Proxy (Bypasses RU Geo-blocks & Russian CA issues) ──
+  const BACKEND_PROXY_URL = process.env.EXPO_PUBLIC_AI_PROXY_URL || 'https://smartstudyhub-ai.vercel.app/api/chat';
+  try {
+    const proxyRes = await fetchWithTimeout(
+      BACKEND_PROXY_URL,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: standardMessages,
+          systemInstruction,
+          image: imageAttachment
+            ? {
+                base64: imageAttachment.base64,
+                mimeType: imageAttachment.mimeType || 'image/jpeg',
+              }
+            : undefined,
+          preferredProvider,
+        }),
+      },
+      16000
+    );
+
+    if (proxyRes.ok) {
+      const data = await proxyRes.json();
+      if (data && data.text) {
+        return {
+          text: data.text,
+          modelUsed: data.modelUsed || 'SmartStudy AI Cloud',
+          webSources: data.webSources,
+        };
+      }
+    }
+  } catch (proxyErr: any) {
+    // If backend proxy is not yet deployed or unreachable, fall back seamlessly to client cascade
+    console.log('[AI Cascade] Serverless backend proxy unavailable, using client fallback:', proxyErr?.message);
+  }
+
   // MULTIMODAL ROUTE (Images attached): only Gemini & OpenRouter Multimodal
   if (imageAttachment?.base64) {
     const visionModels = [
