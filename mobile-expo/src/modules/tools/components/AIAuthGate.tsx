@@ -32,6 +32,7 @@ export const AIAuthGate: React.FC<AIAuthGateProps> = ({
 
   return (
     <ScrollView
+      style={styles.scrollView}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
@@ -229,6 +230,10 @@ export const AIAuthGate: React.FC<AIAuthGateProps> = ({
 };
 
 const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+    width: '100%',
+  },
   container: {
     paddingHorizontal: 22,
     paddingTop: 36,

@@ -905,7 +905,7 @@ export const AIAssistantScreen: React.FC = () => {
 
   // ─── Main render ──────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={colors.background}
@@ -1020,20 +1020,23 @@ export const AIAssistantScreen: React.FC = () => {
 
         {/* ── Messages or Auth Gate ── */}
         {!isRegisteredUser && isConversationEmpty ? (
-          <AIAuthGate
-            onOpenAuth={(mode) => {
-              setAuthInitialScreen(mode || 'login');
-              setShowAuthModal(true);
-            }}
-            onGoogleSignIn={handleGoogleSignInFromGate}
-            isGoogleLoading={isGoogleSigningIn}
-            hasSavedHistory={sessions.some((s) => s.messages && s.messages.length > 0 && !(s.messages.length === 1 && s.messages[0].id === 'welcome'))}
-            onOpenHistory={openDrawer}
-          />
+          <View style={styles.authGateWrapper}>
+            <AIAuthGate
+              onOpenAuth={(mode) => {
+                setAuthInitialScreen(mode || 'login');
+                setShowAuthModal(true);
+              }}
+              onGoogleSignIn={handleGoogleSignInFromGate}
+              isGoogleLoading={isGoogleSigningIn}
+              hasSavedHistory={sessions.some((s) => s.messages && s.messages.length > 0 && !(s.messages.length === 1 && s.messages[0].id === 'welcome'))}
+              onOpenHistory={openDrawer}
+            />
+          </View>
         ) : (
           <FlatList
             ref={flatListRef}
             data={messages}
+            style={styles.chatListFlex}
             keyExtractor={(item) => item.id}
             renderItem={renderMessage}
             contentContainerStyle={[
@@ -1771,6 +1774,13 @@ const styles = StyleSheet.create({
   },
 
   // ── Chat list ──
+  authGateWrapper: {
+    flex: 1,
+    width: '100%',
+  },
+  chatListFlex: {
+    flex: 1,
+  },
   chatList: {
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -1901,7 +1911,7 @@ const styles = StyleSheet.create({
   // ── Input bar ──
   inputWrapper: {
     paddingHorizontal: 14,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 12,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 8,
     paddingTop: 4,
   },
   inputCapsule: {

@@ -195,7 +195,7 @@ export const PromoActivationModal: React.FC<PromoActivationModalProps> = ({
           style={[
             styles.sheetContainer,
             {
-              backgroundColor: colors.backgroundElevated || (isDark ? '#161B26' : '#FFFFFF'),
+              backgroundColor: colors.componentBackground || (isDark ? '#161B26' : '#FFFFFF'),
               borderColor: colors.borderColor,
               transform: [{ translateY }],
             },
@@ -210,7 +210,7 @@ export const PromoActivationModal: React.FC<PromoActivationModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <View>
-              <Text style={[styles.headerTitle, { color: colors.textColorPrimary }]}>
+              <Text style={[styles.headerTitle, { color: colors.textColor }]}>
                 {summary?.isPro ? 'SmartStudy PRO активен' : 'Лимиты и партнерский доступ'}
               </Text>
               <Text style={[styles.headerSubtitle, { color: colors.textColorSecondary }]}>
@@ -229,7 +229,7 @@ export const PromoActivationModal: React.FC<PromoActivationModalProps> = ({
             <View style={[styles.limitCard, { backgroundColor: isDark ? '#1C2230' : '#F4F6F9', borderColor: colors.borderColor }]}>
               <Feather name="message-square" size={16} color={colors.primaryAccent} />
               <Text style={[styles.limitLabel, { color: colors.textColorSecondary }]}>Текст</Text>
-              <Text style={[styles.limitValue, { color: colors.textColorPrimary }]}>
+              <Text style={[styles.limitValue, { color: colors.textColor }]}>
                 {summary ? `${summary.text.remaining}/${summary.text.max}` : '...'}
               </Text>
             </View>
@@ -237,7 +237,7 @@ export const PromoActivationModal: React.FC<PromoActivationModalProps> = ({
             <View style={[styles.limitCard, { backgroundColor: isDark ? '#1C2230' : '#F4F6F9', borderColor: colors.borderColor }]}>
               <Feather name="camera" size={16} color="#10B981" />
               <Text style={[styles.limitLabel, { color: colors.textColorSecondary }]}>Фото</Text>
-              <Text style={[styles.limitValue, { color: colors.textColorPrimary }]}>
+              <Text style={[styles.limitValue, { color: colors.textColor }]}>
                 {summary ? `${summary.vision.remaining}/${summary.vision.max}` : '...'}
               </Text>
             </View>
@@ -245,7 +245,7 @@ export const PromoActivationModal: React.FC<PromoActivationModalProps> = ({
             <View style={[styles.limitCard, { backgroundColor: isDark ? '#1C2230' : '#F4F6F9', borderColor: colors.borderColor }]}>
               <Feather name="check-circle" size={16} color="#8B5CF6" />
               <Text style={[styles.limitLabel, { color: colors.textColorSecondary }]}>Квизы</Text>
-              <Text style={[styles.limitValue, { color: colors.textColorPrimary }]}>
+              <Text style={[styles.limitValue, { color: colors.textColor }]}>
                 {summary ? `${summary.quiz.remaining}/${summary.quiz.max}` : '...'}
               </Text>
             </View>
@@ -253,14 +253,14 @@ export const PromoActivationModal: React.FC<PromoActivationModalProps> = ({
 
           {/* Code Input Section */}
           <View style={styles.inputSection}>
-            <Text style={[styles.sectionTitle, { color: colors.textColorPrimary }]}>
+            <Text style={[styles.sectionTitle, { color: colors.textColor }]}>
               Активация кода доступа
             </Text>
 
             <View style={[styles.inputWrapper, { backgroundColor: isDark ? '#121620' : '#F8FAFC', borderColor: colors.borderColor }]}>
               <Feather name="key" size={16} color={colors.textColorSecondary} style={styles.inputIcon} />
               <TextInput
-                style={[styles.input, { color: colors.textColorPrimary }]}
+                style={[styles.input, { color: colors.textColor }]}
                 placeholder="SSH-XXXX-XXXX"
                 placeholderTextColor={colors.textColorSecondary}
                 value={code}
@@ -332,7 +332,7 @@ export const PromoActivationModal: React.FC<PromoActivationModalProps> = ({
               <Feather name="send" size={18} color={colors.primaryAccent} />
             </View>
             <View style={styles.communityTextWrap}>
-              <Text style={[styles.communityTitle, { color: colors.textColorPrimary }]}>
+              <Text style={[styles.communityTitle, { color: colors.textColor }]}>
                 Наше Telegram-сообщество
               </Text>
               <Text style={[styles.communitySubtitle, { color: colors.textColorSecondary }]}>
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.65)',
   },
   sheetContainer: {

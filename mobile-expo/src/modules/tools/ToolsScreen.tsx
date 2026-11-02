@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../theme';
 import { AppHeader } from '../../components/common/AppHeader';
@@ -68,6 +69,7 @@ export const ToolsScreen: React.FC = () => {
   const { colors } = useTheme();
   const navigation = useNavigation<ToolsNav>();
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -75,7 +77,13 @@ export const ToolsScreen: React.FC = () => {
         title={t('tools')}
         subtitle={t('toolsSubtitle')}
       />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: 110 + (insets.bottom > 0 ? insets.bottom : 0) },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.grid}>
           {TOOLS_LIST.map((tool) => (
             <PressableScale

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   View,
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
   Animated,
   PanResponder,
   BackHandler,
@@ -23,7 +23,6 @@ import { CurrencyConverterScreen } from './screens/CurrencyConverterScreen';
 import { TranslatorScreen } from './screens/TranslatorScreen';
 import { GenPassScreen } from './screens/GenPassScreen';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_EDGE_WIDTH = 80;
 const DISMISS_DISTANCE_THRESHOLD = 95;
 const FLING_VELOCITY_THRESHOLD = 0.35;
@@ -46,6 +45,7 @@ interface StackItem {
 
 export const ToolsStackNavigator: React.FC = () => {
   const { colors } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
   const parentNav = useNavigation<any>();
 
   const [stack, setStack] = useState<StackItem[]>([]);
@@ -60,32 +60,30 @@ export const ToolsStackNavigator: React.FC = () => {
     isDismissing.current = true;
 
     Animated.timing(translateX, {
-      toValue: SCREEN_WIDTH,
+      toValue: screenWidth,
       duration: 180,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
       setStack((prev) => prev.slice(0, -1));
       isDismissing.current = false;
-      translateX.setValue(0);
     });
-  }, [translateX]);
+  }, [screenWidth, translateX]);
 
   const popToTop = useCallback(() => {
     if (stackRef.current.length === 0 || isDismissing.current) return;
     isDismissing.current = true;
 
     Animated.timing(translateX, {
-      toValue: SCREEN_WIDTH,
+      toValue: screenWidth,
       duration: 180,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
       setStack([]);
       isDismissing.current = false;
-      translateX.setValue(0);
     });
-  }, [translateX]);
+  }, [screenWidth, translateX]);
 
   const pushScreen = useCallback(
     (name: keyof ToolsStackParamList, params?: any) => {
@@ -95,7 +93,7 @@ export const ToolsStackNavigator: React.FC = () => {
       }
       const key = `${name}-${Date.now()}`;
       isDismissing.current = false;
-      translateX.setValue(SCREEN_WIDTH);
+      translateX.setValue(screenWidth);
       setStack((prev) => [...prev, { key, name, params }]);
 
       Animated.timing(translateX, {
@@ -105,7 +103,7 @@ export const ToolsStackNavigator: React.FC = () => {
         useNativeDriver: true,
       }).start();
     },
-    [popToTop, translateX]
+    [popToTop, screenWidth, translateX]
   );
 
   // Android hardware back button integration
@@ -249,30 +247,19 @@ export const ToolsStackNavigator: React.FC = () => {
     [currentItem]
   );
 
-  // Parallax translation for the underlay ToolsScreen (-22% -> 0)
-  const underlayTranslateX = translateX.interpolate({
-    inputRange: [0, SCREEN_WIDTH],
-    outputRange: [-SCREEN_WIDTH * 0.22, 0],
-    extrapolate: 'clamp',
-  });
-
-  // Dimmer overlay that fades out as user swipes the tool away
+  // Dimmer overlay over ToolsScreen that fades out as the user swipes the active tool away
   const dimmerOpacity = translateX.interpolate({
-    inputRange: [0, SCREEN_WIDTH],
-    outputRange: [0.28, 0],
+    inputRange: [0, screenWidth],
+    outputRange: [0.22, 0],
     extrapolate: 'clamp',
   });
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      {/* Permanent Base Layer: ToolsScreen */}
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            transform: stack.length > 0 ? [{ translateX: underlayTranslateX }] : [],
-          },
-        ]}
+      {/* Permanent Base Layer: ToolsScreen (Full screen, never cut off, 100% visible) */}
+      <View
+        style={StyleSheet.absoluteFill}
+        pointerEvents={stack.length > 0 ? 'none' : 'auto'}
       >
         <NavigationContext.Provider value={toolsHomeNav as any}>
           <NavigationRouteContext.Provider value={{ key: 'ToolsHome', name: 'ToolsHome' } as any}>
@@ -291,9 +278,9 @@ export const ToolsStackNavigator: React.FC = () => {
             ]}
           />
         )}
-      </Animated.View>
+      </View>
 
-      {/* Active Tool Screen Layer with iOS Swipe Gesture */}
+      {/* Active Tool Screen Layer with iOS-like 1:1 Swipe Gesture */}
       {currentItem && (
         <Animated.View
           style={[
@@ -306,7 +293,7 @@ export const ToolsStackNavigator: React.FC = () => {
           ]}
           {...panResponder.panHandlers}
         >
-          {/* Subtle Left Edge Shadow for depth */}
+          {/* Subtle Left Edge Shadow for physical depth */}
           <View style={styles.leftShadow} pointerEvents="none" />
           <NavigationContext.Provider value={activeToolNav as any}>
             <NavigationRouteContext.Provider value={activeRoute as any}>
@@ -330,14 +317,14 @@ const styles = StyleSheet.create({
   },
   leftShadow: {
     position: 'absolute',
-    left: -12,
+    left: -14,
     top: 0,
     bottom: 0,
-    width: 12,
+    width: 14,
     shadowColor: '#000000',
     shadowOffset: { width: -3, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
   },
 });
