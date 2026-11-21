@@ -7,7 +7,7 @@ import { Quiz } from '../services/quizService';
 
 export type ToolsStackParamList = {
   ToolsHome: undefined;
-  AIAssistant: undefined;
+  AIAssistant: { initialPrompt?: string } | undefined;
   QuizGenerator: { initialQuiz?: Quiz; autoPlay?: boolean } | undefined;
   UnitConverter: undefined;
   CurrencyConverter: undefined;

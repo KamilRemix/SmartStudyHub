@@ -19,7 +19,8 @@ import {
   PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { ToolsStackParamList } from '../../../navigation/types';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
@@ -100,6 +101,7 @@ export const AIAssistantScreen: React.FC = () => {
   const { t } = useI18n();
   const { user } = useAuth();
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<ToolsStackParamList, 'AIAssistant'>>();
   const isRegisteredUser = Boolean(user && !user.isAnonymous && !user.isOfflineDemo);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authInitialScreen, setAuthInitialScreen] = useState<'login' | 'register'>('login');
@@ -203,6 +205,13 @@ export const AIAssistantScreen: React.FC = () => {
     }
     init();
   }, []);
+
+  // Handle incoming initialPrompt from QuizGenerator or other screens
+  useEffect(() => {
+    if (route.params?.initialPrompt) {
+      setInputText(route.params.initialPrompt);
+    }
+  }, [route.params?.initialPrompt]);
 
   // ─── Drawer animation (Fluid Spring) ─────────────────────────────────────
   const openDrawer = useCallback(() => {
